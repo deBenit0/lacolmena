@@ -97,8 +97,8 @@ local buttons = {}
 local function addButton(frame, createButton)
   if not frame or buttons[frame] then return end
   local b = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  b:SetSize(150, 22)
-  b:SetText("Pedir lo que me falta")
+  b:SetSize(160, 22)
+  b:SetText("Pedir en la hermandad")
   if createButton then
     b:SetPoint("BOTTOMRIGHT", createButton, "TOPRIGHT", 0, 4)
   else
