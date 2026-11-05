@@ -316,7 +316,7 @@ ns.UI.RegisterPage("requests", function(page)
       lines[#lines + 1] = "|cff40ff40Sabes fabricarlo.|r"
     elseif Data.ICanGather(r.k) then
       lines[#lines + 1] = "|cff40ff40Puedes conseguirlo (" .. ns.ProfessionName(skill) .. ").|r"
-    elseif rec then
+    elseif rec and #rec.crafters > 0 then
       local names, online = {}, 0
       for _, cr in ipairs(rec.crafters) do
         if not names[cr.n] then

@@ -215,9 +215,27 @@ local function addToIndex(prefix, ids, name, pk)
   end
 end
 
+-- Recetas de la base de datos de Classic: aparecen aunque nadie las haya publicado.
+local function addKnownRecipes()
+  for pk, d in pairs(ns.RECIPE_DB or {}) do
+    for prefix, list in pairs({ i = d.i, e = d.e }) do
+      for _, id in ipairs(Codec.DecodeIDs(list) or {}) do
+        local key = prefix .. id
+        local rec = index[key]
+        if not rec then
+          rec = { crafters = {}, profs = {} }
+          index[key] = rec
+        end
+        rec.profs[pk] = true
+      end
+    end
+  end
+end
+
 function Data.GetIndex()
   if index and not Data.indexDirty then return index end
   index = {}
+  addKnownRecipes()
   local g = ns.G()
   if g then
     for name, e in pairs(g.entries) do

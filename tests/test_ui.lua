@@ -65,6 +65,9 @@ H.eq(slot1.need:GetText(), "4", "necesita 4")
 ns.UI.ShowPage("materials")
 local recipes = panel.pageFrames.materials
 H.ok(recipes:IsShown(), "página de materiales visible")
+H.ok(not ns.db.settings.onlyMyReagents, "por defecto se ve todo")
+ns.db.settings.onlyMyReagents = true
+recipes:Refresh()
 H.eq((countItems(recipes)), 0, "solo lo de mis recetas: nada (Bea no tiene profesiones)")
 ns.db.settings.onlyMyReagents = false
 recipes:Refresh()
@@ -182,7 +185,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.7.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.8.0", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine

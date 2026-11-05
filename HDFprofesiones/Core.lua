@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.7.0"
+ns.VERSION = "0.8.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -201,6 +201,15 @@ function ns.SpellInfo(id)
   end
 end
 
+-- Datos básicos de un objeto sin esperar a que el juego lo tenga en caché:
+-- hueco de equipo, clase y subclase.
+function ns.ItemInstant(itemID)
+  local fn = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+  if not fn then return nil end
+  local _, _, _, equipLoc, _, classID, subclassID = fn(itemID)
+  return equipLoc, classID, subclassID
+end
+
 function ns.ItemCount(itemID)
   local fn = (C_Item and C_Item.GetItemCount) or GetItemCount
   return (fn and fn(itemID)) or 0
@@ -292,6 +301,8 @@ local GATHER_BY_SUBTYPE = {
 function ns.GatherSkillFor(key)
   local kind, id = ns.ParseKey(key)
   if kind ~= "i" then return false end
+  local _, instClass, instSub = ns.ItemInstant(id)
+  if instClass == 7 and GATHER_BY_SUBCLASS[instSub] then return GATHER_BY_SUBCLASS[instSub] end
   local name, _, _, _, _, _, subType, _, _, _, _, classID, subclassID = getItemInfo(id)
   if not name then
     if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end

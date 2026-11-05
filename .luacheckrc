@@ -3,6 +3,7 @@ std = "lua51"
 max_line_length = 160
 unused_args = false
 exclude_files = { "tests/**" }
+files["HDFprofesiones/RecipeDB.lua"] = { max_line_length = false } -- datos generados
 
 globals = { "HDFProfesiones", "HDFProfesionesDB", "StaticPopupDialogs", "UISpecialFrames" }
 
@@ -23,7 +24,7 @@ read_globals = {
   "UnitName", "UnitLevel", "UnitClass", "UnitAffectingCombat", "InCombatLockdown", "IsInInstance",
   "IsInGuild", "GetGuildInfo", "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "GuildRoster",
   -- Objetos y hechizos
-  "GetItemInfo", "GetItemIcon", "GetItemCount", "GetSpellInfo",
+  "GetItemInfo", "GetItemIcon", "GetItemCount", "GetSpellInfo", "GetItemInfoInstant",
   "GetContainerNumSlots", "GetContainerItemInfo", "BANK_CONTAINER", "NUM_BAG_SLOTS", "NUM_BANKBAGSLOTS",
   -- Profesiones
   "GetNumTradeSkills", "GetTradeSkillLine", "IsTradeSkillLinked", "GetTradeSkillInfo", "GetTradeSkillItemLink",

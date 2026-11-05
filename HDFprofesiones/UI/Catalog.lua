@@ -121,9 +121,10 @@ local NON_EQUIP = { [""] = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGN
 
 -- ¿Es equipo? (armas, armaduras, bolsas... y los encantamientos, que se ponen al equipo)
 local function isEquipment(key)
-  local kind = ns.ParseKey(key)
+  local kind, id = ns.ParseKey(key)
   if kind == "e" then return true end
-  local _, _, _, _, _, equipLoc = ns.KeyInfo(key)
+  local equipLoc = ns.ItemInstant(id)
+  if equipLoc == nil then equipLoc = select(6, ns.KeyInfo(key)) end
   return equipLoc ~= nil and not NON_EQUIP[equipLoc]
 end
 
@@ -510,12 +511,13 @@ local function buildCatalog(page, mode)
     if newSelection then setQuantity(made) end
     local rows = crafterRows(key, materials)
     crafters:SetItems(rows)
-    detail.craftersLabel:SetText((materials and "Quién lo da (" or "Quién lo fabrica (") .. #rows .. ")")
+    detail.craftersLabel:SetText((materials and "Quién lo da (" or "Quién lo fabrica (") .. #rows .. ")"
+      .. (#rows == 0 and " |cff999999- nadie lo tiene publicado aún, pero puedes pedirlo|r" or ""))
     page:RefreshButtons()
   end
 
   function page:Refresh()
-    if ns.db.settings[filterSetting] == nil then ns.db.settings[filterSetting] = true end
+    if ns.db.settings[filterSetting] == nil then ns.db.settings[filterSetting] = not materials end
     lowCheck:SetChecked(ns.db.settings[filterSetting])
     local index = Data.GetIndex()
     local profSet, groups = {}, {}

@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.7.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.8.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -23,14 +23,15 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
   cooldowns. Para que se cuente lo que tienes en el banco, ábrelo una vez.
 
 ### Pedir materiales
-Lo que **usan tus recetas** y alguien de la hermandad fabrica o consigue recolectando, agrupado
-por profesión ([+]/[-] para plegar). Puedes buscar, filtrar por profesión (menú desplegable) o
-desmarcar "Solo lo que usan mis recetas" para ver todo. Al elegir uno ves para qué recetas tuyas
+**Todo lo que se puede fabricar en Classic** que no es equipo (materiales, pociones, comida...),
+agrupado por profesión ([+]/[-] para plegar), aunque nadie de la hermandad lo haya publicado aún
+(el addon trae la lista de recetas de cada profesión). Puedes buscar, filtrar por profesión (menú
+desplegable) o marcar "Solo lo que usan mis recetas". Al elegir uno ves para qué recetas tuyas
 sirve, el **precio en la subasta**, quién lo da, la cantidad con − y +, y los botones **Pedir a
 todos**, **Pedir a [nombre]** y **Susurrar**.
 
 ### Pedir equipo
-Armas, armaduras, bolsas y encantamientos que fabrica la hermandad, con sus **materiales en
+Todas las armas, armaduras, bolsas y encantamientos que se pueden fabricar, con sus **materiales en
 casillas** (tienes/necesitas), quién lo fabrica y los mismos botones para pedir.
 
 ### Precio y pago

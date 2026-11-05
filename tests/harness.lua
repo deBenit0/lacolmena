@@ -239,7 +239,7 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Demo.lua", "Prices.lua", "Alerts.lua",
+  "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Demo.lua", "Prices.lua", "Alerts.lua",
   "UI/Widgets.lua", "UI/Main.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
 }
 
@@ -371,6 +371,13 @@ local function makeEnv(client)
         10, cls and cls[1] or 0, cls and cls[2] or 0
     end,
     GetItemIcon = function(id) return "icono" .. tostring(id) end,
+    GetItemInfoInstant = function(id)
+      id = tonumber(id)
+      local gear = H.gear and H.gear[id]
+      local cls = H.itemClass and H.itemClass[id]
+      local equipLoc = gear and gear.equipLoc or (H.equipIDs and H.equipIDs[id] and "INVTYPE_CHEST") or ""
+      return id, "Tipo", "Subtipo", equipLoc, "icono" .. id, cls and cls[1] or 0, cls and cls[2] or 0
+    end,
     GetSpellInfo = function(id)
       if H.spellNames and H.spellNames[id] then return H.spellNames[id], nil, "icono" end
       return "Hechizo " .. id, nil, "icono"
@@ -462,6 +469,8 @@ function H.NewClient(name, opts)
     setfenv(chunk, client.env)
     chunk("HDFprofesiones", client.ns)
   end
+  -- La base de datos de recetas de Classic solo se usa en las pruebas que la piden.
+  if not opts.recipeDB then client.ns.RECIPE_DB = {} end
   H.clients[name] = client
   return client
 end
@@ -522,6 +531,7 @@ function H.Reset()
   H.gear = nil
   H.spellNames = nil
   H.itemClass = nil
+  H.equipIDs = nil
 end
 
 return H
