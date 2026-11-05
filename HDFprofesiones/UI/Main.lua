@@ -107,7 +107,7 @@ function UI.Open(pageId, selectId, host)
   panel:ClearAllPoints()
   if host and host:IsVisible() then
     panel.host = host
-    panel:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 38, 0)
+    panel:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 50, 0)
   else
     panel.host = nil
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
@@ -132,14 +132,35 @@ function UI.IsShown()
   return panel and panel:IsShown()
 end
 
+-- Pestañas laterales de Blizzard en la ventana moderna "Hermandad y comunidades".
+local BLIZZARD_TABS = { "ChatTab", "RosterTab", "GuildBenefitsTab", "GuildInfoTab" }
+
+-- La pestaña va debajo de la última pestaña lateral de Blizzard que se vea;
+-- si no hay ninguna, arriba a la derecha de la ventana.
+function UI.PlaceTab(tab, host)
+  local last
+  for _, key in ipairs(BLIZZARD_TABS) do
+    local t = host[key]
+    if type(t) == "table" and t.IsShown and t:IsShown() then last = t end -- van de arriba abajo
+  end
+  tab:ClearAllPoints()
+  if last then
+    tab:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 2, -18)
+  else
+    tab:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 2, -64)
+  end
+  tab:SetFrameStrata(host:GetFrameStrata() or "MEDIUM")
+  tab:SetFrameLevel(host:GetFrameLevel() + 20)
+end
+
 -- Pestaña lateral con el icono del addon en la ventana de hermandad.
 function UI.AttachHost(host)
   if not host or hosts[host] then return end
   hosts[host] = true
   local tab = CreateFrame("Button", "HDFProfGuildTab" .. (host:GetName() or ""), host)
   tab:SetSize(32, 32)
-  tab:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 2, -64)
-  tab:SetFrameLevel(host:GetFrameLevel() + 10)
+  UI.PlaceTab(tab, host)
+  host:HookScript("OnShow", function() UI.PlaceTab(tab, host) end)
   local bg = tab:CreateTexture(nil, "BACKGROUND")
   bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
   bg:SetSize(64, 64)

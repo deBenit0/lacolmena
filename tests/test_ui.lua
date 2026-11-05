@@ -25,6 +25,9 @@ local env = bea.env
 -- Pestaña lateral en la ventana de hermandad.
 local guildFrame = env.CreateFrame("Frame", "GuildFrame", env.UIParent)
 ns.UI.AttachHost(guildFrame)
+guildFrame.ChatTab = env.CreateFrame("Button", nil, guildFrame)
+guildFrame.GuildInfoTab = env.CreateFrame("Button", nil, guildFrame)
+ns.UI.AttachHost(guildFrame) -- ya enganchada: no se duplica
 local tab = env.HDFProfGuildTabGuildFrame
 H.ok(tab ~= nil, "pestaña lateral creada")
 tab:Click()
