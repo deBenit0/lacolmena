@@ -16,6 +16,9 @@ local function count(page)
   return n, headers, keys
 end
 local mats = panel.pageFrames.materials
+local n0 = count(mats)
+H.eq(n0, 0, "al abrir, todo plegado (Pepe no tiene recetas)")
+mats:SetAllCollapsed(false)
 local n, headers, keys = count(mats)
 H.ok(n > 300, "muchos materiales disponibles: " .. n)
 H.ok(#headers >= 8, "agrupados por profesión: " .. table.concat(headers, ", "))
@@ -23,7 +26,7 @@ H.ok(keys.i2318 and keys.i4234, "están el cuero ligero y el cuero pesado")
 ns.UI.ShowPage("equipment")
 local equip = panel.pageFrames.equipment
 ns.db.settings.hideLowGear = false
-equip:Refresh()
+equip:SetAllCollapsed(false)
 local ne, _, ekeys = count(equip)
 H.ok(ne > 300, "mucho equipo disponible: " .. ne)
 H.ok(ekeys.e20034, "encantamiento cruzado en equipo")

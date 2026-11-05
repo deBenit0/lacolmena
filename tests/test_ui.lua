@@ -53,6 +53,8 @@ end
 H.eq((countItems(equipment)), 0, "la coraza de nivel bajo está oculta")
 ns.db.settings.hideLowGear = false
 equipment:Refresh()
+H.eq((countItems(equipment)), 0, "en equipo las profesiones salen plegadas")
+equipment:SetAllCollapsed(false)
 H.eq((countItems(equipment)), 1, "equipo: la coraza")
 equipment.list.rows[2]:Click()
 H.Advance(10)
@@ -70,7 +72,7 @@ ns.db.settings.onlyMyReagents = true
 recipes:Refresh()
 H.eq((countItems(recipes)), 0, "solo lo de mis recetas: nada (Bea no tiene profesiones)")
 ns.db.settings.onlyMyReagents = false
-recipes:Refresh()
+recipes:SetAllCollapsed(false)
 local n, headers = countItems(recipes)
 H.eq(headers, 1, "una cabecera: Alquimia")
 H.eq(n, 2, "materiales: poción y arcanita (la coraza es equipo)")
@@ -111,6 +113,15 @@ end
 H.ok(potionRow ~= nil, "fila de la poción")
 potionRow:Click()
 H.ok(recipes.detail.price:GetText():find("12000c", 1, true), "precio de subasta: " .. recipes.detail.price:GetText())
+-- Favoritos: la poción sube arriba del todo.
+recipes.detail.fav:Click()
+H.eq(recipes.list.items[1].label, "Favoritos", "grupo Favoritos arriba")
+H.eq(recipes.list.items[2].key, "i13443", "la poción en favoritos")
+H.eq(recipes.detail.fav:GetText(), "- Favorito", "el botón permite quitarla")
+recipes.detail.fav:Click()
+H.ok(recipes.list.items[1].label ~= "Favoritos", "quitada de favoritos")
+recipes.state.key = "i13443"
+recipes:RefreshDetail(true)
 -- Cantidad con + y -.
 H.eq(recipes.detail.qty:GetText(), "1", "cantidad inicial")
 recipes.detail.plus:Click()
@@ -185,7 +196,9 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.8.1", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.9.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
+H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine

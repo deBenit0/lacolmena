@@ -44,7 +44,7 @@ ns.UI.RegisterPage("mine", function(page)
 
   page.stats = W.Text(page, "GameFontHighlightSmall")
   page.stats:SetPoint("TOPLEFT", 320, -30)
-  page.stats:SetSize(280, 330)
+  page.stats:SetSize(280, 390)
   page.stats:SetJustifyV("TOP")
 
   function page:Refresh()
@@ -123,6 +123,24 @@ ns.UI.RegisterPage("mine", function(page)
     end
     local queued = ns.Comm.Pending()
     if queued > 0 then stats[#stats + 1] = string.format("Mensajes por enviar: %d", queued) end
+
+    -- Diagnóstico: qué ha encontrado el addon en este cliente (útil para resolver fallos).
+    local function yes(ok, good, bad)
+      return ok and ("|cff40ff40" .. good .. "|r") or ("|cffff5050" .. bad .. "|r")
+    end
+    local hostNames = ns.UI.HostNames()
+    local profCount = 0
+    for _ in pairs(c.profs) do profCount = profCount + 1 end
+    local priceSource = (Auctionator and Auctionator.API and "Auctionator") or (TSM_API and "TSM") or nil
+    local build = GetBuildInfo and select(4, GetBuildInfo())
+    stats[#stats + 1] = " "
+    stats[#stats + 1] = "|cffffd100Diagnóstico|r"
+    stats[#stats + 1] = "Pestaña en: " .. yes(#hostNames > 0, table.concat(hostNames, ", "), "no encontrada")
+    stats[#stats + 1] = "Ventana de profesión: " .. yes(GetNumTradeSkills ~= nil, "compatible", "no compatible")
+      .. "  (" .. profCount .. " leídas)"
+    stats[#stats + 1] = "Precios: " .. yes(priceSource ~= nil, priceSource or "", "sin Auctionator (usa lo que apunte)")
+    stats[#stats + 1] = "Correo: " .. yes(SendMail ~= nil, "compatible", "no compatible")
+    stats[#stats + 1] = "Interfaz del juego: " .. tostring(build or "?")
     page.stats:SetText(table.concat(stats, "\n"))
   end
 end)

@@ -19,7 +19,7 @@ read_globals = {
   "GetCoinTextureString",
   -- Sistema
   "C_Timer", "C_ChatInfo", "C_Item", "C_Spell", "C_Container", "C_GuildInfo", "Enum",
-  "GetTime", "GetServerTime", "GetNormalizedRealmName", "GetRealmName",
+  "GetTime", "GetServerTime", "GetNormalizedRealmName", "GetRealmName", "GetBuildInfo",
   -- Unidad y hermandad
   "UnitName", "UnitLevel", "UnitClass", "UnitAffectingCombat", "InCombatLockdown", "IsInInstance",
   "IsInGuild", "GetGuildInfo", "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "GuildRoster",

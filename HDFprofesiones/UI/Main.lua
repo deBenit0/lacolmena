@@ -138,6 +138,14 @@ function UI.Toggle(host)
   end
 end
 
+-- Ventanas en las que se ha puesto la pestaña (para el diagnóstico).
+function UI.HostNames()
+  local names = {}
+  for host in pairs(hosts) do names[#names + 1] = host:GetName() or "?" end
+  table.sort(names)
+  return names
+end
+
 function UI.IsShown()
   return panel and panel:IsShown()
 end

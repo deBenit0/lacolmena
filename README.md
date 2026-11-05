@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.8.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.9.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -28,7 +28,11 @@ agrupado por profesión ([+]/[-] para plegar), aunque nadie de la hermandad lo h
 (el addon trae la lista de recetas de cada profesión). Puedes buscar, filtrar por profesión (menú
 desplegable) o marcar "Solo lo que usan mis recetas". Al entrar al juego, el addon carga en segundo
 plano los nombres de todos los objetos (unos 40 segundos la primera vez) para que el buscador los
-encuentre. Al elegir uno ves para qué recetas tuyas
+encuentre.
+
+Las profesiones salen **plegadas**, salvo las que dan materiales que usan tus recetas, y el addon
+recuerda cuáles dejas abiertas. Con **+ Favorito** marcas lo que pides a menudo: sale arriba del
+todo, en el grupo Favoritos. Al elegir uno ves para qué recetas tuyas
 sirve, el **precio en la subasta**, quién lo da, la cantidad con − y +, y los botones **Pedir a
 todos**, **Pedir a [nombre]** y **Susurrar**.
 
@@ -81,7 +85,8 @@ los materiales que te faltan (contando bolsas y banco):
 ### Mis cosas
 Tus profesiones publicadas, el **modo demostración** (jugadores y peticiones de ejemplo que solo
 ves tú, para probar cómo queda), el modo **No disponible** (sin avisos y apareces el último),
-los avisos y el sonido, y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
+los avisos y el sonido, un **diagnóstico** (dónde puso la pestaña, si lee tus profesiones, si
+encuentra Auctionator y el correo, versión del juego) y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
 
 ## Primera prueba en la hermandad: qué mirar
 

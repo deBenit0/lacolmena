@@ -130,7 +130,19 @@ end
 
 local function buildCatalog(page, mode)
   local materials = mode == "materials"
-  local state = { search = "", prof = nil, key = nil, pk = nil, collapsed = {}, gatherOnly = {} }
+  local state = { search = "", prof = nil, key = nil, pk = nil, gatherOnly = {} }
+
+  -- Grupos plegados: se recuerda lo que elige el jugador; si no ha elegido, se pliegan
+  -- todos salvo Favoritos y (en materiales) las profesiones que dan lo que usan tus recetas.
+  local function savedCollapsed()
+    ns.db.settings.collapsed = ns.db.settings.collapsed or {}
+    ns.db.settings.collapsed[mode] = ns.db.settings.collapsed[mode] or {}
+    return ns.db.settings.collapsed[mode]
+  end
+  local function favorites()
+    ns.db.settings.favorites = ns.db.settings.favorites or {}
+    return ns.db.settings.favorites
+  end
 
   -- Barra superior: búsqueda, profesión y filtro de equipo bajo.
   local search = W.Input(page, 160)
@@ -237,7 +249,7 @@ local function buildCatalog(page, mode)
     end,
     onSelect = function(item)
       if item.header then
-        state.collapsed[item.pk] = not state.collapsed[item.pk]
+        savedCollapsed()[item.pk] = not item.collapsed
         page:Refresh()
         return
       end
@@ -260,7 +272,16 @@ local function buildCatalog(page, mode)
 
   detail.name = W.Text(detail, "GameFontNormal")
   detail.name:SetPoint("TOPLEFT", detail.icon, "TOPRIGHT", 8, -2)
-  detail.name:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
+  detail.name:SetPoint("RIGHT", detail, "RIGHT", -104, 0)
+
+  -- Favoritos: lo que pides a menudo sale arriba del todo.
+  detail.fav = W.Button(detail, "+ Favorito", 90, 20, function()
+    if not state.key then return end
+    local favs = favorites()
+    favs[state.key] = not favs[state.key] or nil
+    page:Refresh()
+  end)
+  detail.fav:SetPoint("TOPRIGHT", -8, -10)
   detail.name:SetWordWrap(false)
   detail.sub = W.Text(detail, "GameFontHighlightSmall")
   detail.sub:SetPoint("TOPLEFT", detail.name, "BOTTOMLEFT", 0, -4)
@@ -396,6 +417,15 @@ local function buildCatalog(page, mode)
   -- Referencias para depurar y para las pruebas.
   page.state, page.list, page.detail, page.search, page.profButton = state, list, detail, search, profButton
 
+  -- Pliega o despliega todos los grupos (y lo recuerda).
+  function page:SetAllCollapsed(value)
+    page:Refresh() -- recalcular qué profesiones hay con los filtros actuales
+    local saved = savedCollapsed()
+    for _, pk in ipairs(page.profList or {}) do saved[pk] = value end
+    saved.fav = value
+    page:Refresh()
+  end
+
   function page:RefreshButtons()
     local c = crafters:Selected()
     local me = ns.Me()
@@ -447,7 +477,7 @@ local function buildCatalog(page, mode)
     local rec = key and Data.GetIndex()[key]
     local hasKey = key ~= nil and (rec ~= nil or state.gatherOnly[key] ~= nil)
     local regions = {
-      detail.price,
+      detail.price, detail.fav,
       detail.icon, detail.name, detail.sub, detail.matsLabel, detail.craftersLabel, crafters,
       detail.qtyLabel, detail.minus, detail.qty, detail.plus, detail.made,
       detail.askAll, detail.askOne, detail.whisper,
@@ -472,6 +502,7 @@ local function buildCatalog(page, mode)
     local name, icon, link = ns.KeyInfo(key)
     detail.iconTex:SetTexture(icon)
     detail.name:SetText(link or name or ns.KeyName(key))
+    detail.fav:SetText(favorites()[key] and "- Favorito" or "+ Favorito")
     local profNames = {}
     for p in pairs(profs) do profNames[#profNames + 1] = ns.ProfessionName(p) end
     local _, skill = Data.GatherersOf(key)
@@ -585,12 +616,45 @@ local function buildCatalog(page, mode)
     profButton:SetText("Profesión: " .. (state.prof and ns.ProfessionName(state.prof) or "todas"))
 
     -- Cabecera por profesión y sus objetos debajo (si no está plegada).
-    local items = {}
+    local saved, favs = savedCollapsed(), favorites()
+    local function isCollapsed(pk, default)
+      if state.search ~= "" then return false end -- al buscar, todo abierto
+      if saved[pk] ~= nil then return saved[pk] end
+      return default
+    end
+    local items, favItems = {}, {}
+    for _, pk in ipairs(profList) do
+      for _, item in ipairs(groups[pk] or {}) do
+        if favs[item.key] then
+          item.label = "|cffffd100*|r " .. item.label
+          favItems[#favItems + 1] = {
+            id = "fav:" .. item.key, key = item.key, pk = item.pk, sort = item.sort, icon = item.icon,
+            count = item.count, online = item.online, label = item.label,
+          }
+        end
+      end
+    end
+    if #favItems > 0 then
+      table.sort(favItems, function(a, b) return a.sort < b.sort end)
+      local collapsed = isCollapsed("fav", false)
+      items[#items + 1] = { id = "h:fav", header = true, pk = "fav", label = "Favoritos", count = #favItems, collapsed = collapsed }
+      if not collapsed then
+        for _, item in ipairs(favItems) do items[#items + 1] = item end
+      end
+    end
     for _, pk in ipairs(profList) do
       local group = groups[pk]
       if group then
         table.sort(group, function(a, b) return a.sort < b.sort end)
-        local collapsed = state.collapsed[pk] and state.search == ""
+        -- abierto por defecto si da algo que usan tus recetas (en materiales)
+        local useful = false
+        if materials then
+          for _, item in ipairs(group) do
+            local _, id = ns.ParseKey(item.key)
+            if mine[id] then useful = true break end
+          end
+        end
+        local collapsed = isCollapsed(pk, not useful)
         items[#items + 1] = {
           id = "h:" .. tostring(pk), header = true, pk = pk, label = ns.ProfessionName(pk),
           count = #group, collapsed = collapsed,
