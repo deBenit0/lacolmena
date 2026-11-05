@@ -20,6 +20,10 @@ El ganador se elige al azar con `crypto.randomInt`, con probabilidad proporciona
 No necesita contraseñas, tokens ni crear una app de Twitch: se conecta al chat como espectador
 anónimo, porque Twitch ya envía a todo el chat la información de bits, subs y regalos.
 
+![Panel del sorteo](docs/panel.png)
+
+![Overlay en OBS](docs/overlay.png)
+
 ## Requisitos
 
 [Node.js](https://nodejs.org) 18 o superior. No hay que instalar nada más (`npm install` no hace falta).
