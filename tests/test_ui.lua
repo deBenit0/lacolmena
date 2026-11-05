@@ -72,8 +72,16 @@ recipes.search:GetScript("OnTextChanged")(recipes.search, true)
 
 -- Filtro de profesión: Alquimia y vuelta a todas.
 recipes.profButton:Click()
+local menu = recipes.profMenu
+H.ok(menu:IsShown(), "se abre el menú de profesiones")
+H.ok(menu.buttons[1].text:GetText():find("Todas", 1, true) and menu.buttons[2].text:GetText():find("Alquimia", 1, true),
+  "opciones: Todas y Alquimia")
+menu.buttons[2]:Click()
 H.eq(recipes.state.prof, 171, "filtro: Alquimia")
+H.ok(not menu:IsShown(), "el menú se cierra al elegir")
+H.ok(recipes.profButton:GetText():find("Alquimia", 1, true), "el botón muestra la elegida")
 recipes.profButton:Click()
+menu.buttons[1]:Click()
 H.eq(recipes.state.prof, nil, "filtro: todas")
 
 -- Elegir la poción: pide los materiales (Bea no los conoce) y los recibe de Ana.
@@ -161,7 +169,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.5.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.5.1", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine

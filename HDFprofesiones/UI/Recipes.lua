@@ -105,15 +105,52 @@ ns.UI.RegisterPage("recipes", function(page)
 
   local profButton = W.Button(page, "Profesión: todas", 160, 22)
   profButton:SetPoint("LEFT", search, "RIGHT", 10, 0)
-  profButton:SetScript("OnClick", function()
-    local list = page.profList or {}
-    local current = 0
-    for i, pk in ipairs(list) do
-      if pk == state.prof then current = i end
+  -- Menú desplegable con "Todas" y cada profesión publicada en la hermandad.
+  local menu = W.Box(page, 180, 30)
+  menu:SetPoint("TOPLEFT", profButton, "BOTTOMLEFT", 0, -2)
+  menu:SetFrameStrata("DIALOG")
+  menu:EnableMouse(true)
+  menu:Hide()
+  menu.buttons = {}
+  local function menuButton(i)
+    local b = menu.buttons[i]
+    if not b then
+      b = CreateFrame("Button", nil, menu)
+      b:SetSize(168, 18)
+      b:SetPoint("TOPLEFT", 6, -6 - (i - 1) * 18)
+      b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+      b.text = W.Text(b, "GameFontHighlightSmall")
+      b.text:SetPoint("LEFT", 4, 0)
+      b:SetScript("OnClick", function(self)
+        state.prof = self.pk
+        menu:Hide()
+        page:Refresh()
+      end)
+      menu.buttons[i] = b
     end
-    state.prof = list[current + 1] -- después de la última vuelve a "todas"
-    page:Refresh()
+    return b
+  end
+  function menu:Open()
+    local options = { { pk = nil, label = "Todas" } }
+    for _, pk in ipairs(page.profList or {}) do
+      options[#options + 1] = { pk = pk, label = ns.ProfessionName(pk) }
+    end
+    for i, opt in ipairs(options) do
+      local b = menuButton(i)
+      b.pk = opt.pk
+      local mark = (opt.pk == state.prof) and "|cffffd100> |r" or "   "
+      b.text:SetText(mark .. opt.label)
+      b:Show()
+    end
+    for i = #options + 1, #self.buttons do self.buttons[i]:Hide() end
+    self:SetHeight(12 + #options * 18)
+    self:Show()
+  end
+  page.profMenu = menu
+  profButton:SetScript("OnClick", function()
+    if menu:IsShown() then menu:Hide() else menu:Open() end
   end)
+  page:HookScript("OnHide", function() menu:Hide() end)
 
   local lowCheck = W.Check(page, "Ocultar equipo de nivel bajo", function(checked)
     ns.db.settings.hideLowGear = checked
