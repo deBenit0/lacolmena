@@ -117,6 +117,10 @@ ns.UI.RegisterPage("mine", function(page)
       stats[#stats + 1] = string.format("%d. %s  %s", i, ns.ColoredName(ranking[i].name, e and e.c), Data.KarmaText(ranking[i].name))
     end
     stats[#stats + 1] = "Sincronización: " .. (ns.Sync.IsStarted() and "activa" or "esperando a la hermandad...")
+    local done, total = ns.Preload.Progress()
+    if total > 0 and done < total then
+      stats[#stats + 1] = string.format("Cargando nombres de objetos: %d de %d", done, total)
+    end
     local queued = ns.Comm.Pending()
     if queued > 0 then stats[#stats + 1] = string.format("Mensajes por enviar: %d", queued) end
     page.stats:SetText(table.concat(stats, "\n"))

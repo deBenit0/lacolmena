@@ -37,3 +37,16 @@ row:Click()
 H.ok(mats.detail.craftersLabel:GetText():find("puedes pedirlo", 1, true), "sin fabricantes: se puede pedir igual")
 H.ok(mats.detail.askAll:IsEnabled(), "botón Pedir a todos activo")
 H.eq(#H.errors, 0, "sin errores de Lua")
+
+-- Carga en segundo plano de los nombres: en tandas, y termina sola.
+local requested = 0
+pepe.env.C_Item = { RequestLoadItemDataByID = function() requested = requested + 1 end,
+  GetItemInfo = function() return nil end }
+ns.Preload.Start()
+H.Advance(1)
+H.ok(requested <= 60, "va en tandas pequeñas: " .. requested .. " en 1 s")
+H.Advance(120)
+local done, total = ns.Preload.Progress()
+H.ok(total > 1000 and done == total, "termina de cargar: " .. done .. "/" .. total)
+H.ok(requested >= total, "pide todos los objetos (la ventana abierta también pide los suyos)")
+H.eq(#H.errors, 0, "sin errores de Lua (carga)")
