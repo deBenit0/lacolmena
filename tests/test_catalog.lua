@@ -53,3 +53,15 @@ local done, total = ns.Preload.Progress()
 H.ok(total > 1000 and done == total, "termina de cargar: " .. done .. "/" .. total)
 H.ok(requested >= total, "pide todos los objetos (la ventana abierta también pide los suyos)")
 H.eq(#H.errors, 0, "sin errores de Lua (carga)")
+
+-- Ajuste guardado de la 0.6 ("solo lo de mis recetas" marcado): se desmarca al actualizar.
+H.AddMember("Viejo")
+local viejo = H.Login("Viejo", { recipeDB = true, savedDB = { settings = { onlyMyReagents = true, alerts = true, sound = true } } })
+H.Advance(5)
+H.ok(viejo.ns.db.settings.onlyMyReagents == false, "se desmarca el filtro antiguo")
+viejo.ns.UI.Open("materials")
+local vm = viejo.env.HDFProfPanel.pageFrames.materials
+local headersOnly = 0
+for _, item in ipairs(vm.list.items) do if item.header then headersOnly = headersOnly + 1 end end
+H.ok(headersOnly >= 8, "la lista de materiales muestra las profesiones: " .. headersOnly)
+H.eq(#H.errors, 0, "sin errores de Lua (actualización)")

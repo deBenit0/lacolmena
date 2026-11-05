@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.9.0"
+ns.VERSION = "0.9.1"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -17,7 +17,14 @@ local floor, format = math.floor, string.format
 ---------------------------------------------------------------------------
 -- Llamadas protegidas: un fallo en una parte no rompe las demás
 ---------------------------------------------------------------------------
+local shownErrors = {}
 local function errorHandler(err)
+  -- Para la fase de pruebas: avisar en el chat aunque los errores de Lua estén desactivados.
+  local text = tostring(err)
+  if not shownErrors[text] and DEFAULT_CHAT_FRAME then
+    shownErrors[text] = true
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff5050" .. (ns.TITLE or "HDF") .. " (error, mándale una captura a quien lo programa):|r " .. text)
+  end
   local handler = geterrorhandler and geterrorhandler()
   if handler then return handler(err) end
   return err
@@ -349,6 +356,11 @@ ns.On("ADDON_LOADED", function(name)
   db.settings = db.settings or {}
   for k, v in pairs(DEFAULT_SETTINGS) do
     if db.settings[k] == nil then db.settings[k] = v end
+  end
+  -- Ajustes de versiones anteriores que ya no valen.
+  if (db.settingsVersion or 0) < 1 then
+    db.settings.onlyMyReagents = false -- en la 0.6 venía marcado y dejaba la lista vacía
+    db.settingsVersion = 1
   end
   db.chars = db.chars or {}   -- mis personajes: recetas escaneadas, banco...
   db.guilds = db.guilds or {} -- datos compartidos de cada hermandad

@@ -70,7 +70,9 @@ H.ok(recipes:IsShown(), "página de materiales visible")
 H.ok(not ns.db.settings.onlyMyReagents, "por defecto se ve todo")
 ns.db.settings.onlyMyReagents = true
 recipes:Refresh()
-H.eq((countItems(recipes)), 0, "solo lo de mis recetas: nada (Bea no tiene profesiones)")
+recipes:SetAllCollapsed(false)
+H.ok((countItems(recipes)) > 0, "sin datos de mis recetas no se queda vacía: se ve todo")
+H.ok(recipes.list.items[1] and true, "hay filas")
 ns.db.settings.onlyMyReagents = false
 recipes:SetAllCollapsed(false)
 local n, headers = countItems(recipes)
@@ -196,7 +198,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.9.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.9.1", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

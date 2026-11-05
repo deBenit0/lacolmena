@@ -555,6 +555,12 @@ local function buildCatalog(page, mode)
     local playerLevel = UnitLevel("player") or 60
     local mine = materials and myReagents() or nil
     local onlyMine = materials and ns.db.settings.onlyMyReagents
+    if onlyMine and not next(mine) then
+      onlyMine = false -- no sabemos qué usan tus recetas: mejor enseñar todo que una lista vacía
+      lowCheck.label:SetText("Solo lo que usan mis recetas |cffff8040(sin datos: se muestra todo)|r")
+    elseif materials then
+      lowCheck.label:SetText("Solo lo que usan mis recetas")
+    end
     wipe(state.gatherOnly)
 
     local function add(key, pk, rec)

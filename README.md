@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.9.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.9.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
