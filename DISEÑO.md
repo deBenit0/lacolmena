@@ -10,7 +10,7 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 ## Plataforma
 - **WoW Forever oficial** de Blizzard (Classic+, lanzado el 4-nov-2026, vía Battle.net).
   Cliente Classic moderno → API de Lua actual.
-  Pendiente: confirmar la versión de interfaz para el `.toc` con `/dump select(4, GetBuildInfo())`.
+  Versión de interfaz para el `.toc`: **16001** (obtenida con `/dump select(4, GetBuildInfo())`).
 - **Todos los miembros tendrán el addon**: la comunicación va solo por mensajes ocultos
   de addon en el canal de hermandad.
 - **Solo en español.**
@@ -53,7 +53,7 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
   vía datos guardados de cuenta; basta con entrar una vez con cada uno).
 - Se publican las recetas de tus alts **aunque no estén en la hermandad** (las publica
   el personaje que sí está).
-- Pendiente: qué personaje es el main (propuesta: el de más nivel, cambiable).
+- El **main es el personaje de más nivel**; en empate, el de más tiempo jugado (y si no se sabe, por orden alfabético).
 
 ## Oficiales
 - Se detectan por **permiso de rango** (poder editar la nota de oficial).
@@ -75,7 +75,26 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
   o lo tiene desactualizado.
 - **Limpieza**: quien sale de la hermandad desaparece de las listas; solo se aceptan datos de miembros.
 
-## Pendiente
-- Alcance de la primera versión.
-- Versión de interfaz del `.toc`.
-- Elección del main entre los alts.
+## Fases
+Se programa por fases para poder probar en el juego cuanto antes.
+
+**Fase 1 (versión 0.1.0):** recetas (escaneo, búsqueda, filtros, materiales con lo que tienes,
+cooldowns, desconectados con última vez), peticiones completas (cantidad, encantamientos,
+materiales, pago en oro/objetos, a alguien o a todos, estados, caducidades, límite de 10),
+autor confirma entregas y contador de encargos, compromisos que caducan a las 48 h y se
+pueden soltar, avisos con sonido y modo "no disponible", control de versiones, limpieza
+de quien se va.
+
+**Fase 2:** alts vinculados al main (con sus recetas y materiales), oficiales (moderar y
+prioridad; ver quién no tiene el addon), tooltip con quién fabrica cada objeto, aviso al
+comerciar el objeto pedido, lista de objetos que nadie sabe hacer con aviso al aprenderlos.
+
+## Notas técnicas
+- Mensajes ocultos por el canal de hermandad (prefijo `LaColmena`), troceados a 250 bytes
+  y enviados a 1 mensaje/s de media como mucho.
+- Cada ficha de fabricante tiene un único dueño y una versión; cada parte de una petición
+  (autor, cada fabricante, entregas) también, así que las copias se fusionan siempre igual,
+  en cualquier orden.
+- Al entrar, cada uno manda un resumen; los demás le envían lo que le falta. Los reenvíos
+  se descartan justo antes de salir si otro ya ha empezado a enviar lo mismo.
+- Pruebas: `lua5.1 tests/run.lua` (WoW simulado con varios jugadores conectados).

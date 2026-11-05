@@ -1,0 +1,22 @@
+## Interface: 16001
+## Title: La Colmena
+## Notes: Profesiones de Los hijos del Fundillo: qué fabrica cada uno y qué necesita la hermandad.
+## Author: Los hijos del Fundillo
+## Version: 0.1.0
+## IconTexture: Interface\Icons\Trade_Engineering
+## SavedVariables: LaColmenaDB
+
+Core.lua
+Codec.lua
+Comm.lua
+Data.lua
+Guild.lua
+Scan.lua
+Sync.lua
+Alerts.lua
+UI\Widgets.lua
+UI\Main.lua
+UI\Recipes.lua
+UI\Requests.lua
+UI\Mine.lua
+UI\Dialog.lua
