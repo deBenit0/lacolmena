@@ -135,14 +135,47 @@ end
 -- Pestañas laterales de Blizzard en la ventana moderna "Hermandad y comunidades".
 local BLIZZARD_TABS = { "ChatTab", "RosterTab", "GuildBenefitsTab", "GuildInfoTab" }
 
--- La pestaña va debajo de la última pestaña lateral de Blizzard que se vea;
--- si no hay ninguna, arriba a la derecha de la ventana.
-function UI.PlaceTab(tab, host)
-  local last
+-- La pestaña va debajo de la pestaña lateral de Blizzard que esté más abajo
+-- (no damos por hecho el orden: lo medimos en pantalla).
+local function bottomOf(f)
+  local b = f.GetBottom and f:GetBottom()
+  return type(b) == "number" and b or nil
+end
+
+local function lowestSideTab(host, mine)
+  local candidates, seen = {}, {}
   for _, key in ipairs(BLIZZARD_TABS) do
     local t = host[key]
-    if type(t) == "table" and t.IsShown and t:IsShown() then last = t end -- van de arriba abajo
+    if type(t) == "table" and not seen[t] then
+      seen[t] = true
+      candidates[#candidates + 1] = t
+    end
   end
+  -- Cualquier otro botón pegado por fuera del borde derecho de la ventana.
+  local right = host.GetRight and host:GetRight()
+  if type(right) == "number" and host.GetChildren then
+    for _, child in ipairs({ host:GetChildren() }) do
+      local left = child.GetLeft and child:GetLeft()
+      if not seen[child] and type(left) == "number" and left >= right - 8 then
+        seen[child] = true
+        candidates[#candidates + 1] = child
+      end
+    end
+  end
+  local last, lastBottom
+  for _, t in ipairs(candidates) do
+    if t ~= mine and t.IsShown and t:IsShown() then
+      local b = bottomOf(t)
+      if not last or (b and (not lastBottom or b < lastBottom)) then
+        last, lastBottom = t, b
+      end
+    end
+  end
+  return last
+end
+
+function UI.PlaceTab(tab, host)
+  local last = lowestSideTab(host, tab)
   tab:ClearAllPoints()
   if last then
     -- Mismo tamaño y separación que las de Blizzard: parece un icono más de la columna.
@@ -179,8 +212,14 @@ function UI.AttachHost(host)
     icon:SetTexture(ICON)
     tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
   end
-  UI.PlaceTab(tab, host)
-  host:HookScript("OnShow", function() UI.PlaceTab(tab, host) end)
+  -- Las posiciones solo se pueden medir con la ventana ya dibujada: recolocar al abrirla.
+  local function place() UI.PlaceTab(tab, host) end
+  place()
+  host:HookScript("OnShow", function()
+    place()
+    ns.After(0.1, place)
+    ns.After(0.5, place)
+  end)
   tab:SetScript("OnClick", function(self)
     if self.SetChecked then self:SetChecked(false) end -- no se queda marcada como las de Blizzard
     UI.Toggle(host)
