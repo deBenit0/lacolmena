@@ -1,0 +1,13 @@
+{
+  "name": "sorteo-colmena",
+  "version": "1.0.0",
+  "description": "Sorteos para directos de Twitch: lee el chat y da papeletas según lo que ha gastado cada persona (bits, subs, subs regaladas, Hype Chat).",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  }
+}

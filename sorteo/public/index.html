@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorteo · La Colmena</title>
+<style>
+  :root {
+    --fondo: #14110c; --panel: #1f1a12; --panel2: #2a2318; --borde: #3a3122;
+    --texto: #f3ead8; --suave: #b5a888; --miel: #f5b301; --miel2: #ffd24a;
+    --ok: #4fc36b; --mal: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--fondo); color: var(--texto); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--borde); }
+  h1 { margin: 0; font-size: 20px; } h1 span { color: var(--miel); }
+  h2 { margin: 0 0 10px; font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel2); font-size: 13px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--mal); }
+  .punto.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .grow { flex: 1; }
+  .stats { display: flex; gap: 18px; font-size: 13px; color: var(--suave); } .stats b { color: var(--texto); font-size: 16px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 16px; padding: 16px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--borde); background: var(--panel2); color: var(--texto); padding: 7px 12px; border-radius: 8px; }
+  button:hover { border-color: var(--miel); }
+  button.miel { background: var(--miel); color: #1a1405; border-color: var(--miel); font-weight: 700; }
+  button.miel:hover { background: var(--miel2); }
+  button.peligro:hover { border-color: var(--mal); color: var(--mal); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  input { font: inherit; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+  th { font-size: 12px; color: var(--suave); font-weight: 600; text-transform: uppercase; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.excluido td { opacity: .45; text-decoration: line-through; } tr.excluido td:last-child { text-decoration: none; opacity: 1; }
+  .det { color: var(--suave); font-size: 12px; }
+  .barra { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .barra i { display: block; height: 100%; background: var(--miel); }
+  .vacio { color: var(--suave); text-align: center; padding: 24px 0; }
+  .ruleta { height: 110px; display: grid; place-items: center; text-align: center; background: var(--fondo); border-radius: 10px; margin: 10px 0; font-size: 30px; font-weight: 800; color: var(--miel); overflow: hidden; }
+  .ruleta.final { animation: brillo 1.2s ease-out; }
+  .ruleta small { display: block; font-size: 13px; font-weight: 500; color: var(--suave); }
+  @keyframes brillo { 0% { transform: scale(.9); box-shadow: 0 0 0 var(--miel); } 40% { transform: scale(1.05); box-shadow: 0 0 40px var(--miel); } 100% { transform: scale(1); box-shadow: none; } }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  ul.lista { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+  ul.lista li { padding: 6px 0; border-bottom: 1px solid var(--borde); font-size: 13px; display: flex; gap: 8px; }
+  ul.lista li .h { color: var(--suave); flex: none; font-variant-numeric: tabular-nums; }
+  ul.lista li.no { opacity: .5; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); color: var(--suave); }
+  label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--suave); }
+  details summary { cursor: pointer; color: var(--suave); }
+  .error { color: var(--mal); font-size: 13px; min-height: 1em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐝 Sorteo <span>La Colmena</span></h1>
+  <span class="chip"><span id="punto" class="punto"></span><span id="estadoChat">Conectando…</span></span>
+  <span class="chip" id="estadoSorteo">—</span>
+  <div class="grow"></div>
+  <div class="stats">
+    <div>Participantes<br><b id="nPart">0</b></div>
+    <div>Papeletas<br><b id="nPap">0</b></div>
+    <div>Gastado<br><b id="nEur">0 €</b></div>
+  </div>
+  <button id="btnAbrir"></button>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Participantes</h2>
+      <p class="det" id="reglas"></p>
+      <table>
+        <thead><tr><th>Persona</th><th class="num">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
+        <tbody id="tabla"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>Sortear</h2>
+      <div class="ruleta" id="ruleta"><small>Pulsa el botón para sacar ganador</small></div>
+      <div class="fila">
+        <button class="miel" id="btnSortear">🎲 Sortear</button>
+        <label class="check"><input type="checkbox" id="quitar" checked> Quitar al ganador de los siguientes sorteos</label>
+      </div>
+      <div class="error" id="errSortear"></div>
+    </div>
+
+    <div class="card">
+      <h2>Ganadores</h2>
+      <ul class="lista" id="ganadores"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Añadir a mano</h2>
+      <p class="det">Para donaciones que no pasan por el chat (PayPal, Ko-fi, StreamElements…). Usa un número negativo para corregir.</p>
+      <form class="fila" id="formManual">
+        <input id="mUsuario" placeholder="usuario" style="flex:1 1 120px">
+        <input id="mEuros" type="number" step="0.01" placeholder="€" style="width:90px">
+        <button type="submit">Añadir</button>
+      </form>
+      <div class="error" id="errManual"></div>
+    </div>
+
+    <div class="card">
+      <h2>Actividad del chat</h2>
+      <ul class="lista" id="eventos"></ul>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Pruebas y mantenimiento</summary>
+        <p class="det">Mete eventos falsos para probar el panel sin que nadie gaste dinero. Recuerda reiniciar antes del sorteo de verdad.</p>
+        <div class="fila">
+          <button data-sim="bits">+500 bits</button>
+          <button data-sim="sub">+Sub</button>
+          <button data-sim="regalo">+Sub regalada</button>
+          <button data-sim="hypechat">+Hype Chat 5 €</button>
+        </div>
+        <p></p>
+        <button class="peligro" id="btnReiniciar">🗑 Reiniciar sorteo (borra todo)</button>
+      </details>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const eur = (n) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const hora = (iso) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+let estado = null;
+let animando = false;
+
+async function api(ruta, datos) {
+  const r = await fetch(ruta, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Error');
+  return j;
+}
+
+function el(tag, props = {}, ...hijos) {
+  const e = Object.assign(document.createElement(tag), props);
+  for (const h of hijos) e.append(h);
+  return e;
+}
+
+function detalle(d) {
+  const t = [];
+  if (d.bits) t.push(`${d.bits} bits`);
+  if (d.subs) t.push(`${d.subs} sub${d.subs > 1 ? 's' : ''}`);
+  if (d.regalos) t.push(`${d.regalos} regalada${d.regalos > 1 ? 's' : ''}`);
+  if (d.hypechat) t.push(`Hype Chat ${eur(d.hypechat)}`);
+  if (d.manual) t.push(`manual ${eur(d.manual)}`);
+  return t.join(' · ');
+}
+
+function pintar(s) {
+  estado = s;
+  $('punto').className = 'punto' + (s.chat.conectado ? ' on' : '');
+  $('estadoChat').textContent = s.chat.aviso || (s.chat.conectado ? `#${s.canal}` : 'Desconectado');
+  $('estadoSorteo').textContent = s.abierto ? '🟢 Sorteo abierto: contando gastos' : '🔴 Sorteo cerrado: no se cuentan gastos';
+  $('btnAbrir').textContent = s.abierto ? 'Cerrar inscripción' : 'Abrir inscripción';
+  $('nPart').textContent = s.participantes.length;
+  $('nPap').textContent = s.totalPapeletas;
+  $('nEur').textContent = eur(s.totalEuros);
+  const r = s.reglas;
+  $('reglas').textContent = `1 papeleta por cada ${eur(r.eurosPorPapeleta)} gastado` +
+    (r.minimaSiHaGastado ? ` · mínimo ${r.minimaSiHaGastado} si ha gastado algo` : '') +
+    (r.maximo ? ` · máximo ${r.maximo} por persona` : '');
+
+  const tabla = $('tabla');
+  tabla.replaceChildren();
+  if (!s.participantes.length) {
+    tabla.append(el('tr', {}, el('td', { colSpan: 5, className: 'vacio', textContent: 'Todavía nadie ha gastado nada en este sorteo.' })));
+  }
+  const max = Math.max(1, ...s.participantes.map((p) => p.papeletas));
+  for (const p of s.participantes) {
+    const barra = el('div', { className: 'barra' }, el('i', { style: `width:${(p.papeletas / max) * 100}%` }));
+    const btn = el('button', { textContent: p.excluido ? 'Readmitir' : 'Excluir', title: p.excluido ? 'Volver a meter en el sorteo' : 'Sacar del sorteo' });
+    btn.onclick = () => api('/api/excluir', { login: p.login, excluido: !p.excluido });
+    tabla.append(el('tr', { className: p.excluido ? 'excluido' : '' },
+      el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p.detalle) })),
+      el('td', { className: 'num', textContent: eur(p.euros) }),
+      el('td', { className: 'num' }, el('div', { textContent: p.papeletas }), barra),
+      el('td', { className: 'num', textContent: (p.probabilidad * 100).toFixed(1) + ' %' }),
+      el('td', { className: 'num' }, btn),
+    ));
+  }
+
+  const gan = $('ganadores');
+  gan.replaceChildren();
+  if (!s.ganadores.length) gan.append(el('li', { className: 'no', textContent: 'Aún no hay ganadores.' }));
+  for (const g of s.ganadores) {
+    gan.append(el('li', {}, el('span', { className: 'h', textContent: hora(g.hora) }),
+      el('b', { textContent: '🏆 ' + g.nombre }),
+      el('span', { className: 'det', textContent: `${g.papeletas}/${g.totalPapeletas} papeletas (${(g.probabilidad * 100).toFixed(1)} %)` })));
+  }
+
+  const ev = $('eventos');
+  ev.replaceChildren();
+  if (!s.eventos.length) ev.append(el('li', { className: 'no', textContent: 'Esperando bits, subs, regalos o Hype Chats…' }));
+  for (const e of s.eventos) {
+    const li = el('li', { className: e.contado ? '' : 'no' },
+      el('span', { className: 'h', textContent: hora(e.hora) }),
+      el('span', {}, el('b', { textContent: e.nombre }), ' ' + e.texto + ' ', el('span', { className: 'tag', textContent: eur(e.euros) })));
+    if (!e.contado) li.append(el('span', { className: 'tag', textContent: 'no cuenta: ' + e.motivo }));
+    ev.append(li);
+  }
+}
+
+// Animación tipo ruleta: va pasando nombres (más veces los que tienen más papeletas)
+// cada vez más despacio hasta parar en el ganador.
+function ruleta(caja, candidatos, ganador, alTerminar) {
+  const bolsa = candidatos.flatMap((c) => Array(Math.min(c.papeletas, 20)).fill(c.nombre));
+  const pasos = 32;
+  let i = 0;
+  caja.classList.remove('final');
+  const tick = () => {
+    if (i >= pasos) {
+      caja.replaceChildren('🏆 ' + ganador.nombre, el('small', { textContent: `${ganador.papeletas} de ${ganador.totalPapeletas} papeletas · ${(ganador.probabilidad * 100).toFixed(1)} %` }));
+      void caja.offsetWidth; caja.classList.add('final');
+      return alTerminar && alTerminar();
+    }
+    caja.textContent = bolsa[Math.floor(Math.random() * bolsa.length)];
+    i++;
+    setTimeout(tick, 40 + (i / pasos) ** 3 * 380);
+  };
+  tick();
+}
+
+$('btnSortear').onclick = async () => {
+  if (animando) return;
+  $('errSortear').textContent = '';
+  try {
+    $('btnSortear').disabled = true;
+    await api('/api/sortear', { quitarGanador: $('quitar').checked });
+  } catch (e) {
+    $('errSortear').textContent = e.message;
+    $('btnSortear').disabled = false;
+  }
+};
+
+$('btnAbrir').onclick = () => api(estado && estado.abierto ? '/api/cerrar' : '/api/abrir');
+$('btnReiniciar').onclick = () => {
+  if (confirm('¿Seguro? Se borran participantes, papeletas, actividad y ganadores de este sorteo.')) api('/api/reiniciar');
+};
+document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => api('/api/simular', { tipo: b.dataset.sim }));
+$('formManual').onsubmit = async (ev) => {
+  ev.preventDefault();
+  $('errManual').textContent = '';
+  try {
+    await api('/api/manual', { usuario: $('mUsuario').value, euros: $('mEuros').value });
+    $('mUsuario').value = ''; $('mEuros').value = '';
+  } catch (e) { $('errManual').textContent = e.message; }
+};
+
+const fuente = new EventSource('/api/eventos');
+fuente.addEventListener('estado', (e) => pintar(JSON.parse(e.data)));
+fuente.addEventListener('ganador', (e) => {
+  const { ganador, candidatos } = JSON.parse(e.data);
+  animando = true;
+  ruleta($('ruleta'), candidatos, ganador, () => { animando = false; $('btnSortear').disabled = false; });
+});
+fuente.onerror = () => { $('punto').className = 'punto'; $('estadoChat').textContent = 'Sin conexión con el programa (¿está arrancado?)'; };
+</script>
+</body>
+</html>
