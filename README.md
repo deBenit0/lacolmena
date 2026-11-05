@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.3.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.4.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -32,13 +32,20 @@ filtrar por profesión y ocultar el equipo de nivel bajo. Al elegir un objeto ve
 - la **cantidad** con − y + (de lo que salga por vez) y los botones **Pedir a todos**,
   **Pedir a [nombre]** y **Susurrar**.
 
+### Pedir lo que me falta
+En tu ventana de profesión, elige lo que quieres fabricar (y cuántas veces) y pulsa
+**Pedir lo que me falta**: pide a la hermandad los materiales que no tienes (contando bolsas
+y banco), con la cantidad exacta. No repite lo que ya tengas pedido.
+
 ### Peticiones
 - **Nueva petición:** mayús+clic en un objeto (o arrástralo al icono), cantidad, si aportas
-  los materiales y el pago opcional en oro y/u objetos. Los encantamientos se piden desde
+  los materiales; el pago en oro u objetos y el destinatario están en **Más opciones**. Los encantamientos se piden desde
   la página de Recetas, porque no son objetos.
 - Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
   Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.
+- El aviso trae el botón **Lo hago yo** para aceptar sin abrir nada. Al entrar, un resumen en
+  el chat te dice cuántas puedes hacer, y la pestaña del addon muestra ese número.
 - **Lo hago yo:** te comprometes a hacer una cantidad. Varios pueden repartirse una petición.
 - **Soltar:** si al final no puedes. Un compromiso sin entregar caduca solo a las **48 h**.
 - **Entrega por correo:** quien ha aceptado envía los objetos por correo al autor y la

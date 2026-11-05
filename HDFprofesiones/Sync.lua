@@ -440,6 +440,15 @@ function Sync.Start()
   Data.Purge(ns.Now())
   Sync.PublishMine()
   ns.After(1, Sync.SendHello)
+  -- Resumen en el chat cuando ya se ha puesto al día.
+  ns.After(45, function()
+    local list = Data.ServableRequests(ns.Now())
+    if #list > 0 then
+      ns.Print("hay %d %s que puedes hacer. Míralas en la ventana de hermandad (J), pestaña del addon.",
+        #list, #list == 1 and "petición" or "peticiones")
+      ns.Fire("DATA_CHANGED", "summary")
+    end
+  end)
   -- Un segundo resumen al rato recupera lo que se haya perdido (alguien que se fue a medias...).
   local key = ns.guildKey
   ns.After(180, function()

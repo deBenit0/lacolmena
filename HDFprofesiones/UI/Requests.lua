@@ -42,8 +42,7 @@ local function matchesFilter(filter, r, info, me)
   local myCommit = r.c and r.c[me]
   if filter == "active" then return active end
   if filter == "craft" then
-    return info.state == "open" and r.a ~= me and (not r.to or r.to == me)
-      and (Data.ICanCraft(r.k) or Data.ICanGather(r.k) or false)
+    return Data.CanServe(r, ns.Now())
   end
   if filter == "mine" then return r.a == me end
   if filter == "involved" then

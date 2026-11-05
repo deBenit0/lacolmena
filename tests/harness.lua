@@ -236,7 +236,7 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Alerts.lua",
+  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Alerts.lua",
   "UI/Widgets.lua", "UI/Main.lua", "UI/Recipes.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
 }
 
@@ -395,6 +395,7 @@ local function makeEnv(client)
     end,
     GetTradeSkillReagentItemLink = function(i, r) return itemLink(client.tradeskill.rows[i].reagents[r][1]) end,
     GetTradeSkillCooldown = function(i) return client.tradeskill.rows[i].cooldown end,
+    GetTradeSkillSelectionIndex = function() return client.tradeskill and client.tradeskill.selected or 0 end,
     -- encantamiento (ventana "craft")
     GetCraftDisplaySkillLine = function()
       local t = client.craft

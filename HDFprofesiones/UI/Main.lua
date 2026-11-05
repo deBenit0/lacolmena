@@ -220,6 +220,20 @@ function UI.AttachHost(host)
     ns.After(0.1, place)
     ns.After(0.5, place)
   end)
+  -- Número de peticiones que puedo atender, en la esquina de la pestaña.
+  tab.badge = CreateFrame("Frame", nil, tab)
+  tab.badge:SetSize(20, 20)
+  tab.badge:SetPoint("TOPRIGHT", 6, 6)
+  tab.badge:SetFrameLevel(tab:GetFrameLevel() + 5)
+  local dot = tab.badge:CreateTexture(nil, "ARTWORK")
+  dot:SetAllPoints()
+  dot:SetColorTexture(0.8, 0.1, 0.1, 0.95)
+  tab.badge.text = tab.badge:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  tab.badge.text:SetPoint("CENTER", 0, 0)
+  tab.badge:Hide()
+  UI.tabs = UI.tabs or {}
+  UI.tabs[#UI.tabs + 1] = tab
+  UI.UpdateBadges()
   tab:SetScript("OnClick", function(self)
     if self.SetChecked then self:SetChecked(false) end -- no se queda marcada como las de Blizzard
     UI.Toggle(host)
@@ -253,10 +267,21 @@ ns.On("ADDON_LOADED", function(name)
   if name == "Blizzard_GuildUI" or name == "Blizzard_Communities" then attachHosts() end
 end)
 
+-- Actualiza el número de peticiones pendientes para mí en las pestañas.
+function UI.UpdateBadges()
+  if not UI.tabs then return end
+  local n = ns.G() and #ns.Data.ServableRequests(ns.Now()) or 0
+  for _, tab in ipairs(UI.tabs) do
+    tab.badge:SetShown(n > 0)
+    tab.badge.text:SetText(n > 9 and "9+" or tostring(n))
+  end
+end
+
 local function scheduleRefresh()
   if UI.IsShown() then ns.Coalesce("uiRefresh", 0.3, UI.Refresh) end
 end
 ns.Listen("DATA_CHANGED", scheduleRefresh)
+ns.Listen("DATA_CHANGED", function() ns.Coalesce("badges", 1, UI.UpdateBadges) end)
 ns.Listen("ROSTER_UPDATED", scheduleRefresh)
 ns.Listen("NEW_VERSION", scheduleRefresh)
 ns.Listen("BAGS_CHANGED", scheduleRefresh)

@@ -34,4 +34,7 @@ read_globals = {
   -- Correo
   "SendMail", "GetSendMailItem", "GetSendMailItemLink", "ATTACHMENTS_MAX_SEND", "MailFrame",
   "MailFrameTab_OnClick", "SendMailNameEditBox", "SendMailSubjectEditBox",
+  -- Ventanas de profesión
+  "TradeSkillFrame", "TradeSkillCreateButton", "TradeSkillInputBox", "GetTradeSkillSelectionIndex",
+  "CraftFrame", "CraftCreateButton", "GetCraftSelectionIndex",
 }

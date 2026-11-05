@@ -257,6 +257,34 @@ function Data.GatherersOf(key)
   return names, skill
 end
 
+-- ¿Puedo atender esta petición? (sé fabricarlo o conseguirlo, no es mía y está abierta para mí)
+function Data.CanServe(r, now)
+  local me = ns.Me()
+  if not r or r.a == me or (r.to and r.to ~= me) then return false end
+  if Data.RequestInfo(r, now).state ~= "open" then return false end
+  return r.to == me or Data.ICanCraft(r.k) or Data.ICanGather(r.k) or false
+end
+
+-- Peticiones que puedo atender ahora mismo.
+function Data.ServableRequests(now)
+  local g, list = ns.G(), {}
+  if not g then return list end
+  for _, r in pairs(g.requests) do
+    if Data.CanServe(r, now) then list[#list + 1] = r end
+  end
+  table.sort(list, function(a, b) return (a.t or 0) > (b.t or 0) end)
+  return list
+end
+
+-- Mis peticiones activas de un objeto (para no pedirlo dos veces).
+function Data.MyActiveRequestFor(key, now)
+  local g, me = ns.G(), ns.Me()
+  if not g then return nil end
+  for _, r in pairs(g.requests) do
+    if r.a == me and r.k == key and Data.IsActiveState(Data.RequestInfo(r, now).state) then return r end
+  end
+end
+
 function Data.ICanCraft(key)
   local c = ns.MyChar()
   if not c then return false end

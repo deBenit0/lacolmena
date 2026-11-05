@@ -43,7 +43,7 @@ local function takeCursorItem()
 end
 
 local function create()
-  dialog = W.Panel("HDFProfRequestDialog", UIParent, 400, 340)
+  dialog = W.Panel("HDFProfRequestDialog", UIParent, 400, 366)
   dialog:SetFrameStrata("DIALOG")
   dialog:SetToplevel(true)
   dialog:SetPoint("CENTER", 0, 60)
@@ -96,43 +96,56 @@ local function create()
   dialog.mats = W.Check(dialog, "Aporto yo los materiales")
   dialog.mats:SetPoint("TOPLEFT", 20, -132)
 
+  -- Más opciones (pago y destinatario), ocultas al principio para que sea más corto.
+  local more = CreateFrame("Frame", nil, dialog)
+  more:SetAllPoints()
+  dialog.more = more
+  dialog.moreButton = W.Button(dialog, "Más opciones...", 130, 20)
+  dialog.moreButton:SetPoint("TOPLEFT", 24, -164)
+  dialog.moreButton:SetScript("OnClick", function() dialog:SetExpanded(not more:IsShown()) end)
+  function dialog:SetExpanded(expanded)
+    more:SetShown(expanded)
+    self:SetHeight(expanded and 366 or 236)
+    self.moreButton:SetText(expanded and "Menos opciones" or "Más opciones...")
+  end
+
   -- Pago
-  local payLabel = W.Text(dialog, "GameFontNormalSmall")
-  payLabel:SetPoint("TOPLEFT", 24, -168)
+  local payLabel = W.Text(more, "GameFontNormalSmall")
+  payLabel:SetPoint("TOPLEFT", 24, -194)
   payLabel:SetText("Pago (opcional)")
-  dialog.gold = W.Input(dialog, 56, true)
+  dialog.gold = W.Input(more, 56, true)
   dialog.gold:SetPoint("LEFT", payLabel, "RIGHT", 14, 0)
   dialog.gold:SetMaxLetters(6)
-  local goldLabel = W.Text(dialog, "GameFontHighlightSmall")
+  local goldLabel = W.Text(more, "GameFontHighlightSmall")
   goldLabel:SetPoint("LEFT", dialog.gold, "RIGHT", 4, 0)
   goldLabel:SetText("oro")
-  dialog.silver = W.Input(dialog, 30, true)
+  dialog.silver = W.Input(more, 30, true)
   dialog.silver:SetPoint("LEFT", goldLabel, "RIGHT", 14, 0)
   dialog.silver:SetMaxLetters(2)
-  local silverLabel = W.Text(dialog, "GameFontHighlightSmall")
+  local silverLabel = W.Text(more, "GameFontHighlightSmall")
   silverLabel:SetPoint("LEFT", dialog.silver, "RIGHT", 4, 0)
   silverLabel:SetText("plata")
 
-  local payItemsLabel = W.Text(dialog, "GameFontHighlightSmall")
-  payItemsLabel:SetPoint("TOPLEFT", 24, -192)
+  local payItemsLabel = W.Text(more, "GameFontHighlightSmall")
+  payItemsLabel:SetPoint("TOPLEFT", 24, -218)
   payItemsLabel:SetText("y/o en objetos (mayús+clic) y cuántos:")
   dialog.payRows = {}
   for i = 1, 2 do
-    local link = linkInput(dialog, 250)
-    link:SetPoint("TOPLEFT", 30, -208 - (i - 1) * 24)
-    local count = W.Input(dialog, 40, true)
+    local link = linkInput(more, 250)
+    link:SetPoint("TOPLEFT", 30, -234 - (i - 1) * 24)
+    local count = W.Input(more, 40, true)
     count:SetPoint("LEFT", link, "RIGHT", 12, 0)
     count:SetMaxLetters(4)
     dialog.payRows[i] = { link = link, count = count }
   end
 
   -- Destinatario
-  local toLabel = W.Text(dialog, "GameFontNormalSmall")
-  toLabel:SetPoint("TOPLEFT", 24, -268)
+  local toLabel = W.Text(more, "GameFontNormalSmall")
+  toLabel:SetPoint("TOPLEFT", 24, -294)
   toLabel:SetText("Para:")
-  dialog.toText = W.Text(dialog, "GameFontHighlightSmall")
+  dialog.toText = W.Text(more, "GameFontHighlightSmall")
   dialog.toText:SetPoint("LEFT", toLabel, "RIGHT", 8, 0)
-  dialog.clearTo = W.Button(dialog, "Para todos", 90, 20, function() setTarget(nil) end)
+  dialog.clearTo = W.Button(more, "Para todos", 90, 20, function() setTarget(nil) end)
   dialog.clearTo:SetPoint("LEFT", dialog.toText, "RIGHT", 10, 0)
 
   -- Botones
@@ -182,6 +195,7 @@ function ns.UI.OpenRequestDialog(opts)
   setKey(opts.k, opts.pk)
   setTarget(opts.to)
   dialog.qty:SetText(tostring(opts.q or 1))
+  dialog:SetExpanded(opts.to ~= nil)
   dialog.mats:SetChecked(true)
   dialog.gold:SetText("")
   dialog.silver:SetText("")

@@ -46,6 +46,21 @@ local function createFrame()
   f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   f.hint:SetPoint("BOTTOMLEFT", f.icon, "BOTTOMRIGHT", 10, 0)
   f.hint:SetText("Clic para verla")
+  f.commit = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  f.commit:SetSize(90, 20)
+  f.commit:SetPoint("BOTTOMRIGHT", -10, 7)
+  f.commit:SetText("Lo hago yo")
+  f.commit:SetScript("OnClick", function()
+    local alert = f.alert
+    Alerts.HideCurrent()
+    local g = ns.G()
+    local r = alert and g and g.requests[alert.id]
+    if not r or not Data.CanServe(r, ns.Now()) then return end
+    local remaining = Data.RequestInfo(r, ns.Now()).remaining
+    ns.W.AskAmount(string.format("¿Cuántos vas a hacer? (faltan %d)", remaining), remaining, function(n)
+      ns.Sync.Commit(r.id, n)
+    end)
+  end)
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", 0, 0)
   close:SetScript("OnClick", function() Alerts.HideCurrent() end)
@@ -72,6 +87,9 @@ local function show(alert)
   frame.icon:SetTexture(alert.icon or ns.QUESTION_ICON)
   frame.text:SetText(alert.text)
   frame.hint:SetText(alert.id and "Clic para verla" or "Clic para abrir Profesiones")
+  local g = ns.G()
+  local r = alert.id and g and g.requests[alert.id]
+  frame.commit:SetShown(alert.canCommit and r and Data.CanServe(r, ns.Now()) or false)
   frame:Show()
   if ns.db.settings.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
   local token = {}
@@ -119,7 +137,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
       g.alerted[new.id] = true
       local text = string.format("%s pide %dx %s", ns.ShortName(new.a), new.q, ns.KeyLabel(new.k))
       if new.to == me then text = text .. " (a ti)" end
-      Alerts.Push({ id = new.id, icon = icon, text = text })
+      Alerts.Push({ id = new.id, icon = icon, text = text, canCommit = true })
     end
   end
 
