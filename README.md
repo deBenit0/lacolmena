@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.6.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.7.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -66,6 +66,14 @@ los materiales que te faltan (contando bolsas y banco):
   encargos del fabricante.
 - **Renovar** y **Cerrar** (solo el autor). Las peticiones caducan a los **7 días**; las
   terminadas se siguen viendo 2 días. Máximo **10 abiertas** por jugador.
+
+### Karma
+- **Sube** cuando entregas lo que aceptaste y **baja** cuando recibes lo que pediste, según su
+  valor en subasta: **1 punto por cada oro**. El precio se fija al crear la petición (con
+  Auctionator si lo tiene quien pide; si no, 1 oro por unidad).
+- Si una petición caduca o se cierra sin recibir nada, no se pierde karma.
+- Se ve junto a cada nombre, hay una clasificación en Mis cosas y las peticiones de quien tiene
+  **más karma salen antes** en las listas.
 
 ### Mis cosas
 Tus profesiones publicadas, el **modo demostración** (jugadores y peticiones de ejemplo que solo

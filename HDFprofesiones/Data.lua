@@ -86,6 +86,8 @@ function Data.SanitizeEntry(e)
     av = type(e.av) == "string" and e.av or nil,
     th = cleanNumberMap(e.th, "string"),
     ga = cleanNumberMap(e.ga, "number"),
+    kc = cleanNumberMap(e.kc, "string"),
+    kd = tonumber(e.kd),
   }
   if type(e.p) == "table" then
     local profs, any = {}, false
@@ -141,6 +143,11 @@ function Data.BuildMyEntry(now)
   local th = g.thanks[me]
   if th and next(th) then e.th = deepCopy(th) end
   if c.gather and next(c.gather) then e.ga = deepCopy(c.gather) end
+  local karma = g.karma and g.karma[me]
+  if karma then
+    if karma.kc and next(karma.kc) then e.kc = deepCopy(karma.kc) end
+    if karma.kd and karma.kd > 0 then e.kd = karma.kd end
+  end
   local profs, anyProf = {}, false
   for pk, prof in pairs(c.profs) do
     local items, enchants = {}, {}
@@ -285,6 +292,29 @@ function Data.MyActiveRequestFor(key, now)
   end
 end
 
+-- Karma de un personaje, en puntos (1 punto = 1 oro de valor en subasta):
+-- lo que le reconocen los demás por entregar, menos lo que ha recibido él.
+function Data.KarmaFor(name)
+  local g = ns.G()
+  if not g then return 0 end
+  local copper = 0
+  for _, e in pairs(g.entries) do
+    if e.kc and e.kc[name] then copper = copper + e.kc[name] end
+  end
+  local own = g.entries[name]
+  if own and own.kd then copper = copper - own.kd end
+  if copper >= 0 then return math.floor(copper / 10000) end
+  return -math.floor(-copper / 10000)
+end
+
+-- "+12" en verde, "-5" en rojo, "0" en gris.
+function Data.KarmaText(name)
+  local k = Data.KarmaFor(name)
+  if k > 0 then return "|cff40ff40+" .. k .. "|r" end
+  if k < 0 then return "|cffff5050" .. k .. "|r" end
+  return "|cff9999990|r"
+end
+
 function Data.ICanCraft(key)
   local c = ns.MyChar()
   if not c then return false end
@@ -391,7 +421,7 @@ end
 ---------------------------------------------------------------------------
 -- Peticiones
 ---------------------------------------------------------------------------
-local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn" }
+local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu" }
 
 function Data.SanitizeRequest(r)
   if type(r) ~= "table" then return nil end
@@ -425,6 +455,8 @@ function Data.SanitizeRequest(r)
   if type(r.to) == "string" and r.to ~= "" then out.to = r.to end
   if tonumber(r.x) then out.x = tonumber(r.x) end
   if tonumber(r.rn) then out.rn = tonumber(r.rn) end
+  local vu = tonumber(r.vu)
+  if vu and vu >= 1 then out.vu = floor(vu) end
   if type(r.c) == "table" then
     local c, any = {}, false
     for name, cm in pairs(r.c) do
@@ -589,6 +621,7 @@ function Data.Purge(now)
       g.requests[id] = nil
       g.alerted[id] = nil
       g.thanked[id] = nil
+      if g.karmaSeen then g.karmaSeen[id] = nil end
     end
   end
 end
@@ -615,7 +648,7 @@ function Data.CreateRequest(opts, now)
   local id = me .. ":" .. Codec.EncodeUInt(now) .. Codec.EncodeUInt(g.reqSeq % 1024)
   local r = Data.SanitizeRequest({
     id = id, a = me, t = now, k = opts.k, pk = opts.pk, q = opts.q or 1, av = now,
-    m = opts.m and true or nil, g = opts.g, pi = opts.pi, to = opts.to,
+    m = opts.m and true or nil, g = opts.g, pi = opts.pi, to = opts.to, vu = opts.vu,
   })
   g.requests[id] = r
   return r
@@ -680,11 +713,30 @@ end
 
 -- Contador de encargos: lo lleva el autor. Suma uno a cada fabricante que entrega todo
 -- lo que prometió (o que completa la petición), confirmado a mano o enviado por correo.
+Data.DEFAULT_UNIT_VALUE = 10000 -- si no se sabe el precio: 1 oro por unidad
+
 function Data.CheckThanks(r, now)
   local g, me = ns.G(), ns.Me()
   if not g or not r or r.a ~= me or not r.c then return false end
   local info = Data.RequestInfo(r, now)
   local changed = false
+  -- Karma: por cada unidad entregada, el fabricante gana y yo (autor) pierdo su valor en subasta.
+  g.karma = g.karma or {}
+  g.karma[me] = g.karma[me] or { kc = {}, kd = 0 }
+  local karma = g.karma[me]
+  karma.kc = karma.kc or {}
+  g.karmaSeen = g.karmaSeen or {}
+  g.karmaSeen[r.id] = g.karmaSeen[r.id] or {}
+  local unitValue = r.vu or Data.DEFAULT_UNIT_VALUE
+  for crafter, cm in pairs(r.c) do
+    local units = deliveredOf(cm) - (g.karmaSeen[r.id][crafter] or 0)
+    if units > 0 then
+      g.karmaSeen[r.id][crafter] = deliveredOf(cm)
+      karma.kc[crafter] = (karma.kc[crafter] or 0) + units * unitValue
+      karma.kd = (karma.kd or 0) + units * unitValue
+      changed = true
+    end
+  end
   for crafter, cm in pairs(r.c) do
     local d = deliveredOf(cm)
     if d > 0 and (d >= (cm.n or 0) or info.delivered >= r.q) then

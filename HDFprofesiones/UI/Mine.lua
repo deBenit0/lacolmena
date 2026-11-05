@@ -94,6 +94,7 @@ ns.UI.RegisterPage("mine", function(page)
       string.format("Peticiones activas: %d", active),
       string.format("Tus peticiones abiertas: %d/%d", Data.CountOpenBy(me, now), Data.MAX_OPEN),
       string.format("Encargos que te han confirmado: %d", Data.ThanksFor(me)),
+      "Tu karma: " .. Data.KarmaText(me) .. " |cff999999(1 punto = 1 oro entregado; baja al recibir)|r",
       " ",
       "|cffffd100Addon|r",
       "Tu versión: " .. ns.VERSION,
@@ -102,6 +103,19 @@ ns.UI.RegisterPage("mine", function(page)
       stats[#stats + 1] = "|cffff8040Hay una versión nueva: " .. ns.Sync.newest .. "|r"
     end
     stats[#stats + 1] = string.format("Compañeros con el addon vistos hoy: %d", peers)
+    -- Clasificación de karma (los 5 primeros).
+    local ranking = {}
+    for name in pairs(g.entries) do ranking[#ranking + 1] = { name = name, k = Data.KarmaFor(name) } end
+    table.sort(ranking, function(a, b)
+      if a.k ~= b.k then return a.k > b.k end
+      return a.name < b.name
+    end)
+    stats[#stats + 1] = " "
+    stats[#stats + 1] = "|cffffd100Más karma|r"
+    for i = 1, math.min(5, #ranking) do
+      local e = g.entries[ranking[i].name]
+      stats[#stats + 1] = string.format("%d. %s  %s", i, ns.ColoredName(ranking[i].name, e and e.c), Data.KarmaText(ranking[i].name))
+    end
     stats[#stats + 1] = "Sincronización: " .. (ns.Sync.IsStarted() and "activa" or "esperando a la hermandad...")
     local queued = ns.Comm.Pending()
     if queued > 0 then stats[#stats + 1] = string.format("Mensajes por enviar: %d", queued) end

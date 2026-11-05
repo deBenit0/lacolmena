@@ -67,6 +67,7 @@ local function crafterRows(key, withGatherers)
         online = Guild.IsOnline(cr.n),
         seen = Guild.LastSeen(cr.n),
         thanks = Data.ThanksFor(cr.n),
+        karma = Data.KarmaText(cr.n),
         profs = {},
       }
       byName[cr.n] = row
@@ -316,7 +317,7 @@ local function buildCatalog(page, mode)
       row.name:SetWordWrap(false)
       row.status = W.Text(row, "GameFontHighlightSmall")
       row.status:SetPoint("LEFT", 108, 0)
-      row.status:SetPoint("RIGHT", row, "RIGHT", -44, 0)
+      row.status:SetPoint("RIGHT", row, "RIGHT", -70, 0)
       row.status:SetWordWrap(false)
       row.count = W.Text(row, "GameFontNormalSmall", "RIGHT")
       row.count:SetPoint("RIGHT", -2, 0)
@@ -328,7 +329,7 @@ local function buildCatalog(page, mode)
         for _, p in ipairs(c.profs) do
           GameTooltip:AddLine(ns.ProfessionName(p.pk) .. (p.r and string.format(" %d/%d", p.r, p.m or 0) or ""), 1, 1, 1)
         end
-        GameTooltip:AddLine("Encargos completados: " .. c.thanks, 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Karma: " .. c.karma .. "   Encargos completados: " .. c.thanks, 0.8, 0.8, 0.8)
         GameTooltip:Show()
       end)
       row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -336,7 +337,7 @@ local function buildCatalog(page, mode)
     updateRow = function(row, c)
       row.name:SetText(ns.ColoredName(c.name, c.class))
       row.status:SetText(c.status)
-      row.count:SetText(c.thanks > 0 and (c.thanks .. " enc.") or "")
+      row.count:SetText("karma " .. c.karma)
     end,
     onSelect = function() page:RefreshButtons() end,
   })

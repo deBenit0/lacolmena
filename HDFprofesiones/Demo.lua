@@ -129,6 +129,18 @@ function Demo.Enable()
       Demo.seen[full(name)] = now - (index * 5400)
     end
   end
+  -- Karma de ejemplo: unos han ayudado más que otros.
+  local all = {}
+  for name in pairs(g.entries) do
+    if g.entries[name].demo then all[#all + 1] = name end
+  end
+  table.sort(all)
+  for i, name in ipairs(all) do
+    local e = g.entries[name]
+    local helped = all[(i % #all) + 1]
+    e.kc = { [helped] = ((i * 7) % 9) * 40000 }
+    e.kd = ((i * 5) % 6) * 30000
+  end
   for i, req in ipairs(REQUESTS) do
     local r = Data.SanitizeRequest({
       id = full(req[1]) .. ":demo" .. i, a = full(req[1]), t = now - i * 1800, k = "i" .. req[2],

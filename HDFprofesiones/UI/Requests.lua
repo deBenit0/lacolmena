@@ -116,7 +116,7 @@ ns.UI.RegisterPage("requests", function(page)
       local title = string.format("%dx %s", r.q, ns.KeyLabel(r.k))
       if r.to == ns.Me() then title = "|cffff80ff[A ti]|r " .. title end
       row.title:SetText(title)
-      local sub = ns.ShortName(r.a) .. " - " .. stateText(r, info)
+      local sub = ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ") - " .. stateText(r, info)
       local pay = r.g and ns.FormatMoney(r.g)
       if pay then sub = sub .. " - " .. pay end
       row.sub:SetText(sub)
@@ -283,6 +283,7 @@ ns.UI.RegisterPage("requests", function(page)
     detail.title:SetText(string.format("%dx %s", r.q, link or name or ns.KeyName(r.k)))
     local authorEntry = ns.G().entries[r.a]
     detail.sub:SetText("Pide " .. ns.ColoredName(r.a, authorEntry and authorEntry.c or (Guild.Info(r.a) or {}).class)
+      .. " (karma " .. Data.KarmaText(r.a) .. ")"
       .. " |cffbbbbbbhace " .. ns.FormatDuration(now - (r.t or now)) .. "|r")
 
     local lines = {}
@@ -346,7 +347,7 @@ ns.UI.RegisterPage("requests", function(page)
     for _, r in pairs(g.requests) do
       local info = Data.RequestInfo(r, now)
       if matchesFilter(filter, r, info, me) then
-        items[#items + 1] = { r = r, info = info }
+        items[#items + 1] = { r = r, info = info, karma = Data.KarmaFor(r.a) }
       end
     end
     table.sort(items, function(a, b)
@@ -354,6 +355,8 @@ ns.UI.RegisterPage("requests", function(page)
       if aMe ~= bMe then return aMe end
       local aActive, bActive = Data.IsActiveState(a.info.state), Data.IsActiveState(b.info.state)
       if aActive ~= bActive then return aActive end
+      -- Prioridad: primero las de quien tiene más karma.
+      if a.karma ~= b.karma then return a.karma > b.karma end
       if (a.r.t or 0) ~= (b.r.t or 0) then return (a.r.t or 0) > (b.r.t or 0) end
       return a.r.id < b.r.id
     end)
