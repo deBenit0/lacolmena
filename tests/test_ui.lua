@@ -43,16 +43,30 @@ ns.UI.Open("recipes")
 H.Advance(1)
 local recipes = panel.pageFrames.recipes
 H.ok(recipes:IsShown(), "página de recetas visible")
-local items = recipes.list.items
-H.ok(#items == 2, "2 objetos visibles (la coraza de nivel bajo está oculta): " .. #items)
+local function countItems()
+  local n, headers = 0, 0
+  for _, item in ipairs(recipes.list.items) do
+    if item.header then headers = headers + 1 else n = n + 1 end
+  end
+  return n, headers
+end
+local n, headers = countItems()
+H.eq(headers, 1, "una cabecera: Alquimia")
+H.ok(n == 2, "2 objetos visibles (la coraza de nivel bajo está oculta): " .. n)
 ns.db.settings.hideLowGear = false
 recipes:Refresh()
-H.eq(#recipes.list.items, 3, "3 objetos al desactivar el filtro")
+H.eq((countItems()), 3, "3 objetos al desactivar el filtro")
+
+-- Plegar y desplegar la profesión.
+recipes.list.rows[1]:Click()
+H.eq((countItems()), 0, "Alquimia plegada")
+recipes.list.rows[1]:Click()
+H.eq((countItems()), 3, "Alquimia desplegada")
 
 -- Búsqueda.
 recipes.search:SetText("13443")
 recipes.search:GetScript("OnTextChanged")(recipes.search, true)
-H.eq(#recipes.list.items, 1, "búsqueda por nombre")
+H.eq((countItems()), 1, "búsqueda por nombre")
 recipes.search:SetText("")
 recipes.search:GetScript("OnTextChanged")(recipes.search, true)
 
@@ -71,9 +85,18 @@ H.ok(potionRow ~= nil, "fila de la poción")
 potionRow:Click()
 H.Advance(10)
 recipes:RefreshDetail()
-local mats = recipes.detail.mats:GetText()
-H.ok(mats:find("3x Objeto 8838", 1, true) ~= nil, "materiales de la poción: " .. mats)
-H.ok(mats:find("tienes 1", 1, true) ~= nil, "cuántos tengo")
+local slot1 = recipes.detail.slots[1]
+H.ok(slot1:IsShown() and slot1.itemID == 8838, "casilla 1: material 8838")
+H.eq(slot1.need:GetText(), "3", "necesita 3")
+H.ok(slot1.have:GetText():find("1/3", 1, true) ~= nil, "tengo 1 de 3: " .. slot1.have:GetText())
+H.ok(not recipes.detail.slots[3]:IsShown(), "solo 2 casillas")
+-- Cantidad con + y -.
+H.eq(recipes.detail.qty:GetText(), "1", "cantidad inicial")
+recipes.detail.plus:Click()
+recipes.detail.plus:Click()
+H.eq(recipes.detail.qty:GetText(), "3", "cantidad con +")
+recipes.detail.minus:Click()
+H.eq(recipes.detail.qty:GetText(), "2", "cantidad con -")
 local crafters = recipes.detail.crafters
 H.eq(crafters.items[1].name, "Ana-Reino", "Ana la fabrica")
 H.ok(crafters.items[1].online, "Ana en línea")
@@ -86,6 +109,7 @@ local dialog = env.HDFProfRequestDialog
 H.ok(dialog and dialog:IsShown(), "se abre la ventana de petición")
 H.eq(dialog.key, "i13443", "con el objeto elegido")
 H.eq(dialog.to, "Ana-Reino", "para Ana")
+H.eq(dialog.qty:GetText(), "2", "la cantidad elegida pasa a la petición")
 dialog.qty:SetText("4")
 dialog.gold:SetText("2")
 dialog.payRows[1].link:SetText(H.itemLink(12360))
@@ -137,7 +161,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.2.1", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.3.0", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine
