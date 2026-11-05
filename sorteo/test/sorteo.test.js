@@ -1,129 +1,133 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseLine, aportacionDesdeMensaje } = require('../src/twitch');
-const { Sorteo, calcularPapeletas, elegirPonderado } = require('../src/sorteo');
+const N = require('../js/nucleo.js');
 
-const config = {
-  canal: 'prueba',
-  abrirAlArrancar: true,
-  valores: { bit: 0.01, subPrime: 0, subTier1: 3.99, subTier2: 7.99, subTier3: 19.99 },
-  papeletas: { eurosPorPapeleta: 1, minimaSiHaGastado: 1, maximo: 0 },
-  subsRegaladasCuentanParaQuienRegala: true,
-  conversionMonedas: { EUR: 1, USD: 0.9 },
-  ignorar: ['nightbot'],
-};
+globalThis.window = globalThis;
+require('../js/rueda.js');
+const { trozos, anguloFinal, indiceBajoPuntero } = window.Rueda._interno;
 
-const ap = (linea) => aportacionDesdeMensaje(parseLine(linea), config);
+const aj = N.mezclarAjustes({ canal: 'prueba', conversionMonedas: { USD: 0.9 } });
+const acc = (linea, a = aj) => N.accionesDesdeMensaje(N.parseLine(linea), a);
+const priv = (tags, usuario, texto) => `@${tags} :${usuario}!${usuario}@${usuario}.tmi.twitch.tv PRIVMSG #prueba :${texto}`;
 
-test('bits en PRIVMSG', () => {
-  const r = ap('@badge-info=;bits=250;display-name=Abeja_Reina;id=m1;user-id=1 :abeja_reina!abeja_reina@abeja_reina.tmi.twitch.tv PRIVMSG #prueba :Cheer250 vamos');
-  assert.equal(r.length, 1);
-  assert.equal(r[0].login, 'abeja_reina');
-  assert.equal(r[0].nombre, 'Abeja_Reina');
-  assert.equal(r[0].tipo, 'bits');
-  assert.equal(r[0].cantidad, 250);
-  assert.ok(Math.abs(r[0].euros - 2.5) < 1e-9);
+test('ajustes guardados se mezclan con los de serie', () => {
+  const a = N.mezclarAjustes({ valores: { bit: 0.02 }, maximo: 5, inventado: 1 });
+  assert.equal(a.valores.bit, 0.02);
+  assert.equal(a.valores.subTier1, 3.99);
+  assert.equal(a.maximo, 5);
+  assert.equal(a.inventado, undefined);
 });
 
-test('mensaje normal no cuenta', () => {
-  assert.equal(ap('@display-name=Pepe;id=m2 :pepe!pepe@pepe.tmi.twitch.tv PRIVMSG #prueba :hola'), null);
+test('bits', () => {
+  const [r] = acc(priv('bits=250;display-name=Abeja_Reina;id=m1', 'abeja_reina', 'Cheer250 vamos'));
+  assert.deepEqual([r.tipo, r.login, r.nombre, r.cantidad], ['bits', 'abeja_reina', 'Abeja_Reina', 250]);
+  assert.ok(Math.abs(r.euros - 2.5) < 1e-9);
 });
 
-test('sub, resub y prime', () => {
-  const sub = ap('@display-name=Zángano;id=u1;login=zangano;msg-id=sub;msg-param-sub-plan=1000 :tmi.twitch.tv USERNOTICE #prueba');
-  assert.equal(sub[0].euros, 3.99);
-  assert.equal(sub[0].nombre, 'Zángano');
-  const t3 = ap('@display-name=X;id=u2;login=x;msg-id=resub;msg-param-sub-plan=3000 :tmi.twitch.tv USERNOTICE #prueba :mensaje');
-  assert.equal(t3[0].euros, 19.99);
-  const prime = ap('@display-name=P;id=u3;login=p;msg-id=sub;msg-param-sub-plan=Prime :tmi.twitch.tv USERNOTICE #prueba');
-  assert.equal(prime[0].euros, 0);
+test('palabra clave: solo como primera palabra y sin distinguir mayúsculas', () => {
+  assert.equal(acc(priv('display-name=Pepe;id=a', 'pepe', '!SORTEO por favor'))[0].tipo, 'entrada');
+  assert.equal(acc(priv('display-name=Pepe;id=b', 'pepe', 'quiero !sorteo')).length, 0);
+  assert.equal(acc(priv('display-name=Pepe;id=c', 'pepe', 'hola')).length, 0);
+  assert.equal(acc(priv('id=d', 'pepe', '!sorteo'), { ...aj, palabraClave: '' }).length, 0);
 });
 
-test('subgift cuenta para quien regala; submysterygift no se duplica', () => {
-  const g = ap('@display-name=Gen;id=g1;login=gen;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-display-name=Suertudo :tmi.twitch.tv USERNOTICE #prueba');
-  assert.equal(g[0].login, 'gen');
-  assert.equal(g[0].tipo, 'regalo');
-  assert.match(g[0].texto, /Suertudo/);
-  const mystery = ap('@display-name=Gen;id=g0;login=gen;msg-id=submysterygift;msg-param-mass-gift-count=5;msg-param-sub-plan=1000 :tmi.twitch.tv USERNOTICE #prueba');
-  assert.equal(mystery, null);
+test('palabra clave solo para suscriptores', () => {
+  const soloSubs = { ...aj, soloSuscriptores: true };
+  assert.equal(acc(priv('subscriber=0;id=a', 'pepe', '!sorteo'), soloSubs)[0].rechazo, 'solo suscriptores');
+  assert.equal(acc(priv('subscriber=1;id=b', 'pepe', '!sorteo'), soloSubs)[0].rechazo, undefined);
+  assert.equal(acc(priv('badges=founder/0;id=c', 'pepe', '!sorteo'), soloSubs)[0].rechazo, undefined);
+});
+
+test('cheer que además escribe la palabra da las dos cosas', () => {
+  const r = acc(priv('bits=100;id=x', 'ana', '!sorteo Cheer100'));
+  assert.deepEqual(r.map((a) => a.tipo), ['bits', 'entrada']);
+});
+
+test('subs, regalos, upgrades y prime', () => {
+  const un = (t) => acc(`@${t} :tmi.twitch.tv USERNOTICE #prueba`)[0];
+  assert.equal(un('login=z;id=1;msg-id=sub;msg-param-sub-plan=1000').euros, 3.99);
+  assert.equal(un('login=z;id=2;msg-id=resub;msg-param-sub-plan=3000').euros, 19.99);
+  assert.equal(un('login=z;id=3;msg-id=sub;msg-param-sub-plan=Prime').euros, 0);
+  const g = un('login=gen;display-name=Gen;id=4;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-display-name=Suertudo');
+  assert.equal(g.tipo, 'regalo'); assert.equal(g.login, 'gen'); assert.match(g.texto, /Suertudo/);
+  assert.equal(acc('@login=gen;id=5;msg-id=submysterygift;msg-param-sub-plan=1000 :tmi.twitch.tv USERNOTICE #prueba').length, 0);
+  assert.equal(un('login=z;id=6;msg-id=giftpaidupgrade').euros, 3.99);
 });
 
 test('Hype Chat con conversión de moneda', () => {
-  const r = ap('@display-name=Rica;id=h1;pinned-chat-paid-amount=1000;pinned-chat-paid-currency=USD;pinned-chat-paid-exponent=2 :rica!rica@rica.tmi.twitch.tv PRIVMSG #prueba :hola');
-  assert.equal(r[0].tipo, 'hypechat');
-  assert.ok(Math.abs(r[0].euros - 9) < 1e-9);
+  const [r] = acc(priv('id=h;pinned-chat-paid-amount=1000;pinned-chat-paid-currency=USD;pinned-chat-paid-exponent=2', 'rica', 'hola'));
+  assert.equal(r.tipo, 'hypechat');
+  assert.ok(Math.abs(r.euros - 9) < 1e-9);
 });
 
 test('etiquetas escapadas', () => {
-  const m = parseLine('@display-name=a\\sb;system-msg=x\\:y :tmi.twitch.tv USERNOTICE #c');
+  const m = N.parseLine('@display-name=a\\sb;system-msg=x\\:y :tmi.twitch.tv USERNOTICE #c');
   assert.equal(m.tags['display-name'], 'a b');
   assert.equal(m.tags['system-msg'], 'x;y');
 });
 
-test('cálculo de papeletas', () => {
-  const reglas = { eurosPorPapeleta: 1, minimaSiHaGastado: 1, maximo: 0 };
-  assert.equal(calcularPapeletas(0, reglas), 0);
-  assert.equal(calcularPapeletas(0.3, reglas), 1);
-  assert.equal(calcularPapeletas(3.99, reglas), 3);
-  assert.equal(calcularPapeletas(5, reglas), 5);
-  assert.equal(calcularPapeletas(100, { ...reglas, maximo: 20 }), 20);
-  assert.equal(calcularPapeletas(4.99, { eurosPorPapeleta: 0.5, minimaSiHaGastado: 1 }), 9);
+test('papeletas: escribir + gastar, mínimo, máximo y quien gasta sin escribir', () => {
+  const p = (escribio, euros, extra = {}) => N.papeletasDe({ escribio, euros, excluido: false }, { ...aj, ...extra });
+  assert.equal(p(true, 0), 1);
+  assert.equal(p(false, 0.3), 1);
+  assert.equal(p(true, 3.99), 4);
+  assert.equal(p(true, 12.98), 13);
+  assert.equal(p(false, 100, { maximo: 20 }), 20);
+  assert.equal(p(false, 5, { gastanEntranSinEscribir: false }), 0);
+  assert.equal(p(true, 5, { gastanEntranSinEscribir: false }), 6);
+  assert.equal(p(true, 0, { papeletasPorEscribir: 3 }), 3);
+  assert.equal(N.papeletasDe({ escribio: true, euros: 50, excluido: true }, aj), 0);
 });
 
 test('elección ponderada recorre bien los tramos', () => {
-  const pesos = [1, 3, 6];
   const conteo = [0, 0, 0];
-  for (let r = 0; r < 10; r++) conteo[elegirPonderado(pesos, () => r)]++;
+  for (let r = 0; r < 10; r++) conteo[N.elegirPonderado([1, 3, 6], () => r)]++;
   assert.deepEqual(conteo, [1, 3, 6]);
-  assert.equal(elegirPonderado([0, 0]), -1);
+  assert.equal(N.elegirPonderado([0, 0]), -1);
+  for (let i = 0; i < 200; i++) { const k = N.elegirPonderado([5, 0, 5]); assert.ok(k === 0 || k === 2); }
 });
 
-test('sorteo acumula, ignora duplicados/bots/cerrado y saca ganador', () => {
-  const s = new Sorteo(config);
-  s.registrar({ id: 'a', login: 'ana', nombre: 'Ana', tipo: 'bits', cantidad: 500, euros: 5, texto: '500 bits' });
-  s.registrar({ id: 'a', login: 'ana', nombre: 'Ana', tipo: 'bits', cantidad: 500, euros: 5, texto: '500 bits' });
-  s.registrar({ id: 'b', login: 'ana', nombre: 'Ana', tipo: 'sub', cantidad: 1, euros: 3.99, texto: 'Sub' });
-  s.registrar({ id: 'c', login: 'nightbot', nombre: 'Nightbot', tipo: 'bits', cantidad: 100, euros: 1, texto: '100 bits' });
-  s.registrar({ id: 'd', login: 'luis', nombre: 'Luis', tipo: 'regalo', cantidad: 1, euros: 3.99, texto: 'Regala sub' });
-  s.cerrar();
-  s.registrar({ id: 'e', login: 'tarde', nombre: 'Tarde', tipo: 'bits', cantidad: 100, euros: 1, texto: '100 bits' });
-
-  const { participantes, totalPapeletas } = s.lista();
-  assert.deepEqual(participantes.map((p) => [p.login, p.euros, p.papeletas]), [['ana', 8.99, 8], ['luis', 3.99, 3]]);
-  assert.equal(totalPapeletas, 11);
-
-  const r = s.sortear({ quitarGanador: true });
-  assert.ok(['ana', 'luis'].includes(r.ganador.login));
-  assert.equal(s.lista().participantes.find((p) => p.login === r.ganador.login).papeletas, 0);
-  const r2 = s.sortear();
-  assert.notEqual(r2.ganador.login, r.ganador.login);
-  assert.equal(s.sortear(), null);
+test('registro: duplicados, bots, cerrado, palabra repetida', () => {
+  const e = N.estadoVacio();
+  const r = (a) => N.registrar(e, a, aj);
+  r({ id: 'a', login: 'ana', nombre: 'Ana', tipo: 'bits', cantidad: 500, euros: 5, texto: '500 bits' });
+  assert.equal(r({ id: 'a', login: 'ana', nombre: 'Ana', tipo: 'bits', cantidad: 500, euros: 5, texto: '500 bits' }), null);
+  r({ id: 'b', login: 'ana', tipo: 'entrada', texto: 'escribe' });
+  assert.equal(r({ id: 'b2', login: 'ana', tipo: 'entrada', texto: 'escribe' }), null);
+  assert.equal(r({ id: 'c', login: 'nightbot', tipo: 'entrada', texto: 'x' }).motivo, 'usuario ignorado');
+  r({ id: 'd', login: 'luis', nombre: 'Luis', tipo: 'entrada', texto: 'escribe' });
+  e.abierto = false;
+  assert.equal(r({ id: 'e', login: 'tarde', tipo: 'entrada', texto: 'x' }).motivo, 'sorteo cerrado');
+  const l = N.lista(e, aj);
+  assert.deepEqual(l.participantes.map((p) => [p.login, p.papeletas]), [['ana', 6], ['luis', 1]]);
+  assert.equal(l.totalPapeletas, 7);
 });
 
 test('ajuste manual negativo puede quitar a alguien', () => {
-  const s = new Sorteo(config);
-  s.registrar({ login: 'eva', tipo: 'manual', cantidad: 2, euros: 2, texto: '+2' });
-  assert.equal(s.lista().totalPapeletas, 2);
-  s.registrar({ login: 'eva', tipo: 'manual', cantidad: -2, euros: -2, texto: '-2' });
-  assert.equal(s.lista().participantes.length, 0);
+  const e = N.estadoVacio();
+  N.registrar(e, { login: 'eva', tipo: 'manual', cantidad: 2, euros: 2, texto: '+2' }, aj);
+  assert.equal(N.lista(e, aj).totalPapeletas, 2);
+  N.registrar(e, { login: 'eva', tipo: 'manual', cantidad: -5, euros: -5, texto: '-5' }, aj);
+  assert.equal(N.lista(e, aj).participantes.length, 0);
 });
 
-test('cliente IRC: PING, JOIN y mensajes', () => {
-  const { TwitchChat } = require('../src/twitch');
-  const chat = new TwitchChat('#Prueba');
-  const escritos = [];
-  chat.socket = { write: (t) => escritos.push(t), destroy() {} };
-  const estados = [];
-  const mensajes = [];
-  chat.on('estado', (e) => estados.push(e));
-  chat.on('mensaje', (m) => mensajes.push(m));
-  chat._procesar('PING :tmi.twitch.tv');
-  chat._procesar(':justinfan1!justinfan1@justinfan1.tmi.twitch.tv JOIN #prueba');
-  chat._procesar('@bits=10;display-name=A;id=z :a!a@a.tmi.twitch.tv PRIVMSG #prueba :Cheer10');
-  assert.equal(chat.canal, 'prueba');
-  assert.deepEqual(escritos, ['PONG :tmi.twitch.tv\r\n']);
-  assert.deepEqual(estados, [{ conectado: true }]);
-  assert.equal(mensajes.length, 1);
-  assert.equal(aportacionDesdeMensaje(mensajes[0], config)[0].cantidad, 10);
+test('sortear excluye al ganador y se agota', () => {
+  const e = N.estadoVacio();
+  for (const login of ['a', 'b', 'c']) N.registrar(e, { login, tipo: 'entrada', texto: 'x' }, aj);
+  const vistos = new Set();
+  for (let i = 0; i < 3; i++) vistos.add(N.sortear(e, aj).ganador.login);
+  assert.equal(vistos.size, 3);
+  assert.equal(N.sortear(e, aj), null);
+});
+
+test('la ruleta siempre se para en el trozo del ganador', () => {
+  for (let k = 0; k < 500; k++) {
+    const e = N.estadoVacio();
+    const n = 1 + Math.floor(Math.random() * 40);
+    for (let i = 0; i < n; i++) N.registrar(e, { login: 'u' + i, tipo: 'manual', euros: 1 + Math.random() * 30, texto: '' }, aj);
+    const t = N.sortear(e, aj);
+    assert.equal(indiceBajoPuntero(trozos(t.segmentos), anguloFinal(t)), t.indiceGanador);
+    assert.equal(t.segmentos[t.indiceGanador].login, t.ganador.login);
+  }
 });

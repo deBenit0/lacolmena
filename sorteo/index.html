@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorteo La Colmena</title>
+<style>
+  :root {
+    --fondo: #14110c; --panel: #1f1a12; --panel2: #2a2318; --borde: #3a3122;
+    --texto: #f3ead8; --suave: #b5a888; --miel: #f5b301; --miel2: #ffd24a;
+    --ok: #4fc36b; --mal: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--fondo); color: var(--texto); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--borde); position: sticky; top: 0; z-index: 5; }
+  h1 { margin: 0; font-size: 20px; white-space: nowrap; } h1 span { color: var(--miel); }
+  h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel2); font-size: 13px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--mal); flex: none; }
+  .punto.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .grow { flex: 1; }
+  .stats { display: flex; gap: 16px; font-size: 12px; color: var(--suave); } .stats b { color: var(--texto); font-size: 17px; display: block; }
+  main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; padding: 16px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--borde); background: var(--panel2); color: var(--texto); padding: 7px 12px; border-radius: 8px; }
+  button:hover { border-color: var(--miel); }
+  button.miel { background: var(--miel); color: #1a1405; border-color: var(--miel); font-weight: 800; }
+  button.miel:hover { background: var(--miel2); }
+  button.peligro:hover { border-color: var(--mal); color: var(--mal); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  input[type=text], input[type=number] { font: inherit; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; min-width: 0; width: 100%; }
+  input:focus { outline: 2px solid var(--miel); outline-offset: -1px; }
+  .escenario { position: relative; }
+  #lienzo { width: 100%; aspect-ratio: 1 / 1; max-height: 62vh; display: block; margin: 0 auto; }
+  #confeti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .btn-sortear { display: block; width: 100%; font-size: 22px; padding: 14px; border-radius: 12px; margin-top: 10px; letter-spacing: .04em; }
+  .ganador { display: none; text-align: center; margin-top: 12px; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, #3b2a12, #1f1a12); border: 2px solid var(--miel); }
+  .ganador.visible { display: block; animation: aparece .6s ease-out; }
+  .ganador .nombre { font-size: 34px; font-weight: 900; color: var(--miel); }
+  @keyframes aparece { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+  th { font-size: 11px; color: var(--suave); font-weight: 600; text-transform: uppercase; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.excluido td { opacity: .45; } tr.excluido td:first-child { text-decoration: line-through; } tr.excluido td:last-child { opacity: 1; }
+  .det { color: var(--suave); font-size: 12px; }
+  .barra { height: 5px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .barra i { display: block; height: 100%; background: var(--miel); }
+  .scroll { max-height: 420px; overflow: auto; }
+  .vacio { color: var(--suave); text-align: center; padding: 22px 0; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  ul.lista { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+  ul.lista li { padding: 6px 0; border-bottom: 1px solid var(--borde); font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+  ul.lista li .h { color: var(--suave); flex: none; font-variant-numeric: tabular-nums; }
+  ul.lista li.no { opacity: .5; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); color: var(--suave); white-space: nowrap; }
+  .tag.miel { background: #3b2a12; color: var(--miel2); }
+  .error { color: var(--mal); font-size: 13px; min-height: 1em; margin-top: 6px; }
+  details > summary { cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); list-style: none; }
+  details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
+  .ajustes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 14px; margin-top: 12px; }
+  .ajustes label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--suave); }
+  .ajustes label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--texto); font-size: 13px; }
+  .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--miel); }
+  .aviso { background: #3b2a12; border: 1px solid var(--miel); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .entrada-chat { text-align: center; font-size: 14px; color: var(--suave); margin-top: 8px; }
+  .entrada-chat b { color: var(--miel2); font-size: 16px; }
+  .ayuda { font-size: 13px; color: var(--suave); }
+  .ayuda code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; color: var(--texto); word-break: break-all; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐝 Sorteo <span>La Colmena</span></h1>
+  <span class="chip"><span id="punto" class="punto"></span><span id="estadoChat">Sin conectar</span></span>
+  <button id="btnAbrir" class="chip"></button>
+  <div class="grow"></div>
+  <div class="stats">
+    <div>Participantes<b id="nPart">0</b></div>
+    <div>Papeletas<b id="nPap">0</b></div>
+    <div>Gastado<b id="nEur">0 €</b></div>
+  </div>
+  <button id="btnEscena" title="Abre la escena para capturarla en OBS">🎬 Abrir escena</button>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <div id="avisoCanal" class="aviso" hidden>👋 Primero escribe el nombre de tu canal de Twitch en <b>Ajustes</b> (abajo del todo) y pulsa Guardar.</div>
+      <div class="escenario">
+        <canvas id="lienzo"></canvas>
+        <canvas id="confeti"></canvas>
+      </div>
+      <div class="entrada-chat" id="comoEntrar"></div>
+      <button class="miel btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
+      <div class="error" id="errSortear"></div>
+      <div class="ganador" id="ganador">
+        <div class="det">🏆 Ganador</div>
+        <div class="nombre" id="gNombre"></div>
+        <div class="det" id="gInfo"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lo que escribe el último ganador</h2>
+      <p class="det" style="margin-top:-6px">Para comprobar que está en el directo.</p>
+      <ul class="lista" id="mensajesGanador"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Ganadores</h2>
+      <ul class="lista" id="ganadores"></ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>Participantes</h2>
+      <p class="det" id="reglas" style="margin-top:-4px"></p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Persona</th><th class="num">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
+          <tbody id="tabla"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Actividad del chat</h2>
+      <ul class="lista" id="eventos"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Añadir a mano</h2>
+      <p class="det" style="margin-top:-6px">Donaciones que no pasan por el chat (PayPal, Ko-fi, StreamElements…). Número negativo para restar.</p>
+      <form class="fila" id="formManual">
+        <input type="text" id="mUsuario" placeholder="usuario" style="flex:1 1 140px; width:auto">
+        <input type="number" id="mEuros" step="0.01" placeholder="€" style="width:90px">
+        <button type="submit">Añadir</button>
+      </form>
+      <div class="error" id="errManual"></div>
+    </div>
+
+    <div class="card">
+      <details id="detAjustes">
+        <summary>Ajustes</summary>
+        <form id="formAjustes">
+          <div class="ajustes" id="camposAjustes"></div>
+          <div class="fila" style="margin-top:14px">
+            <button class="miel" type="submit">Guardar</button>
+            <span class="det" id="ajustesOk"></span>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Usar en OBS</summary>
+        <div class="ayuda">
+          <p>La escena es transparente y muestra la ruleta solo cuando sorteas. Necesita estar <b>en el mismo navegador</b> que este panel para recibir la orden de girar. Dos formas:</p>
+          <p><b>A · Todo dentro de OBS (recomendado).</b> En OBS: <i>Ver → Paneles → Paneles de navegador personalizados</i> y añade este panel con la dirección <code id="urlPanel"></code>. Después añade una <i>Fuente de navegador</i> (1920×1080) con <code id="urlEscena"></code> y marca <i>Controlar audio vía OBS</i>.</p>
+          <p><b>B · Captura de ventana.</b> Pulsa <b>🎬 Abrir escena</b>, y en OBS añade una <i>Captura de ventana</i> de esa ventana con un filtro de <i>Clave cromática</i> (verde). Para fondo verde usa <code>escena.html?fondo=verde</code>.</p>
+          <p>Opciones de la escena (se añaden a la dirección): <code>?ranking=5</code> top de papeletas · <code>?anuncio=1</code> barra "escribe !sorteo para participar" · <code>?siempre=1</code> ruleta siempre visible · <code>?segundos=20</code> tiempo del ganador en pantalla · <code>?sonido=0</code> sin sonido. Se combinan con <code>&amp;</code>.</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Pruebas y copias de seguridad</summary>
+        <p class="det">Mete eventos falsos para probar sin que nadie gaste. Reinicia antes del sorteo de verdad.</p>
+        <div class="fila">
+          <button data-sim="entrada">+5 escriben la palabra</button>
+          <button data-sim="bits">+500 bits</button>
+          <button data-sim="sub">+Sub</button>
+          <button data-sim="regalo">+Sub regalada</button>
+          <button data-sim="hypechat">+Hype Chat 5 €</button>
+        </div>
+        <p></p>
+        <div class="fila">
+          <button id="btnExportar">⬇ Exportar</button>
+          <label class="fila" style="cursor:pointer"><button type="button" onclick="this.nextElementSibling.click()">⬆ Importar</button><input type="file" id="fImportar" accept=".json,application/json" hidden></label>
+          <div class="grow"></div>
+          <button class="peligro" id="btnReiniciar">🗑 Reiniciar sorteo</button>
+        </div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<script src="js/nucleo.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/rueda.js"></script>
+<script src="js/enlace.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const eur = (n) => (Number(n) || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const hora = (iso) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+function el(tag, props, ...hijos) { const e = Object.assign(document.createElement(tag), props || {}); hijos.forEach((h) => e.append(h)); return e; }
+
+// --- Almacenamiento (puede no estar disponible: el panel sigue funcionando) ---
+function leer(clave) { try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function escribir(clave, valor) { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin almacenamiento */ } }
+
+let aj = Nucleo.mezclarAjustes(leer('colmena-ajustes'));
+const params = new URLSearchParams(location.search);
+if (params.get('canal')) aj.canal = params.get('canal');
+const claveEstado = () => 'colmena-estado-' + (aj.canal || '_');
+let estado = Object.assign(Nucleo.estadoVacio(), leer(claveEstado()) || {});
+let girando = false;
+let chatEstado = { conectado: false, texto: 'Sin conectar' };
+
+let tGuardar = null;
+function guardar() { clearTimeout(tGuardar); tGuardar = setTimeout(() => escribir(claveEstado(), estado), 400); }
+
+// --- Chat ----------------------------------------------------------------
+const chat = new ChatTwitch({
+  alEstado: (s) => { chatEstado = s; pintar(); },
+  alMensaje: (msg) => {
+    const ultimo = estado.ganadores[0];
+    if (ultimo && msg.command === 'PRIVMSG' && Nucleo.autor(msg).login === ultimo.login) {
+      estado.mensajesGanador.unshift({ hora: new Date().toISOString(), texto: Nucleo.texto(msg) });
+      estado.mensajesGanador.length = Math.min(estado.mensajesGanador.length, 30);
+      guardar(); pintar();
+    }
+    const acciones = Nucleo.accionesDesdeMensaje(msg, aj);
+    if (!acciones.length) return;
+    acciones.forEach((a) => Nucleo.registrar(estado, a, aj));
+    guardar(); pintar();
+  },
+});
+
+// --- Pintado (agrupado por frame para chats con mucho movimiento) -----------
+let pendiente = false;
+function pintar() { if (!pendiente) { pendiente = true; requestAnimationFrame(() => { pendiente = false; pintarYa(); }); } }
+
+function detalle(p) {
+  const d = p.detalle, t = [];
+  if (p.escribio) t.push('escribió ' + (aj.palabraClave || ''));
+  if (d.bits) t.push(d.bits + ' bits');
+  if (d.subs) t.push(d.subs + (d.subs > 1 ? ' subs' : ' sub'));
+  if (d.regalos) t.push(d.regalos + (d.regalos > 1 ? ' regaladas' : ' regalada'));
+  if (d.hypechat) t.push('Hype Chat ' + eur(d.hypechat));
+  if (d.manual) t.push('manual ' + eur(d.manual));
+  return t.join(' · ');
+}
+
+function resumenParaEscena(l) {
+  return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave,
+    totalPapeletas: l.totalPapeletas, participantes: l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ nombre: p.nombre, papeletas: p.papeletas })) };
+}
+
+function pintarYa() {
+  $('punto').className = 'punto' + (chatEstado.conectado ? ' on' : '');
+  $('estadoChat').textContent = chatEstado.texto;
+  $('avisoCanal').hidden = !!aj.canal;
+  $('btnAbrir').textContent = estado.abierto ? '🟢 Abierto · pulsa para cerrar' : '🔴 Cerrado · pulsa para abrir';
+  if (girando) return; // no desvelar al ganador antes de que pare la ruleta
+
+  const l = Nucleo.lista(estado, aj);
+  $('nPart').textContent = l.participantes.filter((p) => p.papeletas > 0).length;
+  $('nPap').textContent = l.totalPapeletas;
+  $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + p.euros, 0));
+  const palabra = (aj.palabraClave || '').trim();
+  $('comoEntrar').replaceChildren(...(palabra
+    ? ['Para participar: escribe ', el('b', { textContent: palabra }), ' en el chat' + (aj.soloSuscriptores ? ' (solo subs)' : '') + ' · bits, subs y regalos dan papeletas extra']
+    : ['Solo participa quien gasta: bits, subs, subs regaladas y Hype Chat']));
+  const partes = [];
+  if (palabra) partes.push(`${aj.papeletasPorEscribir} por escribir ${palabra}`);
+  partes.push(`+1 por cada ${eur(aj.eurosPorPapeleta)} gastado`);
+  if (aj.minimaSiHaGastado) partes.push(`mínimo ${aj.minimaSiHaGastado} si gasta algo`);
+  if (aj.maximo) partes.push(`máximo ${aj.maximo} por persona`);
+  if (palabra && !aj.gastanEntranSinEscribir) partes.push('quien gasta también tiene que escribir la palabra');
+  $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
+
+  ruleta.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ login: p.login, nombre: p.nombre, papeletas: p.papeletas })));
+  Enlace.enviar(resumenParaEscena(l));
+
+  const tabla = $('tabla');
+  tabla.replaceChildren();
+  if (!l.participantes.length) tabla.append(el('tr', {}, el('td', { colSpan: 5, className: 'vacio', textContent: palabra ? `Nadie todavía. Que escriban ${palabra} en el chat.` : 'Todavía nadie ha gastado nada.' })));
+  const max = Math.max(1, ...l.participantes.map((p) => p.papeletas));
+  for (const p of l.participantes) {
+    const btn = el('button', { textContent: p.excluido ? 'Readmitir' : 'Excluir' });
+    btn.onclick = () => { estado.participantes[p.login].excluido = !p.excluido; guardar(); pintar(); };
+    tabla.append(el('tr', { className: p.excluido ? 'excluido' : '' },
+      el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p) })),
+      el('td', { className: 'num', textContent: p.euros ? eur(p.euros) : '—' }),
+      el('td', { className: 'num' }, el('div', { textContent: p.papeletas }), el('div', { className: 'barra' }, el('i', { style: `width:${(p.papeletas / max) * 100}%` }))),
+      el('td', { className: 'num', textContent: (p.probabilidad * 100).toFixed(1) + ' %' }),
+      el('td', { className: 'num' }, btn)));
+  }
+
+  const gan = $('ganadores');
+  gan.replaceChildren();
+  if (!estado.ganadores.length) gan.append(el('li', { className: 'no', textContent: 'Aún no hay ganadores.' }));
+  for (const g of estado.ganadores) {
+    gan.append(el('li', {}, el('span', { className: 'h', textContent: hora(g.hora) }), el('b', { textContent: '🏆 ' + g.nombre }),
+      el('span', { className: 'det', textContent: `${g.papeletas} de ${g.totalPapeletas} papeletas (${(g.probabilidad * 100).toFixed(1)} %)` })));
+  }
+
+  const mg = $('mensajesGanador');
+  mg.replaceChildren();
+  if (!estado.ganadores.length) mg.append(el('li', { className: 'no', textContent: 'Cuando haya ganador, aquí verás sus mensajes.' }));
+  else if (!estado.mensajesGanador.length) mg.append(el('li', { className: 'no', textContent: `${estado.ganadores[0].nombre} aún no ha escrito desde que ganó…` }));
+  for (const m of estado.mensajesGanador) mg.append(el('li', {}, el('span', { className: 'h', textContent: hora(m.hora) }), el('span', { textContent: m.texto })));
+
+  const ev = $('eventos');
+  ev.replaceChildren();
+  if (!estado.eventos.length) ev.append(el('li', { className: 'no', textContent: 'Esperando gente en el chat…' }));
+  for (const e of estado.eventos.slice(0, 120)) {
+    const li = el('li', { className: e.contado ? '' : 'no' }, el('span', { className: 'h', textContent: hora(e.hora) }),
+      el('span', {}, el('b', { textContent: e.nombre }), ' ' + e.texto + ' '));
+    if (e.euros) li.append(el('span', { className: 'tag miel', textContent: eur(e.euros) }));
+    if (!e.contado) li.append(el('span', { className: 'tag', textContent: 'no cuenta: ' + e.motivo }));
+    ev.append(li);
+  }
+}
+
+// --- Ruleta ----------------------------------------------------------------
+const ruleta = new Rueda.Ruleta($('lienzo'));
+Rueda.Sonido.activo = !!aj.sonidoPanel;
+
+$('btnSortear').onclick = async () => {
+  if (girando) return;
+  $('errSortear').textContent = '';
+  const tirada = Nucleo.sortear(estado, aj);
+  if (!tirada) { $('errSortear').textContent = 'No hay nadie con papeletas.'; return; }
+  guardar();
+  Rueda.Sonido.preparar();
+  girando = true;
+  $('btnSortear').disabled = true;
+  $('ganador').classList.remove('visible');
+  const inicio = Date.now();
+  Enlace.enviar({ tipo: 'tirada', tirada, inicio });
+  await ruleta.girar(tirada, inicio);
+  const g = tirada.ganador;
+  $('gNombre').textContent = g.nombre;
+  $('gInfo').textContent = `${g.papeletas} de ${g.totalPapeletas} papeletas · ${(g.probabilidad * 100).toFixed(1)} % de probabilidad · ${g.participantes} participantes`;
+  $('ganador').classList.add('visible');
+  Rueda.confeti($('confeti'));
+  setTimeout(() => { girando = false; $('btnSortear').disabled = false; pintar(); }, 2500);
+};
+
+// La escena pide el estado al abrirse.
+Enlace.escuchar((m) => { if (m && m.tipo === 'hola' && !girando) Enlace.enviar(resumenParaEscena(Nucleo.lista(estado, aj))); });
+
+// --- Controles ----------------------------------------------------------------
+$('btnAbrir').onclick = () => { estado.abierto = !estado.abierto; guardar(); pintar(); };
+$('btnEscena').onclick = () => window.open('escena.html', 'escena-colmena', 'width=1280,height=720');
+$('btnReiniciar').onclick = () => {
+  if (!confirm('¿Seguro? Se borran participantes, papeletas, actividad y ganadores de este sorteo.')) return;
+  const abierto = estado.abierto;
+  estado = Nucleo.estadoVacio(); estado.abierto = abierto;
+  $('ganador').classList.remove('visible');
+  guardar(); pintar();
+};
+
+$('formManual').onsubmit = (ev) => {
+  ev.preventDefault();
+  $('errManual').textContent = '';
+  const usuario = $('mUsuario').value.trim().replace(/^@/, '');
+  const euros = Number($('mEuros').value);
+  if (!usuario || !Number.isFinite(euros) || euros === 0) { $('errManual').textContent = 'Pon usuario y euros (distinto de 0).'; return; }
+  const r = Nucleo.registrar(estado, { tipo: 'manual', login: usuario, nombre: usuario, cantidad: euros, euros, texto: `ajuste manual ${euros > 0 ? '+' : ''}${euros} €` }, aj);
+  if (r && !r.contado) $('errManual').textContent = 'No se ha contado: ' + r.motivo;
+  $('mUsuario').value = ''; $('mEuros').value = '';
+  guardar(); pintar();
+};
+
+let nSim = 0;
+document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
+  const tipo = b.dataset.sim;
+  const nombres = ['AbejaMaya', 'Zangano_Rex', 'MielYFlores', 'Polen99', 'ReinaColmena', 'Panalito', 'Aguijon', 'Melifera', 'Zumbido', 'Apicultora'];
+  const nombre = () => nombres[Math.floor(Math.random() * nombres.length)] + (Math.random() < 0.5 ? Math.floor(Math.random() * 99) : '');
+  const v = aj.valores;
+  const crea = {
+    entrada: (n) => ({ tipo: 'entrada', texto: `escribe ${aj.palabraClave || '!sorteo'} (prueba)` }),
+    bits: () => ({ tipo: 'bits', cantidad: 500, euros: 500 * v.bit, texto: '500 bits (prueba)' }),
+    sub: () => ({ tipo: 'sub', cantidad: 1, euros: v.subTier1, texto: 'Sub Tier 1 (prueba)' }),
+    regalo: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
+    hypechat: () => ({ tipo: 'hypechat', cantidad: 5, euros: 5, texto: 'Hype Chat 5 EUR (prueba)' }),
+  }[tipo];
+  for (let i = 0; i < (tipo === 'entrada' ? 5 : 1); i++) {
+    const n = nombre();
+    Nucleo.registrar(estado, Object.assign({ id: 'prueba-' + Date.now() + '-' + nSim++, login: n.toLowerCase(), nombre: n }, crea()), aj);
+  }
+  guardar(); pintar();
+});
+
+$('btnExportar').onclick = () => {
+  const blob = new Blob([JSON.stringify({ ajustes: aj, estado }, null, 2)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `sorteo-${aj.canal || 'colmena'}-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove();
+};
+$('fImportar').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.ajustes) { aj = Nucleo.mezclarAjustes(d.ajustes); escribir('colmena-ajustes', aj); }
+    if (d.estado) estado = Object.assign(Nucleo.estadoVacio(), d.estado);
+    guardar(); construirAjustes(); chat.conectar(aj.canal); pintar();
+  } catch (err) { alert('Ese archivo no es una copia válida del sorteo.'); }
+  e.target.value = '';
+};
+
+// --- Ajustes ----------------------------------------------------------------
+const CAMPOS = [
+  ['h', 'Canal'],
+  ['canal', 'Tu canal de Twitch', 'text'],
+  ['h', 'Entrar escribiendo en el chat'],
+  ['palabraClave', 'Palabra para entrar (vacío = solo quien gasta)', 'text'],
+  ['papeletasPorEscribir', 'Papeletas por escribirla', 'number'],
+  ['soloSuscriptores', 'Solo suscriptores pueden entrar escribiendo', 'check'],
+  ['h', 'Papeletas por gastar'],
+  ['eurosPorPapeleta', '€ por cada papeleta extra', 'number'],
+  ['minimaSiHaGastado', 'Mínimo de papeletas si gasta algo', 'number'],
+  ['maximo', 'Máximo por persona (0 = sin tope)', 'number'],
+  ['gastanEntranSinEscribir', 'Quien gasta entra aunque no escriba la palabra', 'check'],
+  ['subsRegaladasCuentanParaQuienRegala', 'Las subs regaladas cuentan para quien regala', 'check'],
+  ['h', 'Cuánto vale cada cosa (€)'],
+  ['valores.bit', '1 bit', 'number'],
+  ['valores.subTier1', 'Sub Tier 1', 'number'],
+  ['valores.subTier2', 'Sub Tier 2', 'number'],
+  ['valores.subTier3', 'Sub Tier 3', 'number'],
+  ['valores.subPrime', 'Sub Prime', 'number'],
+  ['h', 'Sorteo'],
+  ['quitarGanador', 'Quitar al ganador de los siguientes sorteos', 'check'],
+  ['duracionRuleta', 'Segundos que gira la ruleta', 'number'],
+  ['sonidoPanel', 'Sonido también en este panel', 'check'],
+  ['ignorar', 'Cuentas ignoradas (separadas por comas)', 'text'],
+];
+const obtener = (ruta) => ruta.split('.').reduce((o, k) => o[k], aj);
+function fijar(ruta, v) { const ks = ruta.split('.'); const ult = ks.pop(); ks.reduce((o, k) => o[k], aj)[ult] = v; }
+
+function construirAjustes() {
+  const caja = $('camposAjustes');
+  caja.replaceChildren();
+  for (const [ruta, texto, tipo] of CAMPOS) {
+    if (ruta === 'h') { caja.append(el('h3', { textContent: texto })); continue; }
+    let v = obtener(ruta);
+    if (ruta === 'ignorar') v = v.join(', ');
+    if (tipo === 'check') caja.append(el('label', { className: 'check' }, el('input', { type: 'checkbox', name: ruta, checked: !!v }), texto));
+    else caja.append(el('label', {}, texto, el('input', { type: tipo, name: ruta, value: v, step: 'any', min: tipo === 'number' ? 0 : undefined, placeholder: ruta === 'canal' ? 'nombre_de_tu_canal' : '' })));
+  }
+}
+
+$('formAjustes').onsubmit = (ev) => {
+  ev.preventDefault();
+  const canalAntes = aj.canal;
+  for (const [ruta, , tipo] of CAMPOS) {
+    if (ruta === 'h') continue;
+    const inp = ev.target.elements[ruta];
+    if (tipo === 'check') fijar(ruta, inp.checked);
+    else if (tipo === 'number') fijar(ruta, Math.max(0, Number(inp.value) || 0));
+    else if (ruta === 'ignorar') fijar(ruta, inp.value.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+    else if (ruta === 'canal') fijar(ruta, inp.value.trim().toLowerCase().replace(/^#/, '').replace(/^https?:\/\/(www\.)?twitch\.tv\//, '').split(/[/?]/)[0]);
+    else fijar(ruta, inp.value.trim());
+  }
+  if (!(aj.eurosPorPapeleta > 0)) aj.eurosPorPapeleta = 1;
+  escribir('colmena-ajustes', aj);
+  Rueda.Sonido.activo = !!aj.sonidoPanel;
+  if (aj.canal !== canalAntes) {
+    escribir('colmena-estado-' + (canalAntes || '_'), estado);
+    estado = Object.assign(Nucleo.estadoVacio(), leer(claveEstado()) || {});
+    chat.conectar(aj.canal);
+  }
+  construirAjustes();
+  $('ajustesOk').textContent = '✔ Guardado';
+  setTimeout(() => { $('ajustesOk').textContent = ''; }, 2000);
+  pintar();
+};
+
+// --- Arranque ---------------------------------------------------------------
+const base = location.href.replace(/[?#].*$/, '').replace(/index\.html$/, '');
+$('urlPanel').textContent = base + 'index.html';
+$('urlEscena').textContent = base + 'escena.html';
+construirAjustes();
+if (!aj.canal) $('detAjustes').open = true;
+chat.conectar(aj.canal);
+pintar();
+</script>
+</body>
+</html>
