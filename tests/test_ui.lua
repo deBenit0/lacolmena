@@ -137,7 +137,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.1.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.1.1", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine
