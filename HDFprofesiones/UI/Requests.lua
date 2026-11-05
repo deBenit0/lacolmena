@@ -42,7 +42,8 @@ local function matchesFilter(filter, r, info, me)
   local myCommit = r.c and r.c[me]
   if filter == "active" then return active end
   if filter == "craft" then
-    return info.state == "open" and r.a ~= me and (not r.to or r.to == me) and Data.ICanCraft(r.k)
+    return info.state == "open" and r.a ~= me and (not r.to or r.to == me)
+      and (Data.ICanCraft(r.k) or Data.ICanGather(r.k) or false)
   end
   if filter == "mine" then return r.a == me end
   if filter == "involved" then
@@ -307,8 +308,19 @@ ns.UI.RegisterPage("requests", function(page)
         mine.n - Data.DeliveredOf(mine), ns.ShortName(r.a))
     end
     local rec = Data.GetIndex()[r.k]
+    local gatherers, skill = Data.GatherersOf(r.k)
+    if skill and #gatherers > 0 then
+      local online = 0
+      for _, who in ipairs(gatherers) do
+        if Guild.IsOnline(who) then online = online + 1 end
+      end
+      lines[#lines + 1] = string.format("Lo pueden conseguir %d con %s (%d en línea).",
+        #gatherers, ns.ProfessionName(skill), online)
+    end
     if Data.ICanCraft(r.k) then
       lines[#lines + 1] = "|cff40ff40Sabes fabricarlo.|r"
+    elseif Data.ICanGather(r.k) then
+      lines[#lines + 1] = "|cff40ff40Puedes conseguirlo (" .. ns.ProfessionName(skill) .. ").|r"
     elseif rec then
       local names, online = {}, 0
       for _, cr in ipairs(rec.crafters) do
@@ -320,7 +332,7 @@ ns.UI.RegisterPage("requests", function(page)
       local total = 0
       for _ in pairs(names) do total = total + 1 end
       lines[#lines + 1] = string.format("Lo saben hacer %d en la hermandad (%d en línea).", total, online)
-    else
+    elseif not (skill and #gatherers > 0) then
       lines[#lines + 1] = "|cffff8040Nadie de la hermandad lo tiene publicado.|r"
     end
     detail.info:SetText(table.concat(lines, "\n"))

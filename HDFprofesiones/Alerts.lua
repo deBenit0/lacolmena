@@ -101,16 +101,21 @@ function Alerts.Push(alert)
 end
 
 -- Decide si una petición nueva o cambiada merece aviso.
-function Alerts.OnRequestUpdated(old, new)
+function Alerts.OnRequestUpdated(old, new, retry)
   if not new then return end
   local g, me, now = ns.G(), ns.Me(), ns.Now()
   if not g or not me then return end
   local info = Data.RequestInfo(new, now)
   local _, icon = ns.KeyInfo(new.k)
 
-  -- Petición nueva de otro que puedo hacer (o dirigida a mí).
+  -- Petición nueva de otro que puedo hacer o conseguir (o dirigida a mí).
   if not old and new.a ~= me and info.state == "open" and (new.t or 0) > now - MAX_AGE and not g.alerted[new.id] then
-    if new.to == me or (not new.to and Data.ICanCraft(new.k)) then
+    local canGather = Data.ICanGather(new.k)
+    if canGather == nil and not retry then
+      -- el juego aún no sabe qué objeto es: volver a mirarlo en un momento
+      ns.After(3, function() Alerts.OnRequestUpdated(nil, g.requests[new.id], true) end)
+    end
+    if new.to == me or (not new.to and (Data.ICanCraft(new.k) or canGather)) then
       g.alerted[new.id] = true
       local text = string.format("%s pide %dx %s", ns.ShortName(new.a), new.q, ns.KeyLabel(new.k))
       if new.to == me then text = text .. " (a ti)" end

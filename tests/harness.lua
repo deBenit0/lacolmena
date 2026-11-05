@@ -361,8 +361,10 @@ local function makeEnv(client)
     GetItemInfo = function(id)
       id = tonumber(id)
       local gear = H.gear and H.gear[id]
+      local cls = H.itemClass and H.itemClass[id]
       return "Objeto " .. id, itemLink(id), 2, gear and gear.ilvl or 40, gear and gear.minLevel or 0,
-        "Tipo", "Subtipo", 20, gear and gear.equipLoc or "", "icono" .. id
+        "Tipo", cls and cls[3] or "Subtipo", 20, gear and gear.equipLoc or "", "icono" .. id,
+        10, cls and cls[1] or 0, cls and cls[2] or 0
     end,
     GetItemIcon = function(id) return "icono" .. tostring(id) end,
     GetSpellInfo = function(id)
@@ -513,6 +515,7 @@ function H.Reset()
   H.traffic = { messages = 0, bytes = 0, byType = {} }
   H.gear = nil
   H.spellNames = nil
+  H.itemClass = nil
 end
 
 return H

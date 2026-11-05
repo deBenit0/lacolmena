@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.2.0"
+ns.VERSION = "0.2.1"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -274,7 +274,32 @@ ns.PROFESSIONS = {
   [755] = { name = "Joyería", spells = { 25229 }, names = { "Joyería", "Jewelcrafting" } },
   [773] = { name = "Inscripción", spells = { 45357 }, names = { "Inscripción", "Inscription" } },
   [40] = { name = "Venenos", spells = { 2842 }, names = { "Venenos", "Poisons" } },
+  [393] = { name = "Desuello", spells = { 8613 }, names = { "Desuello", "Skinning" }, gather = true },
+  [182] = { name = "Herboristería", spells = { 2366 }, names = { "Herboristería", "Herbalism" }, gather = true },
 }
+
+-- Recolección: qué habilidad consigue cada tipo de material (subclase de "Objetos comerciables").
+ns.GATHER_SKILLS = { [393] = true, [182] = true, [186] = true }
+local GATHER_BY_SUBCLASS = { [6] = 393, [7] = 186, [9] = 182 }
+local GATHER_BY_SUBTYPE = {
+  ["cuero"] = 393, ["leather"] = 393,
+  ["metal y piedra"] = 186, ["metal & stone"] = 186,
+  ["hierba"] = 182, ["herb"] = 182,
+}
+
+-- Habilidad de recolección que consigue un objeto; false si no es recolectable;
+-- nil si el juego aún no tiene el objeto en caché.
+function ns.GatherSkillFor(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return false end
+  local name, _, _, _, _, _, subType, _, _, _, _, classID, subclassID = getItemInfo(id)
+  if not name then
+    if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+    return nil
+  end
+  if classID == 7 and GATHER_BY_SUBCLASS[subclassID] then return GATHER_BY_SUBCLASS[subclassID] end
+  return (type(subType) == "string" and GATHER_BY_SUBTYPE[subType:lower()]) or false
+end
 
 local profByName
 local function buildProfessionNames()

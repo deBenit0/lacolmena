@@ -138,7 +138,7 @@ end
 function Scan.SkillLines()
   local c = ns.MyChar()
   if not c or not GetNumSkillLines or not GetSkillLineInfo then return end
-  local present, allExpanded, changed = {}, true, false
+  local present, allExpanded, changed, gather = {}, true, false, {}
   local total = GetNumSkillLines() or 0
   for i = 1, total do
     local name, isHeader, isExpanded, rank, _, _, maxRank = GetSkillLineInfo(i)
@@ -146,7 +146,8 @@ function Scan.SkillLines()
       if not isExpanded then allExpanded = false end
     elseif name then
       local pk = ns.ProfessionKey(name)
-      if ns.PROFESSIONS[pk] then
+      if ns.GATHER_SKILLS[pk] and rank then gather[pk] = rank end
+      if ns.PROFESSIONS[pk] and not ns.PROFESSIONS[pk].gather then
         present[pk] = true
         local prof = c.profs[pk]
         if prof and rank and (prof.r ~= rank or prof.m ~= maxRank) then
@@ -158,6 +159,10 @@ function Scan.SkillLines()
   end
   -- Si algún grupo está plegado no vemos todas las habilidades: no borrar nada.
   if allExpanded and total > 0 then
+    if ns.Codec.Serialize(gather) ~= ns.Codec.Serialize(c.gather or {}) then
+      c.gather = gather
+      changed = true
+    end
     for pk in pairs(c.profs) do
       if type(pk) == "number" and not present[pk] then
         c.profs[pk] = nil

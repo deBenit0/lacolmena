@@ -85,6 +85,7 @@ function Data.SanitizeEntry(e)
     u = (e.u == true) or nil,
     av = type(e.av) == "string" and e.av or nil,
     th = cleanNumberMap(e.th, "string"),
+    ga = cleanNumberMap(e.ga, "number"),
   }
   if type(e.p) == "table" then
     local profs, any = {}, false
@@ -139,6 +140,7 @@ function Data.BuildMyEntry(now)
   local e = { n = me, c = c.class, l = c.level, u = c.u or nil, av = ns.VERSION }
   local th = g.thanks[me]
   if th and next(th) then e.th = deepCopy(th) end
+  if c.gather and next(c.gather) then e.ga = deepCopy(c.gather) end
   local profs, anyProf = {}, false
   for pk, prof in pairs(c.profs) do
     local items, enchants = {}, {}
@@ -232,6 +234,27 @@ function Data.SingleProfession(key)
     only = pk
   end
   return only
+end
+
+-- ¿Puedo conseguirlo recolectando? true/false, o nil si aún no se sabe qué objeto es.
+function Data.ICanGather(key)
+  local skill = ns.GatherSkillFor(key)
+  if skill == nil then return nil end
+  local c = ns.MyChar()
+  return skill and c and c.gather and c.gather[skill] ~= nil or false
+end
+
+-- Quién de la hermandad puede conseguirlo recolectando: lista de nombres y la habilidad.
+function Data.GatherersOf(key)
+  local skill = ns.GatherSkillFor(key)
+  local g = ns.G()
+  local names = {}
+  if not skill or not g then return names, skill end
+  for name, e in pairs(g.entries) do
+    if e.ga and e.ga[skill] then names[#names + 1] = name end
+  end
+  table.sort(names)
+  return names, skill
 end
 
 function Data.ICanCraft(key)

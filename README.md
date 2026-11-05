@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.2.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.2.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -34,7 +34,8 @@ profesión y ocultar el equipo de nivel bajo. Al elegir un objeto ves:
 - **Nueva petición:** mayús+clic en un objeto (o arrástralo al icono), cantidad, si aportas
   los materiales y el pago opcional en oro y/u objetos. Los encantamientos se piden desde
   la página de Recetas, porque no son objetos.
-- Quien pueda fabricarlo recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
+- Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
+  Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.
 - **Lo hago yo:** te comprometes a hacer una cantidad. Varios pueden repartirse una petición.
 - **Soltar:** si al final no puedes. Un compromiso sin entregar caduca solo a las **48 h**.
