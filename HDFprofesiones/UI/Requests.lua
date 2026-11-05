@@ -178,7 +178,11 @@ ns.UI.RegisterPage("requests", function(page)
       local e = g and g.entries[c.name]
       local text = ns.ColoredName(c.name, e and e.c or (Guild.Info(c.name) or {}).class)
       text = text .. string.format(": %d", c.promised)
-      if c.delivered > 0 then text = text .. string.format(" (entregadas %d)", c.delivered) end
+      if c.mailed > 0 and c.mailed >= c.delivered then
+        text = text .. string.format(" (enviadas por correo %d)", c.mailed)
+      elseif c.delivered > 0 then
+        text = text .. string.format(" (entregadas %d)", c.delivered)
+      end
       if c.active and c.deadline then
         text = text .. " |cffbbbbbb- quedan " .. ns.FormatDuration(c.deadline - ns.Now()) .. "|r"
       elseif not c.active and c.delivered < c.promised then
@@ -255,9 +259,16 @@ ns.UI.RegisterPage("requests", function(page)
       setButton(detail.b2, "Soltar", mine and Data.CommitActive(mine, now), function()
         W.Confirm("¿Seguro que ya no lo vas a hacer?", function() ns.Sync.Release(r.id) end)
       end)
-      setButton(detail.b3, "Susurrar", true, function()
-        if ChatFrame_SendTell then ChatFrame_SendTell(r.a) end
-      end)
+      local myActive = mine and Data.CommitActive(mine, now)
+      if myActive and ns.Mail.CanPrepare() then
+        setButton(detail.b3, "Preparar correo", true, function()
+          ns.Mail.Prepare(r, mine.n - Data.DeliveredOf(mine))
+        end)
+      else
+        setButton(detail.b3, "Susurrar", true, function()
+          if ChatFrame_SendTell then ChatFrame_SendTell(r.a) end
+        end)
+      end
     end
   end
 
@@ -290,6 +301,11 @@ ns.UI.RegisterPage("requests", function(page)
     if needed then lines[#lines + 1] = "|cffbbbbbbHace falta: " .. needed .. "|r" end
     lines[#lines + 1] = "Paga: " .. (payText(r) or "|cffbbbbbbnada indicado|r")
     lines[#lines + 1] = "Para: " .. (r.to and ns.ShortName(r.to) or "cualquiera")
+    local mine = r.c and r.c[ns.Me()]
+    if mine and Data.CommitActive(mine, now) then
+      lines[#lines + 1] = string.format("|cff40ff40Envíale %d por correo a %s: la petición se completará sola.|r",
+        mine.n - Data.DeliveredOf(mine), ns.ShortName(r.a))
+    end
     local rec = Data.GetIndex()[r.k]
     if Data.ICanCraft(r.k) then
       lines[#lines + 1] = "|cff40ff40Sabes fabricarlo.|r"

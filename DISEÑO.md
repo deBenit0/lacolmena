@@ -35,7 +35,10 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - Botón **"Pedir"** en cada receta: a un fabricante concreto o a todos.
 - **Caducan a los 7 días** (renovables).
 - Estados: **Abierta → Aceptada → Hecha**.
-  - El **autor confirma "Hecha"** (así el contador no se infla).
+  - **Entrega por correo:** cuando quien aceptó envía el correo con los objetos al autor, se
+    apunta sola y la petición se completa al llegar a la cantidad (caso principal: un herrero
+    pide cuero y la peletera se lo manda). Solo cuentan los objetos pedidos y hasta lo prometido.
+  - El autor también puede confirmar a mano las entregas en persona ("Recibido").
   - Al **comerciar** el objeto pedido con el autor, el addon propone cerrarla.
   - Una aceptada que pasa **48 h** sin hacerse vuelve a abierta.
   - El fabricante puede **soltarla**.

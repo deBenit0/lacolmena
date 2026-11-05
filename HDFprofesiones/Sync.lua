@@ -344,6 +344,8 @@ Comm.Register("Q", function(sender, payload)
     cancel("Q", r.id)
   end
   if changed then
+    -- Si es mía y alguien ha entregado (por correo), sumo su encargo.
+    if merged.a == ns.Me() and Data.CheckThanks(merged, ns.Now()) then Sync.PublishMine() end
     ns.Fire("DATA_CHANGED", "request", r.id)
     ns.Fire("REQUEST_UPDATED", old, merged)
   end

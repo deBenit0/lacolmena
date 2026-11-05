@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.1.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.2.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -38,8 +38,11 @@ profesión y ocultar el equipo de nivel bajo. Al elegir un objeto ves:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.
 - **Lo hago yo:** te comprometes a hacer una cantidad. Varios pueden repartirse una petición.
 - **Soltar:** si al final no puedes. Un compromiso sin entregar caduca solo a las **48 h**.
-- **Recibido** (solo el autor): confirma lo entregado. Esto suma al contador de encargos del
-  fabricante.
+- **Entrega por correo:** quien ha aceptado envía los objetos por correo al autor y la
+  petición **se completa sola** al enviarse el correo (solo cuentan los objetos pedidos y hasta
+  lo prometido). Con el buzón abierto, el botón **Preparar correo** pone el destinatario y el asunto.
+- **Recibido** (solo el autor): para entregas en mano. Las entregas suman al contador de
+  encargos del fabricante.
 - **Renovar** y **Cerrar** (solo el autor). Las peticiones caducan a los **7 días**; las
   terminadas se siguen viendo 2 días. Máximo **10 abiertas** por jugador.
 

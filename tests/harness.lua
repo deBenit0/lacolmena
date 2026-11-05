@@ -236,7 +236,7 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Alerts.lua",
+  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Alerts.lua",
   "UI/Widgets.lua", "UI/Main.lua", "UI/Recipes.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
 }
 
@@ -415,6 +415,17 @@ local function makeEnv(client)
       return "Objeto " .. re[1], "icono", re[2], 0
     end,
     GetCraftReagentItemLink = function(i, r) return itemLink(client.craft.rows[i].reagents[r][1]) end,
+    -- correo: client.mailAttach = { {itemID, cantidad}, ... }
+    SendMail = function(to) client.sentMail[#client.sentMail + 1] = to end,
+    GetSendMailItemLink = function(i)
+      local a = client.mailAttach and client.mailAttach[i]
+      return a and itemLink(a[1]) or nil
+    end,
+    GetSendMailItem = function(i)
+      local a = client.mailAttach and client.mailAttach[i]
+      if a then return "Objeto " .. a[1], a[1], "icono", a[2], 1, true end
+    end,
+    ATTACHMENTS_MAX_SEND = 12,
     -- habilidades
     GetNumSkillLines = function() return #client.skills end,
     GetSkillLineInfo = function(i)
@@ -432,7 +443,7 @@ function H.NewClient(name, opts)
   local client = {
     name = name, level = opts.level or 60, class = opts.class or "WARRIOR",
     inGuild = opts.inGuild ~= false, online = false, dead = false,
-    frames = {}, chat = {}, sounds = {}, popups = {}, whispers = {},
+    frames = {}, chat = {}, sounds = {}, popups = {}, whispers = {}, sentMail = {},
     bags = opts.bags or {}, skills = opts.skills or {}, sent = 0,
   }
   client.env = makeEnv(client)
@@ -484,6 +495,14 @@ end
 function H.OpenCraft(client, craft)
   client.craft = craft
   H.FireEvent(client, "CRAFT_SHOW")
+end
+
+-- Envía un correo con objetos adjuntos y simula la respuesta del servidor.
+function H.SendMail(client, to, attachments, ok)
+  client.mailAttach = attachments
+  client.env.SendMail(to, "asunto", "")
+  client.mailAttach = nil
+  H.FireEvent(client, ok == false and "MAIL_FAILED" or "MAIL_SEND_SUCCESS")
 end
 
 function H.Reset()

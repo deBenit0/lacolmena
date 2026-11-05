@@ -31,4 +31,7 @@ read_globals = {
   "GetTradeSkillCooldown", "GetNumCrafts", "GetCraftDisplaySkillLine", "GetCraftInfo", "GetCraftItemLink",
   "GetCraftRecipeLink", "GetCraftNumReagents", "GetCraftReagentInfo", "GetCraftReagentItemLink",
   "GetNumSkillLines", "GetSkillLineInfo",
+  -- Correo
+  "SendMail", "GetSendMailItem", "GetSendMailItemLink", "ATTACHMENTS_MAX_SEND", "MailFrame",
+  "MailFrameTab_OnClick", "SendMailNameEditBox", "SendMailSubjectEditBox",
 }

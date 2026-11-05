@@ -118,6 +118,20 @@ function Alerts.OnRequestUpdated(old, new)
     end
   end
 
+  -- Me han enviado por correo algo de una de mis peticiones.
+  if new.a == me and old then
+    for name, cm in pairs(new.c or {}) do
+      local before = old.c and old.c[name]
+      local sentBefore = before and before.s or 0
+      if (cm.s or 0) > sentBefore then
+        Alerts.Push({
+          id = new.id, icon = icon,
+          text = string.format("%s te ha enviado %dx %s por correo", ns.ShortName(name), cm.s - sentBefore, ns.KeyLabel(new.k)),
+        })
+      end
+    end
+  end
+
   -- Alguien se compromete en una de mis peticiones.
   if new.a == me and old then
     for name, cm in pairs(new.c or {}) do

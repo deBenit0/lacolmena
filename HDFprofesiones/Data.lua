@@ -12,7 +12,8 @@
 --     g = pago en cobre, pi = { [objeto] = n } pago en objetos, to = para quién,
 --     x = cerrada, rn = renovada,
 --     c = { [fabricante] = { n = prometidas, cv = versión, rl = soltada,
---                            d = entregadas (lo confirma el autor), dv = versión } } }
+--                            d = entregadas (lo confirma el autor), dv = versión,
+--                            s = enviadas por correo (lo apunta el fabricante), sv = versión } } }
 -- Cada parte tiene un único dueño y su propia versión, así que dos copias se
 -- fusionan siempre igual, en cualquier orden (no hay conflictos).
 local _, ns = ...
@@ -383,6 +384,9 @@ function Data.SanitizeRequest(r)
         local d = tonumber(cm.d)
         if d and d >= 1 then o.d = floor(d) end
         if tonumber(cm.dv) then o.dv = tonumber(cm.dv) end
+        local sent = tonumber(cm.s)
+        if sent and sent >= 1 then o.s = floor(sent) end
+        if tonumber(cm.sv) then o.sv = tonumber(cm.sv) end
         if next(o) then
           c[name] = o
           any = true
@@ -426,7 +430,11 @@ function Data.MergeRequests(a, b)
     local cb = (b.c and b.c[name]) or {}
     local crafter = pickBlock({ n = ca.n, cv = ca.cv, rl = ca.rl }, { n = cb.n, cv = cb.cv, rl = cb.rl }, "cv")
     local delivered = pickBlock({ d = ca.d, dv = ca.dv }, { d = cb.d, dv = cb.dv }, "dv")
-    local o = { n = crafter.n, cv = crafter.cv, rl = crafter.rl, d = delivered.d, dv = delivered.dv }
+    local sent = pickBlock({ s = ca.s, sv = ca.sv }, { s = cb.s, sv = cb.sv }, "sv")
+    local o = {
+      n = crafter.n, cv = crafter.cv, rl = crafter.rl,
+      d = delivered.d, dv = delivered.dv, s = sent.s, sv = sent.sv,
+    }
     if next(o) then
       commits[name] = o
       any = true
@@ -440,17 +448,27 @@ function Data.RequestHash(r)
   return Codec.Hash(Codec.Serialize(r))
 end
 
+-- Entregado por un fabricante: lo que confirmó el autor o lo que envió por correo (lo mayor).
+local function deliveredOf(cm)
+  return max(cm.d or 0, cm.s or 0)
+end
+Data.DeliveredOf = deliveredOf
+
+local function lastActivity(cm)
+  return max(cm.cv or 0, cm.dv or 0, cm.sv or 0)
+end
+
 function Data.CommitActive(cm, now)
   if not cm or cm.rl or not cm.n then return false end
-  if (cm.d or 0) >= cm.n then return false end
-  return now <= max(cm.cv or 0, cm.dv or 0) + Data.COMMIT_TTL
+  if deliveredOf(cm) >= cm.n then return false end
+  return now <= lastActivity(cm) + Data.COMMIT_TTL
 end
 
 -- Estado calculado de una petición (no se guarda: todos llegan al mismo resultado).
 function Data.RequestInfo(r, now)
   local info = { delivered = 0, pending = 0, commits = {} }
   for name, cm in pairs(r.c or {}) do
-    local d = cm.d or 0
+    local d = deliveredOf(cm)
     info.delivered = info.delivered + d
     local active = Data.CommitActive(cm, now)
     local pending = active and (cm.n - d) or 0
@@ -460,9 +478,10 @@ function Data.RequestInfo(r, now)
         name = name,
         promised = max(cm.n or 0, d),
         delivered = d,
+        mailed = cm.s or 0,
         pending = pending,
         active = active,
-        deadline = active and (max(cm.cv or 0, cm.dv or 0) + Data.COMMIT_TTL) or nil,
+        deadline = active and (lastActivity(cm) + Data.COMMIT_TTL) or nil,
       }
     end
   end
@@ -473,7 +492,7 @@ function Data.RequestInfo(r, now)
     info.state, info.ended = "closed", r.x
   elseif info.delivered >= r.q then
     local last = 0
-    for _, cm in pairs(r.c or {}) do last = max(last, cm.dv or 0) end
+    for _, cm in pairs(r.c or {}) do last = max(last, cm.dv or 0, cm.sv or 0) end
     info.state, info.ended = "done", last
   elseif now > info.expires then
     info.state, info.ended = "expired", info.expires
@@ -565,7 +584,7 @@ function Data.Commit(id, amount, now)
   amount = min(info.remaining, max(1, floor(tonumber(amount) or 1)))
   r.c = r.c or {}
   local cm = r.c[me] or {}
-  local delivered = cm.d or 0
+  local delivered = deliveredOf(cm)
   local myPending = Data.CommitActive(cm, now) and (cm.n - delivered) or 0
   cm.n = delivered + myPending + amount
   cm.cv = bump(cm.cv, now)
@@ -587,7 +606,7 @@ end
 -- El autor confirma que ha recibido "amount" de un fabricante.
 -- Devuelve la petición y si cambió el contador de encargos.
 function Data.ConfirmDelivery(id, crafter, amount, now)
-  local g, r, me = ns.G(), getRequest(id), ns.Me()
+  local r, me = getRequest(id), ns.Me()
   if not r then return nil, "La petición ya no existe." end
   if r.a ~= me then return nil, "Solo el autor puede confirmar entregas." end
   local info = Data.RequestInfo(r, now)
@@ -600,20 +619,62 @@ function Data.ConfirmDelivery(id, crafter, amount, now)
     cm.n = amount
     cm.cv = bump(cm.cv, now)
   end
-  cm.d = (cm.d or 0) + amount
+  cm.d = deliveredOf(cm) + amount
   cm.dv = bump(cm.dv, now)
   r.c[crafter] = cm
-  local thanksChanged = false
-  if cm.d >= (cm.n or 0) or info.delivered + amount >= r.q then
-    g.thanked[id] = g.thanked[id] or {}
-    if not g.thanked[id][crafter] then
-      g.thanked[id][crafter] = true
-      g.thanks[me] = g.thanks[me] or {}
-      g.thanks[me][crafter] = (g.thanks[me][crafter] or 0) + 1
-      thanksChanged = true
+  return r, Data.CheckThanks(r, now)
+end
+
+-- Contador de encargos: lo lleva el autor. Suma uno a cada fabricante que entrega todo
+-- lo que prometió (o que completa la petición), confirmado a mano o enviado por correo.
+function Data.CheckThanks(r, now)
+  local g, me = ns.G(), ns.Me()
+  if not g or not r or r.a ~= me or not r.c then return false end
+  local info = Data.RequestInfo(r, now)
+  local changed = false
+  for crafter, cm in pairs(r.c) do
+    local d = deliveredOf(cm)
+    if d > 0 and (d >= (cm.n or 0) or info.delivered >= r.q) then
+      g.thanked[r.id] = g.thanked[r.id] or {}
+      if not g.thanked[r.id][crafter] then
+        g.thanked[r.id][crafter] = true
+        g.thanks[me] = g.thanks[me] or {}
+        g.thanks[me][crafter] = (g.thanks[me][crafter] or 0) + 1
+        changed = true
+      end
     end
   end
-  return r, thanksChanged
+  return changed
+end
+
+-- He enviado un correo con objetos a alguien: lo apunto en sus peticiones que yo había
+-- aceptado (solo objetos de la petición y hasta lo que prometí). Devuelve las peticiones cambiadas.
+function Data.RegisterMail(recipient, items, now)
+  local g, me = ns.G(), ns.Me()
+  local changed = {}
+  if not g or not recipient or type(items) ~= "table" then return changed end
+  -- las más antiguas primero
+  local list = {}
+  local to = recipient:lower()
+  for _, r in pairs(g.requests) do
+    if r.a:lower() == to and r.c and r.c[me] then list[#list + 1] = r end
+  end
+  table.sort(list, function(a, b) return (a.t or 0) < (b.t or 0) end)
+  for _, r in ipairs(list) do
+    local kind, id = ns.ParseKey(r.k)
+    local cm = r.c[me]
+    local left = items[id] or 0
+    if kind == "i" and left > 0 and Data.CommitActive(cm, now) then
+      local credit = min(left, cm.n - deliveredOf(cm))
+      if credit > 0 then
+        cm.s = deliveredOf(cm) + credit
+        cm.sv = bump(cm.sv, now)
+        items[id] = left - credit
+        changed[#changed + 1] = r
+      end
+    end
+  end
+  return changed
 end
 
 function Data.CloseRequest(id, now)
