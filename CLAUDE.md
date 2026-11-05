@@ -5,5 +5,6 @@
 - Nunca soltar listas de preguntas en texto plano.
 
 ## Proyecto
-- Addon de WoW (servidor WoW Forever) para la hermandad La Colmena: coordinar profesiones (ofertas de fabricación a cambio de materiales y peticiones con pago opcional).
+- Addon de WoW (WoW Forever oficial de Blizzard) para la hermandad **Los hijos del Fundillo**: coordinar profesiones (ofertas de fabricación a cambio de materiales y peticiones con pago opcional). Nombre provisional del addon: La Colmena.
+- Todas las decisiones de diseño están en `DISEÑO.md`.
 - Idioma de trabajo: español.

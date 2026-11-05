@@ -1,0 +1,81 @@
+# Addon de profesiones — Los hijos del Fundillo
+
+Nombre provisional del addon: **La Colmena** (como el repositorio).
+
+## Objetivo
+Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
+- cada miembro **ofrece** lo que sabe fabricar (a cambio de los materiales);
+- cada miembro **pide** lo que necesita y, opcionalmente, qué paga por ello.
+
+## Plataforma
+- **WoW Forever oficial** de Blizzard (Classic+, lanzado el 4-nov-2026, vía Battle.net).
+  Cliente Classic moderno → API de Lua actual.
+  Pendiente: confirmar la versión de interfaz para el `.toc` con `/dump select(4, GetBuildInfo())`.
+- **Todos los miembros tendrán el addon**: la comunicación va solo por mensajes ocultos
+  de addon en el canal de hermandad.
+- **Solo en español.**
+- **Sin Discord** (descartado).
+
+## Recetas (ofertas)
+- Escaneo **automático** al abrir la ventana de cada profesión; se publican **todas** las recetas.
+  Se reescanea al aprender recetas nuevas.
+- **Sin condiciones** por oferta: el modelo es "tráeme los materiales".
+- Cada receta muestra sus **materiales y cuántos tienes** (bolsas, banco y todos tus personajes).
+- **Cooldowns** visibles (transmutaciones, tela lunar…): disponible o tiempo restante.
+- Fabricantes **desconectados visibles**, con "visto por última vez".
+- Orden: **conectados primero**, luego por última conexión.
+- Búsqueda por **texto + filtro por profesión** + filtro para ocultar recetas triviales.
+- En el **tooltip** de cualquier objeto: quién de la hermandad lo fabrica.
+
+## Peticiones
+- Se pide un **objeto enlazado** o un **encantamiento** (los encantamientos no son objetos).
+- **Cantidad** con entregas parciales (p. ej. 12/20 pociones); varios fabricantes pueden aportar.
+- Indicador de **si el autor aporta los materiales**.
+- **Pago opcional**: oro y/u objetos.
+- Botón **"Pedir"** en cada receta: a un fabricante concreto o a todos.
+- **Caducan a los 7 días** (renovables).
+- Estados: **Abierta → Aceptada → Hecha**.
+  - El **autor confirma "Hecha"** (así el contador no se infla).
+  - Al **comerciar** el objeto pedido con el autor, el addon propone cerrarla.
+  - Una aceptada que pasa **48 h** sin hacerse vuelve a abierta.
+  - El fabricante puede **soltarla**.
+- **Máximo 10** peticiones abiertas por jugador.
+- **Aviso emergente + sonido** solo a quien conoce la receta; clic en el aviso abre la petición.
+- Objetos pedidos que **nadie sabe hacer**: se listan aparte y se avisa cuando alguien aprende la receta.
+- **Contador** de encargos completados por fabricante.
+
+## Avisos / ruido
+- Modo **"no disponible"**: no recibes avisos y apareces detrás en las listas.
+- **Silencio en combate, mazmorras y bandas**; los avisos se guardan y se muestran al salir.
+
+## Personajes (alts)
+- Alts **vinculados al main**, detección **automática** (personajes de la misma cuenta,
+  vía datos guardados de cuenta; basta con entrar una vez con cada uno).
+- Se publican las recetas de tus alts **aunque no estén en la hermandad** (las publica
+  el personaje que sí está).
+- Pendiente: qué personaje es el main (propuesta: el de más nivel, cambiable).
+
+## Oficiales
+- Se detectan por **permiso de rango** (poder editar la nota de oficial).
+- **Moderan**: cerrar o borrar cualquier petición.
+- **Prioridad**: marcan peticiones "de hermandad" que salen destacadas.
+
+## Interfaz
+- **Integrada en la ventana de hermandad** como pestaña lateral (sin tocar las pestañas de
+  Blizzard, para que los parches no la rompan con facilidad).
+- **Sin** comando de barra ni botón de minimapa.
+  Riesgo asumido: si un parche cambia la ventana de hermandad, no habrá forma de abrir
+  el addon hasta actualizarlo.
+
+## Detalles internos
+- **Sincronización por versiones**: solo viaja lo que cambia; los conectados se pasan los
+  datos de los desconectados.
+- **Sin base de datos de recetas cerrada**: las recetas nuevas de Forever se aprenden al escanear.
+- **Control de versiones**: aviso de versión nueva; los oficiales ven quién no tiene el addon
+  o lo tiene desactualizado.
+- **Limpieza**: quien sale de la hermandad desaparece de las listas; solo se aceptan datos de miembros.
+
+## Pendiente
+- Alcance de la primera versión.
+- Versión de interfaz del `.toc`.
+- Elección del main entre los alts.
