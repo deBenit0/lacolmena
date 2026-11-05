@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.8.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.8.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -26,7 +26,9 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
 **Todo lo que se puede fabricar en Classic** que no es equipo (materiales, pociones, comida...),
 agrupado por profesión ([+]/[-] para plegar), aunque nadie de la hermandad lo haya publicado aún
 (el addon trae la lista de recetas de cada profesión). Puedes buscar, filtrar por profesión (menú
-desplegable) o marcar "Solo lo que usan mis recetas". Al elegir uno ves para qué recetas tuyas
+desplegable) o marcar "Solo lo que usan mis recetas". Al entrar al juego, el addon carga en segundo
+plano los nombres de todos los objetos (unos 40 segundos la primera vez) para que el buscador los
+encuentre. Al elegir uno ves para qué recetas tuyas
 sirve, el **precio en la subasta**, quién lo da, la cantidad con − y +, y los botones **Pedir a
 todos**, **Pedir a [nombre]** y **Susurrar**.
 
