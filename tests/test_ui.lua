@@ -25,10 +25,10 @@ local env = bea.env
 -- Pestaña lateral en la ventana de hermandad.
 local guildFrame = env.CreateFrame("Frame", "GuildFrame", env.UIParent)
 ns.UI.AttachHost(guildFrame)
-local tab = env.LaColmenaGuildTabGuildFrame
+local tab = env.HDFProfGuildTabGuildFrame
 H.ok(tab ~= nil, "pestaña lateral creada")
 tab:Click()
-local panel = env.LaColmenaPanel
+local panel = env.HDFProfPanel
 H.ok(panel and panel:IsShown(), "la pestaña abre la ventana")
 H.ok(panel.host == guildFrame, "pegada a la ventana de hermandad")
 guildFrame:Hide()
@@ -79,7 +79,7 @@ H.ok(crafters.items[1].online, "Ana en línea")
 crafters.rows[1]:Click()
 H.ok(recipes.detail.askOne:IsEnabled(), "botón Pedir a Ana activo")
 recipes.detail.askOne:Click()
-local dialog = env.LaColmenaRequestDialog
+local dialog = env.HDFProfRequestDialog
 H.ok(dialog and dialog:IsShown(), "se abre la ventana de petición")
 H.eq(dialog.key, "i13443", "con el objeto elegido")
 H.eq(dialog.to, "Ana-Reino", "para Ana")
@@ -99,18 +99,18 @@ H.ok(not requests.detail.b1:IsEnabled(), "Recibido desactivado sin compromisos")
 
 -- Ana la ve, le salta el aviso, hace clic y acepta.
 H.Advance(10)
-local alert = ana.env.LaColmenaAlert
+local alert = ana.env.HDFProfAlert
 H.ok(alert and alert:IsShown(), "aviso visible para Ana")
 H.ok(alert.text:GetText():find("(a ti)", 1, true) ~= nil, "aviso: la petición es para ella")
 alert:Click()
-local anaPanel = ana.env.LaColmenaPanel
+local anaPanel = ana.env.HDFProfPanel
 local anaRequests = anaPanel.pageFrames.requests
 H.ok(anaPanel:IsShown() and anaRequests:IsShown(), "el aviso abre sus peticiones")
 H.eq(anaRequests.state.id, id, "con la petición elegida")
 H.ok(anaRequests.detail.b1:IsEnabled(), "Lo hago yo activo")
 anaRequests.detail.b1:Click()
 local popup = ana.popups[#ana.popups]
-H.eq(popup.which, "LACOLMENA_AMOUNT", "pregunta cuántos")
+H.eq(popup.which, "HDFPROF_AMOUNT", "pregunta cuántos")
 popup.data.callback(4)
 H.Advance(10)
 

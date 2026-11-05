@@ -1,4 +1,4 @@
-# La Colmena
+# Los hijos del Fundillo: profesiones
 
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
@@ -8,8 +8,9 @@ Esta es la **fase 1** (versión 0.1.0). El diseño completo está en [`DISEÑO.m
 ## Instalación
 
 1. Descarga el repositorio (botón **Code → Download ZIP** en GitHub) o el ZIP del addon.
-2. Copia la carpeta **`LaColmena`** dentro de `Interface\AddOns` de tu instalación de WoW Forever.
-3. En la pantalla de personajes, pulsa **AddOns** y comprueba que *La Colmena* está activado.
+2. Copia la carpeta **`HDFprofesiones`** dentro de `World of Warcraft\_forever_\Interface\AddOns`.
+   Debe quedar `AddOns\HDFprofesiones\HDFprofesiones.toc` (sin carpetas de más en medio).
+3. En la pantalla de personajes, pulsa **AddOns** y comprueba que *Los hijos del Fundillo* está activado.
 
 Todos los miembros deben tenerlo: la información viaja entre los que están conectados.
 
@@ -68,4 +69,4 @@ objeto pedido y lista de objetos que nadie sabe hacer.
 
 - Pruebas (fuera del juego, con un WoW simulado y varios jugadores conectados entre sí):
   `lua5.1 tests/run.lua`
-- Análisis estático: `luacheck LaColmena`
+- Análisis estático: `luacheck HDFprofesiones`

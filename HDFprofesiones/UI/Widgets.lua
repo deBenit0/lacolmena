@@ -106,7 +106,7 @@ function W.List(parent, width, height, opts)
   box.items = {}
   local keyOf = opts.keyOf or function(item) return item end
 
-  local scroll = CreateFrame("ScrollFrame", "LaColmenaList" .. listCounter, box, "FauxScrollFrameTemplate")
+  local scroll = CreateFrame("ScrollFrame", "HDFProfList" .. listCounter, box, "FauxScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 4, -5)
   scroll:SetPoint("BOTTOMRIGHT", -27, 5)
   box.scroll = scroll
@@ -192,7 +192,7 @@ local function popupEditBox(popup)
   return popup.editBox or popup.EditBox or (popup.GetName and popup:GetName() and _G[popup:GetName() .. "EditBox"])
 end
 
-StaticPopupDialogs["LACOLMENA_AMOUNT"] = {
+StaticPopupDialogs["HDFPROF_AMOUNT"] = {
   text = "%s",
   button1 = ACCEPT or "Aceptar",
   button2 = CANCEL or "Cancelar",
@@ -228,7 +228,7 @@ StaticPopupDialogs["LACOLMENA_AMOUNT"] = {
   EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
 }
 
-StaticPopupDialogs["LACOLMENA_CONFIRM"] = {
+StaticPopupDialogs["HDFPROF_CONFIRM"] = {
   text = "%s",
   button1 = YES or "Sí",
   button2 = NO or "No",
@@ -244,7 +244,7 @@ StaticPopupDialogs["LACOLMENA_CONFIRM"] = {
 -- Según la versión del juego, los datos llegan antes o después de mostrarse: los ponemos siempre.
 function W.AskAmount(text, default, callback)
   local data = { default = default, callback = callback }
-  local popup = StaticPopup_Show("LACOLMENA_AMOUNT", text, nil, data)
+  local popup = StaticPopup_Show("HDFPROF_AMOUNT", text, nil, data)
   if popup then
     popup.data = data
     local edit = popupEditBox(popup)
@@ -257,6 +257,6 @@ end
 
 function W.Confirm(text, callback)
   local data = { callback = callback }
-  local popup = StaticPopup_Show("LACOLMENA_CONFIRM", text, nil, data)
+  local popup = StaticPopup_Show("HDFPROF_CONFIRM", text, nil, data)
   if popup then popup.data = data end
 end

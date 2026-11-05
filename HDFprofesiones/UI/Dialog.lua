@@ -30,7 +30,7 @@ end
 -- Caja de texto que acepta enlaces con mayús+clic.
 local function linkInput(parent, width)
   local edit = W.Input(parent, width)
-  edit.laColmenaLink = true
+  edit.hdfLink = true
   return edit
 end
 
@@ -43,7 +43,7 @@ local function takeCursorItem()
 end
 
 local function create()
-  dialog = W.Panel("LaColmenaRequestDialog", UIParent, 400, 340)
+  dialog = W.Panel("HDFProfRequestDialog", UIParent, 400, 340)
   dialog:SetFrameStrata("DIALOG")
   dialog:SetToplevel(true)
   dialog:SetPoint("CENTER", 0, 60)
@@ -53,7 +53,7 @@ local function create()
   dialog:SetScript("OnDragStart", dialog.StartMoving)
   dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
   dialog:Hide()
-  tinsert(UISpecialFrames, "LaColmenaRequestDialog")
+  tinsert(UISpecialFrames, "HDFProfRequestDialog")
 
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
@@ -199,7 +199,7 @@ end
 if ChatEdit_InsertLink then
   hooksecurefunc("ChatEdit_InsertLink", function(link)
     local focus = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
-    if focus and focus.laColmenaLink and type(link) == "string" then
+    if focus and focus.hdfLink and type(link) == "string" then
       focus:SetText(link)
     end
   end)

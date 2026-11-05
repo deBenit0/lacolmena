@@ -1,16 +1,16 @@
--- La Colmena: profesiones de Los hijos del Fundillo.
+-- Los hijos del Fundillo: addon de profesiones de la hermandad.
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
 ns.VERSION = "0.1.0"
 ns.PROTOCOL = 1
-ns.PREFIX = "LaColmena"
-ns.TITLE = "La Colmena"
+ns.PREFIX = "HDFprofesiones"
+ns.TITLE = "Los hijos del Fundillo"
 -- Los tiempos se guardan en segundos desde el 1-ene-2026 (UTC): así ocupan menos al enviarlos.
 ns.EPOCH = 1767225600
 ns.QUESTION_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
-LaColmena = ns -- acceso global, útil para depurar con /dump
+HDFProfesiones = ns -- acceso global, útil para depurar con /dump
 
 local floor, format = math.floor, string.format
 
@@ -307,8 +307,8 @@ local DEFAULT_SETTINGS = { alerts = true, sound = true, hideLowGear = true }
 
 ns.On("ADDON_LOADED", function(name)
   if name ~= ADDON then return end
-  LaColmenaDB = LaColmenaDB or {}
-  local db = LaColmenaDB
+  HDFProfesionesDB = HDFProfesionesDB or {}
+  local db = HDFProfesionesDB
   db.schema = db.schema or 1
   db.settings = db.settings or {}
   for k, v in pairs(DEFAULT_SETTINGS) do

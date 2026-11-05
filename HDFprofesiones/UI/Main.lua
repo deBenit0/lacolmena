@@ -18,7 +18,7 @@ function UI.RegisterPage(id, create)
 end
 
 local function createPanel()
-  panel = W.Panel("LaColmenaPanel", UIParent, 640, 480)
+  panel = W.Panel("HDFProfPanel", UIParent, 640, 480)
   panel:SetFrameStrata("HIGH")
   panel:SetToplevel(true)
   panel:SetClampedToScreen(true)
@@ -29,7 +29,7 @@ local function createPanel()
   end)
   panel:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
   panel:Hide()
-  tinsert(UISpecialFrames, "LaColmenaPanel")
+  tinsert(UISpecialFrames, "HDFProfPanel")
 
   panel.title = W.Text(panel, "GameFontNormal")
   panel.title:SetPoint("TOPLEFT", 22, -18)
@@ -69,8 +69,7 @@ end
 
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
-  local guild = ns.guildName
-  panel.title:SetText(ns.TITLE .. (guild and (" - " .. guild) or ""))
+  panel.title:SetText(ns.TITLE .. " - Profesiones")
   local inGuild = ns.G() ~= nil
   panel.noGuild:SetShown(not inGuild)
   for id, f in pairs(panel.pageFrames) do
@@ -137,7 +136,7 @@ end
 function UI.AttachHost(host)
   if not host or hosts[host] then return end
   hosts[host] = true
-  local tab = CreateFrame("Button", "LaColmenaGuildTab" .. (host:GetName() or ""), host)
+  local tab = CreateFrame("Button", "HDFProfGuildTab" .. (host:GetName() or ""), host)
   tab:SetSize(32, 32)
   tab:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 2, -64)
   tab:SetFrameLevel(host:GetFrameLevel() + 10)

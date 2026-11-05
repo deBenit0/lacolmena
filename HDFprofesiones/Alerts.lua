@@ -18,7 +18,7 @@ local function canShowNow()
 end
 
 local function createFrame()
-  local f = CreateFrame("Button", "LaColmenaAlert", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  local f = CreateFrame("Button", "HDFProfAlert", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   f:SetSize(360, 64)
   f:SetPoint("TOP", UIParent, "TOP", 0, -140)
   f:SetFrameStrata("DIALOG")
@@ -71,7 +71,7 @@ local function show(alert)
   frame.alert = alert
   frame.icon:SetTexture(alert.icon or ns.QUESTION_ICON)
   frame.text:SetText(alert.text)
-  frame.hint:SetText(alert.id and "Clic para verla" or "Clic para abrir La Colmena")
+  frame.hint:SetText(alert.id and "Clic para verla" or "Clic para abrir Profesiones")
   frame:Show()
   if ns.db.settings.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
   local token = {}

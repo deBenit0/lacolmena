@@ -4,7 +4,7 @@ max_line_length = 160
 unused_args = false
 exclude_files = { "tests/**" }
 
-globals = { "LaColmena", "LaColmenaDB", "StaticPopupDialogs", "UISpecialFrames" }
+globals = { "HDFProfesiones", "HDFProfesionesDB", "StaticPopupDialogs", "UISpecialFrames" }
 
 read_globals = {
   -- Lua de WoW

@@ -1,6 +1,6 @@
 # Addon de profesiones — Los hijos del Fundillo
 
-Nombre provisional del addon: **La Colmena** (como el repositorio).
+Nombre del addon: carpeta **HDFprofesiones**, título en el juego **Los hijos del Fundillo**.
 
 ## Objetivo
 Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
@@ -90,7 +90,7 @@ prioridad; ver quién no tiene el addon), tooltip con quién fabrica cada objeto
 comerciar el objeto pedido, lista de objetos que nadie sabe hacer con aviso al aprenderlos.
 
 ## Notas técnicas
-- Mensajes ocultos por el canal de hermandad (prefijo `LaColmena`), troceados a 250 bytes
+- Mensajes ocultos por el canal de hermandad (prefijo `HDFprofesiones`), troceados a 250 bytes
   y enviados a 1 mensaje/s de media como mucho.
 - Cada ficha de fabricante tiene un único dueño y una versión; cada parte de una petición
   (autor, cada fabricante, entregas) también, así que las copias se fusionan siempre igual,

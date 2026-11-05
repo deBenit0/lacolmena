@@ -4,7 +4,7 @@
 local H = {}
 
 H.ROOT = (arg and arg[0] and arg[0]:match("^(.*)/tests/[^/]+$")) or "."
-H.ADDON_DIR = H.ROOT .. "/LaColmena"
+H.ADDON_DIR = H.ROOT .. "/HDFprofesiones"
 H.EPOCH = 1767225600
 H.SERVER_START = H.EPOCH + 300 * 86400 -- un día cualquiera de 2026
 
@@ -437,11 +437,11 @@ function H.NewClient(name, opts)
   }
   client.env = makeEnv(client)
   client.ns = {}
-  client.env.LaColmenaDB = opts.savedDB and H.copy(opts.savedDB) or nil
+  client.env.HDFProfesionesDB = opts.savedDB and H.copy(opts.savedDB) or nil
   for _, file in ipairs(ADDON_FILES) do
     local chunk = assert(loadfile(H.ADDON_DIR .. "/" .. file))
     setfenv(chunk, client.env)
-    chunk("LaColmena", client.ns)
+    chunk("HDFprofesiones", client.ns)
   end
   H.clients[name] = client
   return client
@@ -453,7 +453,7 @@ function H.Login(name, opts)
   local client = H.NewClient(name, opts)
   client.online = true
   if m then m.online = true end
-  H.FireEvent(client, "ADDON_LOADED", "LaColmena")
+  H.FireEvent(client, "ADDON_LOADED", "HDFprofesiones")
   H.FireEvent(client, "PLAYER_LOGIN")
   H.FireEvent(client, "PLAYER_ENTERING_WORLD")
   for _, c in pairs(H.clients) do
@@ -472,7 +472,7 @@ function H.Logout(client)
   for _, c in pairs(H.clients) do
     if c.online then H.FireEvent(c, "GUILD_ROSTER_UPDATE") end
   end
-  return H.copy(client.env.LaColmenaDB)
+  return H.copy(client.env.HDFProfesionesDB)
 end
 
 -- Abre la ventana de profesión de un jugador.
