@@ -145,7 +145,10 @@ function UI.PlaceTab(tab, host)
   end
   tab:ClearAllPoints()
   if last then
-    tab:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 2, -18)
+    -- Mismo tamaño y separación que las de Blizzard: parece un icono más de la columna.
+    local w, h = last:GetSize()
+    if type(w) == "number" and w > 0 then tab:SetSize(w, h) end
+    tab:SetPoint("TOP", last, "BOTTOM", 0, -20)
   else
     tab:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 2, -64)
   end
@@ -157,19 +160,31 @@ end
 function UI.AttachHost(host)
   if not host or hosts[host] then return end
   hosts[host] = true
-  local tab = CreateFrame("Button", "HDFProfGuildTab" .. (host:GetName() or ""), host)
-  tab:SetSize(32, 32)
+  local name = "HDFProfGuildTab" .. (host:GetName() or "")
+  local ICON = "Interface\\Icons\\Trade_Engineering"
+  -- Si existe, usamos la plantilla de Blizzard de esas pestañas para que se vea igual.
+  local ok, tab = pcall(CreateFrame, "CheckButton", name, host, "CommunitiesFrameTabTemplate")
+  if ok and tab and type(tab.Icon) == "table" and tab.Icon.SetTexture then
+    tab.Icon:SetTexture(ICON)
+    tab:SetScript("OnShow", nil)
+  else
+    tab = CreateFrame("Button", name, host)
+    tab:SetSize(32, 32)
+    local bg = tab:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
+    bg:SetSize(64, 64)
+    bg:SetPoint("TOPLEFT", -3, 11)
+    local icon = tab:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    icon:SetTexture(ICON)
+    tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  end
   UI.PlaceTab(tab, host)
   host:HookScript("OnShow", function() UI.PlaceTab(tab, host) end)
-  local bg = tab:CreateTexture(nil, "BACKGROUND")
-  bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
-  bg:SetSize(64, 64)
-  bg:SetPoint("TOPLEFT", -3, 11)
-  local icon = tab:CreateTexture(nil, "ARTWORK")
-  icon:SetAllPoints()
-  icon:SetTexture("Interface\\Icons\\Trade_Engineering")
-  tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-  tab:SetScript("OnClick", function() UI.Toggle(host) end)
+  tab:SetScript("OnClick", function(self)
+    if self.SetChecked then self:SetChecked(false) end -- no se queda marcada como las de Blizzard
+    UI.Toggle(host)
+  end)
   tab:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(ns.TITLE)
