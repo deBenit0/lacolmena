@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.4.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.5.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -32,10 +32,14 @@ filtrar por profesión y ocultar el equipo de nivel bajo. Al elegir un objeto ve
 - la **cantidad** con − y + (de lo que salga por vez) y los botones **Pedir a todos**,
   **Pedir a [nombre]** y **Susurrar**.
 
-### Pedir lo que me falta
-En tu ventana de profesión, elige lo que quieres fabricar (y cuántas veces) y pulsa
-**Pedir en la hermandad**: pide a la hermandad los materiales que no tienes (contando bolsas
-y banco), con la cantidad exacta. No repite lo que ya tengas pedido.
+### Pedir en la hermandad (desde tu ventana de profesión)
+Elige lo que quieres fabricar y pulsa **Pedir en la hermandad**. Se abre una ventana con
+los materiales que te faltan (contando bolsas y banco):
+- **Veces a fabricar** con − y +: las cantidades se recalculan solas.
+- Cada material con su **casilla** y **cantidad editable**, y una nota: quién lo da en la
+  hermandad, si puedes conseguirlo tú, si nadie lo da (probablemente de vendedor) o si ya lo
+  tenías pedido (entonces **se amplía** esa petición en vez de crear otra).
+- Vienen marcados solo los que da la hermandad y tú no puedes conseguir.
 
 ### Peticiones
 - **Nueva petición:** mayús+clic en un objeto (o arrástralo al icono), cantidad, si aportas

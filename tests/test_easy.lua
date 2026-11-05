@@ -28,33 +28,51 @@ pepe.env.TradeSkillInputBox:SetText("3")
 H.OpenTradeSkill(pepe, BLACKSMITHING)
 H.Advance(2)
 pepe.ns.Missing.OnClick()
-local popup = pepe.popups[#pepe.popups]
-H.eq(popup.which, "HDFPROF_CONFIRM", "pregunta antes de pedir")
-H.ok(popup.text:find("11x Objeto 4234", 1, true) and popup.text:find("6x Objeto 2840", 1, true), "cantidades exactas: " .. popup.text)
-popup.data.callback()
+local picker = pepe.env.HDFProfMissingDialog
+H.ok(picker and picker:IsShown(), "se abre la ventana para elegir qué pedir")
+H.eq(picker.times, 3, "toma las veces de la ventana de profesión")
+local rowLeather, rowBars = picker.rows[1], picker.rows[2]
+H.eq(rowLeather.data.id, 4234, "fila 1: cuero")
+H.eq(rowLeather.qty:GetText(), "11", "faltan 11 cueros (4x3 - 1)")
+H.ok(rowLeather.check:GetChecked(), "cuero marcado: lo da la hermandad")
+H.ok(rowLeather.note:GetText():find("Peletería", 1, true), "nota: lo da Peletería: " .. rowLeather.note:GetText())
+H.eq(rowBars.qty:GetText(), "6", "faltan 6 barras")
+H.ok(not rowBars.check:GetChecked(), "barras sin marcar: nadie las da")
+H.ok(rowBars.note:GetText():find("vendedor", 1, true), "nota: ¿vendedor?")
+picker:Submit()
+H.ok(not picker:IsShown(), "se cierra al pedir")
 H.Advance(10)
 local leatherReq, oreReq
 for _, r in pairs(pepe.ns.G().requests) do
   if r.k == "i4234" then leatherReq = r elseif r.k == "i2840" then oreReq = r end
 end
 H.ok(leatherReq and leatherReq.q == 11, "petición de 11 cueros")
-H.ok(oreReq and oreReq.q == 6, "petición de 6 barras")
-pepe.ns.Missing.OnClick()
-pepe.popups[#pepe.popups].data.callback()
-local count = 0
-for _ in pairs(pepe.ns.G().requests) do count = count + 1 end
-H.eq(count, 2, "no se piden dos veces")
-
--- Ana recibe el aviso con "Lo hago yo" y acepta desde ahí.
+H.ok(oreReq == nil, "las barras de vendedor no se piden")
 local alert = ana.env.HDFProfAlert
 H.ok(alert and alert:IsShown(), "aviso a Ana")
 H.ok(alert.commit:IsShown(), "el aviso tiene el botón Lo hago yo")
+
+-- Ahora quiere hacer 4: se amplía la petición de cuero en vez de crear otra.
+pepe.ns.Missing.OnClick()
+picker:SetTimes(4)
+H.eq(rowLeather.qty:GetText(), "15", "con 4 veces faltan 15")
+H.ok(rowLeather.note:GetText():find("se amplía a 15", 1, true), "nota: se amplía")
+picker:Submit()
+H.Advance(10)
+local count = 0
+for _ in pairs(pepe.ns.G().requests) do count = count + 1 end
+H.eq(count, 1, "sigue habiendo una sola petición")
+H.eq(pepe.ns.G().requests[leatherReq.id].q, 15, "ampliada a 15")
+H.Advance(10)
+H.eq(ana.ns.G().requests[leatherReq.id].q, 15, "Ana ve la petición ampliada")
+
+-- Ana recibe el aviso con "Lo hago yo" y acepta desde ahí.
 -- número en la pestaña: 1 (la de cuero; las barras no las sabe hacer)
 H.Advance(2)
 local tab = ana.env.HDFProfGuildTabGuildFrame
 H.ok(tab.badge:IsShown() and tab.badge.text:GetText() == "1", "pestaña con 1 pendiente: " .. tostring(tab.badge.text:GetText()))
 alert.commit:Click()
-ana.popups[#ana.popups].data.callback(11)
+ana.popups[#ana.popups].data.callback(15)
 H.Advance(10)
 H.eq(pepe.ns.Data.RequestInfo(pepe.ns.G().requests[leatherReq.id], pepe.ns.Now()).state, "accepted", "aceptada desde el aviso")
 H.Advance(2)

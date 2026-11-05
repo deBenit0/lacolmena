@@ -1,5 +1,5 @@
--- "Pedir lo que me falta": botón en la ventana de profesión que pide a la hermandad los
--- materiales que faltan para fabricar la receta elegida (bolsas + banco), con la cantidad exacta.
+-- "Pedir en la hermandad": botón en la ventana de profesión que abre una ventana con los
+-- materiales que faltan para la receta elegida (bolsas + banco), para elegir qué pedir.
 local _, ns = ...
 local Data = ns.Data
 local Missing = {}
@@ -20,7 +20,7 @@ local function selectedReagents()
       local id = itemIdFromLink(GetCraftReagentItemLink(i, r))
       if id and count then list[#list + 1] = { id = id, need = count } end
     end
-    return list, 1
+    return list, 1, (GetCraftInfo(i))
   end
   if GetTradeSkillSelectionIndex then
     local i = GetTradeSkillSelectionIndex()
@@ -33,33 +33,85 @@ local function selectedReagents()
     end
     -- cuántas veces quiere fabricarla (la caja de cantidad de la ventana)
     local times = TradeSkillInputBox and tonumber(TradeSkillInputBox:GetText()) or 1
-    return list, math.max(1, times or 1)
+    return list, math.max(1, times or 1), (GetTradeSkillInfo(i))
   end
 end
 
--- Lo que falta: { { id, missing } }, ya descontando lo que tengo (bolsas + banco).
+-- Lo que falta para fabricar "times" veces, con qué hacer con cada material:
+--   { id, missing, guild = quién lo da en la hermandad (texto) o nil, self = puedo yo,
+--     existing = mi petición abierta de ese material, checked = marcado por defecto }
 function Missing.Compute(reagents, times)
-  local out = {}
+  local now, me, out = ns.Now(), ns.Me(), {}
+  local index = Data.GetIndex()
   for _, re in ipairs(reagents or {}) do
     local missing = re.need * times - ns.Scan.Have(re.id)
-    if missing > 0 then out[#out + 1] = { id = re.id, missing = missing } end
+    if missing > 0 then
+      local key = "i" .. re.id
+      local row = { id = re.id, missing = missing }
+      -- ¿Quién de la hermandad (que no sea yo) lo fabrica o lo recolecta?
+      local profs, crafters = {}, {}
+      local rec = index[key]
+      for _, cr in ipairs(rec and rec.crafters or {}) do
+        if cr.n ~= me then
+          crafters[cr.n] = true
+          profs[ns.ProfessionName(cr.p)] = true
+        end
+      end
+      local gatherers, skill = Data.GatherersOf(key)
+      for _, name in ipairs(gatherers) do
+        if name ~= me then
+          crafters[name] = true
+          profs[ns.ProfessionName(skill)] = true
+        end
+      end
+      local n, names = 0, {}
+      for _ in pairs(crafters) do n = n + 1 end
+      for name in pairs(profs) do names[#names + 1] = name end
+      table.sort(names)
+      if n > 0 then row.guild = table.concat(names, ", ") .. " (" .. n .. ")" end
+      row.self = Data.ICanCraft(key) or Data.ICanGather(key) or false
+      row.existing = Data.MyActiveRequestFor(key, now)
+      row.checked = row.guild ~= nil and not row.self
+      out[#out + 1] = row
+    end
   end
   return out
 end
 
--- Crea las peticiones (sin repetir las que ya tengo abiertas). Devuelve creadas, omitidas.
+local function noteFor(row, qty)
+  if row.existing then
+    local info = Data.RequestInfo(row.existing, ns.Now())
+    local target = info.delivered + qty
+    if target > row.existing.q then
+      return string.format("|cffffd100Ya pedido: se amplía a %d|r", target)
+    end
+    return "|cffbbbbbbYa lo tienes pedido|r"
+  end
+  if row.self then return "|cff40ff40Puedes conseguirlo tú|r" end
+  if row.guild then return "|cff40ff40Lo dan: " .. row.guild .. "|r" end
+  return "|cffff8040Nadie de la hermandad lo da (¿vendedor?)|r"
+end
+
+-- Crea o amplía las peticiones de las filas marcadas. Devuelve creadas, ampliadas, omitidas.
 function Missing.Request(list)
-  local now, created, skipped = ns.Now(), {}, {}
+  local now = ns.Now()
+  local created, extended, skipped = {}, {}, {}
   for _, m in ipairs(list) do
     local key = "i" .. m.id
-    if Data.MyActiveRequestFor(key, now) then
-      skipped[#skipped + 1] = m
+    local existing = Data.MyActiveRequestFor(key, now)
+    if existing then
+      local target = Data.RequestInfo(existing, now).delivered + m.missing
+      if target > existing.q and ns.Sync.SetQuantity(existing.id, target) then
+        extended[#extended + 1] = { id = m.id, missing = target }
+      else
+        skipped[#skipped + 1] = m
+      end
     else
       local r = ns.Sync.CreateRequest({ k = key, pk = Data.SingleProfession(key), q = m.missing })
       if r then created[#created + 1] = m else skipped[#skipped + 1] = m end
     end
   end
-  return created, skipped
+  return created, extended, skipped
 end
 
 local function describe(list)
@@ -68,28 +120,144 @@ local function describe(list)
   return table.concat(parts, ", ")
 end
 
+---------------------------------------------------------------------------
+-- Ventana para elegir qué pedir
+---------------------------------------------------------------------------
+local MAX_ROWS = 8
+local picker
+
+local function createPicker()
+  local W = ns.W
+  picker = W.Panel("HDFProfMissingDialog", UIParent, 460, 150 + MAX_ROWS * 30)
+  picker:SetFrameStrata("DIALOG")
+  picker:SetToplevel(true)
+  picker:SetPoint("CENTER", 0, 40)
+  picker:SetMovable(true)
+  picker:SetClampedToScreen(true)
+  picker:RegisterForDrag("LeftButton")
+  picker:SetScript("OnDragStart", picker.StartMoving)
+  picker:SetScript("OnDragStop", picker.StopMovingOrSizing)
+  picker:Hide()
+  tinsert(UISpecialFrames, "HDFProfMissingDialog")
+
+  local title = W.Text(picker, "GameFontNormal")
+  title:SetPoint("TOP", 0, -18)
+  title:SetText("Pedir en la hermandad")
+  local close = CreateFrame("Button", nil, picker, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -6, -6)
+
+  picker.recipe = W.Text(picker, "GameFontHighlight")
+  picker.recipe:SetPoint("TOPLEFT", 24, -44)
+  picker.recipe:SetPoint("RIGHT", picker, "RIGHT", -24, 0)
+  picker.recipe:SetWordWrap(false)
+
+  local timesLabel = W.Text(picker, "GameFontNormalSmall")
+  timesLabel:SetPoint("TOPLEFT", 24, -70)
+  timesLabel:SetText("Veces a fabricar:")
+  picker.minus = W.Button(picker, "-", 24, 20, function() picker:SetTimes(picker.times - 1) end)
+  picker.minus:SetPoint("LEFT", timesLabel, "RIGHT", 8, 0)
+  picker.timesText = W.Text(picker, "GameFontHighlight", "CENTER")
+  picker.timesText:SetWidth(36)
+  picker.timesText:SetPoint("LEFT", picker.minus, "RIGHT", 2, 0)
+  picker.plus = W.Button(picker, "+", 24, 20, function() picker:SetTimes(picker.times + 1) end)
+  picker.plus:SetPoint("LEFT", picker.timesText, "RIGHT", 2, 0)
+
+  picker.rows = {}
+  for i = 1, MAX_ROWS do
+    local row = CreateFrame("Frame", nil, picker)
+    row:SetSize(412, 28)
+    row:SetPoint("TOPLEFT", 20, -96 - (i - 1) * 30)
+    row.check = W.Check(row, "")
+    row.check:SetPoint("LEFT", 0, 0)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(22, 22)
+    row.icon:SetPoint("LEFT", row.check, "RIGHT", 2, 0)
+    row.qty = W.Input(row, 40, true)
+    row.qty:SetPoint("LEFT", row.icon, "RIGHT", 10, 0)
+    row.qty:SetMaxLetters(4)
+    row.name = W.Text(row, "GameFontHighlightSmall")
+    row.name:SetPoint("TOPLEFT", row.qty, "TOPRIGHT", 8, 2)
+    row.name:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row.name:SetWordWrap(false)
+    row.note = W.Text(row, "GameFontHighlightSmall")
+    row.note:SetPoint("BOTTOMLEFT", row.qty, "BOTTOMRIGHT", 8, -3)
+    row.note:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row.note:SetWordWrap(false)
+    row.qty:HookScript("OnTextChanged", function(self)
+      if row.data then row.note:SetText(noteFor(row.data, tonumber(self:GetText()) or 0)) end
+    end)
+    picker.rows[i] = row
+  end
+
+  picker.empty = W.Text(picker, "GameFontNormal", "CENTER")
+  picker.empty:SetPoint("TOP", 0, -110)
+  picker.empty:SetTextColor(0.6, 0.6, 0.6)
+  picker.empty:SetText("Ya tienes todos los materiales (contando el banco).")
+
+  local ask = W.Button(picker, "Pedir", 96, 22, function() picker:Submit() end)
+  ask:SetPoint("BOTTOMRIGHT", -22, 18)
+  picker.askButton = ask
+  local cancel = W.Button(picker, "Cancelar", 86, 22, function() picker:Hide() end)
+  cancel:SetPoint("RIGHT", ask, "LEFT", -6, 0)
+
+  function picker:SetTimes(n)
+    self.times = math.max(1, math.min(200, n))
+    self.timesText:SetText(self.times)
+    self.list = Missing.Compute(self.reagents, self.times)
+    for i, row in ipairs(self.rows) do
+      local m = self.list[i]
+      row.data = m
+      row:SetShown(m ~= nil)
+      if m then
+        local _, icon = ns.KeyInfo("i" .. m.id)
+        row.icon:SetTexture(icon)
+        row.name:SetText(ns.KeyName("i" .. m.id))
+        row.check:SetChecked(m.checked)
+        row.qty:SetText(tostring(m.missing))
+        row.note:SetText(noteFor(m, m.missing))
+      end
+    end
+    self.empty:SetShown(#self.list == 0)
+    self.askButton:SetEnabled(#self.list > 0)
+  end
+
+  function picker:Submit()
+    local chosen = {}
+    for _, row in ipairs(self.rows) do
+      local qty = tonumber(row.qty:GetText()) or 0
+      if row.data and row:IsShown() and row.check:GetChecked() and qty > 0 then
+        chosen[#chosen + 1] = { id = row.data.id, missing = qty }
+      end
+    end
+    if #chosen == 0 then
+      ns.Print("no has marcado ningún material.")
+      return
+    end
+    self:Hide()
+    local created, extended, skipped = Missing.Request(chosen)
+    if #created > 0 then ns.Print("pedido a la hermandad: %s.", describe(created)) end
+    if #extended > 0 then ns.Print("ampliado lo que ya tenías pedido: %s.", describe(extended)) end
+    if #skipped > 0 then
+      ns.Print("no se ha pedido (ya estaba pedido o tienes %d abiertas): %s.", Data.MAX_OPEN, describe(skipped))
+    end
+  end
+end
+
 function Missing.OnClick()
   if not ns.G() then
     ns.Print("no estás en ninguna hermandad.")
     return
   end
-  local reagents, times = selectedReagents()
+  local reagents, times, recipeName = selectedReagents()
   if not reagents then
     ns.Print("elige primero una receta en la ventana de profesión.")
     return
   end
-  local list = Missing.Compute(reagents, times)
-  if #list == 0 then
-    ns.Print("ya tienes todos los materiales (contando el banco).")
-    return
-  end
-  ns.W.Confirm("¿Pedir a la hermandad lo que te falta?\n\n" .. describe(list), function()
-    local created, skipped = Missing.Request(list)
-    if #created > 0 then ns.Print("pedido a la hermandad: %s.", describe(created)) end
-    if #skipped > 0 then
-      ns.Print("no se ha pedido (ya lo tenías pedido o tienes %d abiertas): %s.", Data.MAX_OPEN, describe(skipped))
-    end
-  end)
+  if not picker then createPicker() end
+  picker.reagents = reagents
+  picker.recipe:SetText(recipeName or "")
+  picker:SetTimes(times)
+  picker:Show()
 end
 
 -- Botón encima del de "Crear" (o arriba a la derecha si no lo encuentra).

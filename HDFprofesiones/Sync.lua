@@ -416,6 +416,10 @@ function Sync.ConfirmDelivery(id, crafter, amount)
   return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
 end
 
+function Sync.SetQuantity(id, q)
+  return afterRequestAction(Data.SetQuantity(id, q, ns.Now()))
+end
+
 function Sync.Close(id)
   return afterRequestAction(Data.CloseRequest(id, ns.Now()))
 end

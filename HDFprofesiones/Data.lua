@@ -728,6 +728,18 @@ function Data.RegisterMail(recipient, items, now)
   return changed
 end
 
+-- El autor amplía la cantidad de su petición (por ejemplo, porque ahora necesita más).
+function Data.SetQuantity(id, q, now)
+  local r, me = getRequest(id), ns.Me()
+  if not r then return nil, "La petición ya no existe." end
+  if r.a ~= me then return nil, "Solo el autor puede cambiarla." end
+  q = min(Data.MAX_QTY, max(1, floor(tonumber(q) or 1)))
+  if q == r.q then return r end
+  r.q = q
+  r.av = bump(r.av, now)
+  return r
+end
+
 function Data.CloseRequest(id, now)
   local r, me = getRequest(id), ns.Me()
   if not r then return nil, "La petición ya no existe." end
