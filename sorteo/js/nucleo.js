@@ -20,7 +20,7 @@
     ignorar: ['nightbot', 'streamelements', 'streamlabs', 'moobot', 'ananonymousgifter'],
     // Sorteo
     quitarGanador: true,
-    duracionRuleta: 8,
+    duracionSorteo: 8,
     sonidoPanel: false,
   };
 
@@ -239,7 +239,35 @@
     return { participantes: ps, totalPapeletas: total };
   }
 
-  // Saca ganador y prepara la tirada de ruleta (misma animación en panel y escena).
+  // Tira de nombres que pasa por pantalla: aparecen más veces quienes tienen
+  // más papeletas, sin repetir el mismo nombre dos veces seguidas, y el
+  // ganador queda en la posición `indiceGanador` (con unos nombres más detrás
+  // para que la pantalla no se quede vacía por arriba al pararse).
+  function construirTira(segmentos, indiceGanador, largo, aleatorio) {
+    const rnd = aleatorio || ((n) => Math.floor(Math.random() * n));
+    const pesos = segmentos.map((s) => s.papeletas);
+    // Saca un nombre ponderado que no esté en `evitar`.
+    const sacar = (evitar) => {
+      for (let intento = 0; intento < 10; intento++) {
+        const n = segmentos[elegirPonderado(pesos, rnd)].nombre;
+        if (!evitar.includes(n)) return n;
+      }
+      const libre = segmentos.find((s) => !evitar.includes(s.nombre));
+      return libre ? libre.nombre : segmentos[0].nombre;
+    };
+    const ganador = segmentos[indiceGanador].nombre;
+    const uno = segmentos.length === 1;
+    // Se construye hacia atrás desde el ganador y luego hacia delante, sin
+    // repetir nunca el mismo nombre dos veces seguidas.
+    const tira = new Array(largo + EXTRA_TIRA);
+    tira[largo] = ganador;
+    for (let k = largo - 1; k >= 0; k--) tira[k] = uno ? ganador : sacar([tira[k + 1]]);
+    for (let k = largo + 1; k < tira.length; k++) tira[k] = uno ? ganador : sacar([tira[k - 1]]);
+    return { tira, indiceGanador: largo };
+  }
+  const EXTRA_TIRA = 6;
+
+  // Saca ganador y prepara la animación (la misma en panel y escena).
   function sortear(estado, aj, opciones) {
     opciones = opciones || {};
     const { participantes, totalPapeletas } = lista(estado, aj);
@@ -252,14 +280,14 @@
     estado.ganadores.unshift(ganador);
     estado.mensajesGanador = [];
     if (aj.quitarGanador) estado.participantes[g.login].excluido = true;
-    // Punto de parada dentro del trozo del ganador (no en el borde).
-    const posicion = 0.15 + Math.random() * 0.7;
-    return { segmentos, indiceGanador: i, ganador, posicion,
-      vueltas: 6 + Math.floor(Math.random() * 3), duracionMs: Math.max(3, Number(aj.duracionRuleta) || 8) * 1000 };
+    const duracionMs = Math.max(3, Number(aj.duracionSorteo) || 8) * 1000;
+    const largo = Math.round(30 + duracionMs / 1000 * 4); // nombres que pasan antes del ganador
+    const { tira, indiceGanador } = construirTira(segmentos, i, largo);
+    return { tira, indiceGanador, ganador, duracionMs };
   }
 
   const Nucleo = { AJUSTES_DEFECTO, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
-    papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear };
+    papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear, construirTira };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo;
   else raiz.Nucleo = Nucleo;

@@ -3,7 +3,7 @@
  * navegador, o escena abierta con el botón "Abrir escena"). */
 (function () {
   'use strict';
-  const NOMBRE = 'colmena-sorteo';
+  const NOMBRE = 'fundillo-sorteo';
   const oyentes = [];
   let canal = null;
   try { canal = new BroadcastChannel(NOMBRE); canal.onmessage = (e) => oyentes.forEach((f) => f(e.data)); } catch (e) { canal = null; }

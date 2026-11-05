@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sorteo La Colmena</title>
+<title>Sorteo del Fundillo</title>
 <style>
   :root {
-    --fondo: #14110c; --panel: #1f1a12; --panel2: #2a2318; --borde: #3a3122;
-    --texto: #f3ead8; --suave: #b5a888; --miel: #f5b301; --miel2: #ffd24a;
+    --fondo: #0b0b0e; --panel: #16161b; --panel2: #202028; --borde: #2e2e38;
+    --texto: #f2f2f5; --suave: #a3a3b2; --acento: #a970ff; --acento2: #c4a0ff;
     --ok: #4fc36b; --mal: #e5534b;
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--fondo); color: var(--texto); }
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--borde); position: sticky; top: 0; z-index: 5; }
-  h1 { margin: 0; font-size: 20px; white-space: nowrap; } h1 span { color: var(--miel); }
+  h1 { margin: 0; font-size: 20px; white-space: nowrap; } h1 span { color: var(--acento); }
   h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel2); font-size: 13px; }
   .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--mal); flex: none; }
@@ -24,20 +24,20 @@
   @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
   .card { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
   button { font: inherit; cursor: pointer; border: 1px solid var(--borde); background: var(--panel2); color: var(--texto); padding: 7px 12px; border-radius: 8px; }
-  button:hover { border-color: var(--miel); }
-  button.miel { background: var(--miel); color: #1a1405; border-color: var(--miel); font-weight: 800; }
-  button.miel:hover { background: var(--miel2); }
+  button:hover { border-color: var(--acento); }
+  button.acento { background: var(--acento); color: #fff; border-color: var(--acento); font-weight: 800; }
+  button.acento:hover { background: var(--acento2); }
   button.peligro:hover { border-color: var(--mal); color: var(--mal); }
   button:disabled { opacity: .5; cursor: not-allowed; }
   input[type=text], input[type=number] { font: inherit; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; min-width: 0; width: 100%; }
-  input:focus { outline: 2px solid var(--miel); outline-offset: -1px; }
+  input:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
   .escenario { position: relative; }
-  #lienzo { width: 100%; aspect-ratio: 1 / 1; max-height: 62vh; display: block; margin: 0 auto; }
+  #lienzo { width: 100%; aspect-ratio: 4 / 3; max-height: 60vh; display: block; margin: 0 auto; border-radius: 12px; background: #000; }
   #confeti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .btn-sortear { display: block; width: 100%; font-size: 22px; padding: 14px; border-radius: 12px; margin-top: 10px; letter-spacing: .04em; }
-  .ganador { display: none; text-align: center; margin-top: 12px; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, #3b2a12, #1f1a12); border: 2px solid var(--miel); }
+  .ganador { display: none; text-align: center; margin-top: 12px; padding: 14px; border-radius: 12px; background: #000; border: 2px solid var(--acento); }
   .ganador.visible { display: block; animation: aparece .6s ease-out; }
-  .ganador .nombre { font-size: 34px; font-weight: 900; color: var(--miel); }
+  .ganador .nombre { font-size: 34px; font-weight: 900; color: var(--acento); }
   @keyframes aparece { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
@@ -46,7 +46,7 @@
   tr.excluido td { opacity: .45; } tr.excluido td:first-child { text-decoration: line-through; } tr.excluido td:last-child { opacity: 1; }
   .det { color: var(--suave); font-size: 12px; }
   .barra { height: 5px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
-  .barra i { display: block; height: 100%; background: var(--miel); }
+  .barra i { display: block; height: 100%; background: var(--acento); }
   .scroll { max-height: 420px; overflow: auto; }
   .vacio { color: var(--suave); text-align: center; padding: 22px 0; }
   .fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -55,24 +55,24 @@
   ul.lista li .h { color: var(--suave); flex: none; font-variant-numeric: tabular-nums; }
   ul.lista li.no { opacity: .5; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); color: var(--suave); white-space: nowrap; }
-  .tag.miel { background: #3b2a12; color: var(--miel2); }
+  .tag.acento { background: #2a1f40; color: var(--acento2); }
   .error { color: var(--mal); font-size: 13px; min-height: 1em; margin-top: 6px; }
   details > summary { cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); list-style: none; }
   details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
   .ajustes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 14px; margin-top: 12px; }
   .ajustes label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--suave); }
   .ajustes label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--texto); font-size: 13px; }
-  .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--miel); }
-  .aviso { background: #3b2a12; border: 1px solid var(--miel); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--acento); }
+  .aviso { background: #2a1f40; border: 1px solid var(--acento); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
   .entrada-chat { text-align: center; font-size: 14px; color: var(--suave); margin-top: 8px; }
-  .entrada-chat b { color: var(--miel2); font-size: 16px; }
+  .entrada-chat b { color: var(--acento2); font-size: 16px; }
   .ayuda { font-size: 13px; color: var(--suave); }
   .ayuda code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; color: var(--texto); word-break: break-all; }
 </style>
 </head>
 <body>
 <header>
-  <h1>🐝 Sorteo <span>La Colmena</span></h1>
+  <h1>Sorteo <span>del Fundillo</span></h1>
   <span class="chip"><span id="punto" class="punto"></span><span id="estadoChat">Sin conectar</span></span>
   <button id="btnAbrir" class="chip"></button>
   <div class="grow"></div>
@@ -93,7 +93,7 @@
         <canvas id="confeti"></canvas>
       </div>
       <div class="entrada-chat" id="comoEntrar"></div>
-      <button class="miel btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
+      <button class="acento btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
       <div class="error" id="errSortear"></div>
       <div class="ganador" id="ganador">
         <div class="det">🏆 Ganador</div>
@@ -148,7 +148,7 @@
         <form id="formAjustes">
           <div class="ajustes" id="camposAjustes"></div>
           <div class="fila" style="margin-top:14px">
-            <button class="miel" type="submit">Guardar</button>
+            <button class="acento" type="submit">Guardar</button>
             <span class="det" id="ajustesOk"></span>
           </div>
         </form>
@@ -159,10 +159,10 @@
       <details>
         <summary>Usar en OBS</summary>
         <div class="ayuda">
-          <p>La escena es transparente y muestra la ruleta solo cuando sorteas. Necesita estar <b>en el mismo navegador</b> que este panel para recibir la orden de girar. Dos formas:</p>
+          <p>La escena es transparente y solo aparece cuando sorteas (fondo negro con los nombres cayendo). Necesita estar <b>en el mismo navegador</b> que este panel para recibir la orden de girar. Dos formas:</p>
           <p><b>A · Todo dentro de OBS (recomendado).</b> En OBS: <i>Ver → Paneles → Paneles de navegador personalizados</i> y añade este panel con la dirección <code id="urlPanel"></code>. Después añade una <i>Fuente de navegador</i> (1920×1080) con <code id="urlEscena"></code> y marca <i>Controlar audio vía OBS</i>.</p>
           <p><b>B · Captura de ventana.</b> Pulsa <b>🎬 Abrir escena</b>, y en OBS añade una <i>Captura de ventana</i> de esa ventana con un filtro de <i>Clave cromática</i> (verde). Para fondo verde usa <code>escena.html?fondo=verde</code>.</p>
-          <p>Opciones de la escena (se añaden a la dirección): <code>?ranking=5</code> top de papeletas · <code>?anuncio=1</code> barra "escribe !sorteo para participar" · <code>?siempre=1</code> ruleta siempre visible · <code>?segundos=20</code> tiempo del ganador en pantalla · <code>?sonido=0</code> sin sonido. Se combinan con <code>&amp;</code>.</p>
+          <p>Opciones de la escena (se añaden a la dirección): <code>?ranking=5</code> top de papeletas · <code>?anuncio=1</code> barra "escribe !sorteo para participar" · <code>?siempre=1</code> animación siempre visible · <code>?segundos=20</code> tiempo del ganador en pantalla · <code>?sonido=0</code> sin sonido. Se combinan con <code>&amp;</code>.</p>
         </div>
       </details>
     </div>
@@ -192,7 +192,7 @@
 
 <script src="js/nucleo.js"></script>
 <script src="js/chat.js"></script>
-<script src="js/rueda.js"></script>
+<script src="js/rodillo.js"></script>
 <script src="js/enlace.js"></script>
 <script>
 'use strict';
@@ -205,10 +205,10 @@ function el(tag, props, ...hijos) { const e = Object.assign(document.createEleme
 function leer(clave) { try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
 function escribir(clave, valor) { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin almacenamiento */ } }
 
-let aj = Nucleo.mezclarAjustes(leer('colmena-ajustes'));
+let aj = Nucleo.mezclarAjustes(leer('fundillo-ajustes'));
 const params = new URLSearchParams(location.search);
 if (params.get('canal')) aj.canal = params.get('canal');
-const claveEstado = () => 'colmena-estado-' + (aj.canal || '_');
+const claveEstado = () => 'fundillo-estado-' + (aj.canal || '_');
 let estado = Object.assign(Nucleo.estadoVacio(), leer(claveEstado()) || {});
 let girando = false;
 let chatEstado = { conectado: false, texto: 'Sin conectar' };
@@ -258,7 +258,7 @@ function pintarYa() {
   $('estadoChat').textContent = chatEstado.texto;
   $('avisoCanal').hidden = !!aj.canal;
   $('btnAbrir').textContent = estado.abierto ? '🟢 Abierto · pulsa para cerrar' : '🔴 Cerrado · pulsa para abrir';
-  if (girando) return; // no desvelar al ganador antes de que pare la ruleta
+  if (girando) return; // no desvelar al ganador antes de que pare la animación
 
   const l = Nucleo.lista(estado, aj);
   $('nPart').textContent = l.participantes.filter((p) => p.papeletas > 0).length;
@@ -276,7 +276,7 @@ function pintarYa() {
   if (palabra && !aj.gastanEntranSinEscribir) partes.push('quien gasta también tiene que escribir la palabra');
   $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
 
-  ruleta.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ login: p.login, nombre: p.nombre, papeletas: p.papeletas })));
+  rodillo.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => p.nombre));
   Enlace.enviar(resumenParaEscena(l));
 
   const tabla = $('tabla');
@@ -314,15 +314,15 @@ function pintarYa() {
   for (const e of estado.eventos.slice(0, 120)) {
     const li = el('li', { className: e.contado ? '' : 'no' }, el('span', { className: 'h', textContent: hora(e.hora) }),
       el('span', {}, el('b', { textContent: e.nombre }), ' ' + e.texto + ' '));
-    if (e.euros) li.append(el('span', { className: 'tag miel', textContent: eur(e.euros) }));
+    if (e.euros) li.append(el('span', { className: 'tag acento', textContent: eur(e.euros) }));
     if (!e.contado) li.append(el('span', { className: 'tag', textContent: 'no cuenta: ' + e.motivo }));
     ev.append(li);
   }
 }
 
-// --- Ruleta ----------------------------------------------------------------
-const ruleta = new Rueda.Ruleta($('lienzo'));
-Rueda.Sonido.activo = !!aj.sonidoPanel;
+// --- Animación ---------------------------------------------------------------
+const rodillo = new Animacion.Rodillo($('lienzo'));
+Animacion.Sonido.activo = !!aj.sonidoPanel;
 
 $('btnSortear').onclick = async () => {
   if (girando) return;
@@ -330,18 +330,18 @@ $('btnSortear').onclick = async () => {
   const tirada = Nucleo.sortear(estado, aj);
   if (!tirada) { $('errSortear').textContent = 'No hay nadie con papeletas.'; return; }
   guardar();
-  Rueda.Sonido.preparar();
+  Animacion.Sonido.preparar();
   girando = true;
   $('btnSortear').disabled = true;
   $('ganador').classList.remove('visible');
   const inicio = Date.now();
   Enlace.enviar({ tipo: 'tirada', tirada, inicio });
-  await ruleta.girar(tirada, inicio);
+  await rodillo.girar(tirada, inicio);
   const g = tirada.ganador;
   $('gNombre').textContent = g.nombre;
   $('gInfo').textContent = `${g.papeletas} de ${g.totalPapeletas} papeletas · ${(g.probabilidad * 100).toFixed(1)} % de probabilidad · ${g.participantes} participantes`;
   $('ganador').classList.add('visible');
-  Rueda.confeti($('confeti'));
+  Animacion.confeti($('confeti'));
   setTimeout(() => { girando = false; $('btnSortear').disabled = false; pintar(); }, 2500);
 };
 
@@ -350,7 +350,7 @@ Enlace.escuchar((m) => { if (m && m.tipo === 'hola' && !girando) Enlace.enviar(r
 
 // --- Controles ----------------------------------------------------------------
 $('btnAbrir').onclick = () => { estado.abierto = !estado.abierto; guardar(); pintar(); };
-$('btnEscena').onclick = () => window.open('escena.html', 'escena-colmena', 'width=1280,height=720');
+$('btnEscena').onclick = () => window.open('escena.html', 'escena-fundillo', 'width=1280,height=720');
 $('btnReiniciar').onclick = () => {
   if (!confirm('¿Seguro? Se borran participantes, papeletas, actividad y ganadores de este sorteo.')) return;
   const abierto = estado.abierto;
@@ -374,7 +374,7 @@ $('formManual').onsubmit = (ev) => {
 let nSim = 0;
 document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
   const tipo = b.dataset.sim;
-  const nombres = ['AbejaMaya', 'Zangano_Rex', 'MielYFlores', 'Polen99', 'ReinaColmena', 'Panalito', 'Aguijon', 'Melifera', 'Zumbido', 'Apicultora'];
+  const nombres = ['ElPepe', 'Lucia_GG', 'xXDarkXx', 'MarioKart64', 'LaPaca', 'Tomasito', 'NoobMaster', 'Rocio_Live', 'ElBicho', 'Chusqui'];
   const nombre = () => nombres[Math.floor(Math.random() * nombres.length)] + (Math.random() < 0.5 ? Math.floor(Math.random() * 99) : '');
   const v = aj.valores;
   const crea = {
@@ -393,14 +393,14 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
 
 $('btnExportar').onclick = () => {
   const blob = new Blob([JSON.stringify({ ajustes: aj, estado }, null, 2)], { type: 'application/json' });
-  const a = el('a', { href: URL.createObjectURL(blob), download: `sorteo-${aj.canal || 'colmena'}-${new Date().toISOString().slice(0, 10)}.json` });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `sorteo-${aj.canal || 'fundillo'}-${new Date().toISOString().slice(0, 10)}.json` });
   document.body.append(a); a.click(); a.remove();
 };
 $('fImportar').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
   try {
     const d = JSON.parse(await f.text());
-    if (d.ajustes) { aj = Nucleo.mezclarAjustes(d.ajustes); escribir('colmena-ajustes', aj); }
+    if (d.ajustes) { aj = Nucleo.mezclarAjustes(d.ajustes); escribir('fundillo-ajustes', aj); }
     if (d.estado) estado = Object.assign(Nucleo.estadoVacio(), d.estado);
     guardar(); construirAjustes(); chat.conectar(aj.canal); pintar();
   } catch (err) { alert('Ese archivo no es una copia válida del sorteo.'); }
@@ -429,7 +429,7 @@ const CAMPOS = [
   ['valores.subPrime', 'Sub Prime', 'number'],
   ['h', 'Sorteo'],
   ['quitarGanador', 'Quitar al ganador de los siguientes sorteos', 'check'],
-  ['duracionRuleta', 'Segundos que gira la ruleta', 'number'],
+  ['duracionSorteo', 'Segundos que tardan en pasar los nombres', 'number'],
   ['sonidoPanel', 'Sonido también en este panel', 'check'],
   ['ignorar', 'Cuentas ignoradas (separadas por comas)', 'text'],
 ];
@@ -461,10 +461,10 @@ $('formAjustes').onsubmit = (ev) => {
     else fijar(ruta, inp.value.trim());
   }
   if (!(aj.eurosPorPapeleta > 0)) aj.eurosPorPapeleta = 1;
-  escribir('colmena-ajustes', aj);
-  Rueda.Sonido.activo = !!aj.sonidoPanel;
+  escribir('fundillo-ajustes', aj);
+  Animacion.Sonido.activo = !!aj.sonidoPanel;
   if (aj.canal !== canalAntes) {
-    escribir('colmena-estado-' + (canalAntes || '_'), estado);
+    escribir('fundillo-estado-' + (canalAntes || '_'), estado);
     estado = Object.assign(Nucleo.estadoVacio(), leer(claveEstado()) || {});
     chat.conectar(aj.canal);
   }

@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const N = require('../js/nucleo.js');
 
 globalThis.window = globalThis;
-require('../js/rueda.js');
-const { trozos, anguloFinal, indiceBajoPuntero } = window.Rueda._interno;
+require('../js/rodillo.js');
+const { desplazamientoFinal, indiceEnCentro } = window.Animacion._interno;
 
 const aj = N.mezclarAjustes({ canal: 'prueba', conversionMonedas: { USD: 0.9 } });
 const acc = (linea, a = aj) => N.accionesDesdeMensaje(N.parseLine(linea), a);
@@ -121,13 +121,24 @@ test('sortear excluye al ganador y se agota', () => {
   assert.equal(N.sortear(e, aj), null);
 });
 
-test('la ruleta siempre se para en el trozo del ganador', () => {
+test('los nombres siempre se paran en el ganador', () => {
   for (let k = 0; k < 500; k++) {
     const e = N.estadoVacio();
     const n = 1 + Math.floor(Math.random() * 40);
-    for (let i = 0; i < n; i++) N.registrar(e, { login: 'u' + i, tipo: 'manual', euros: 1 + Math.random() * 30, texto: '' }, aj);
+    for (let i = 0; i < n; i++) N.registrar(e, { login: 'u' + i, nombre: 'U' + i, tipo: 'manual', euros: 1 + Math.random() * 30, texto: '' }, aj);
     const t = N.sortear(e, aj);
-    assert.equal(indiceBajoPuntero(trozos(t.segmentos), anguloFinal(t)), t.indiceGanador);
-    assert.equal(t.segmentos[t.indiceGanador].login, t.ganador.login);
+    assert.equal(t.tira[indiceEnCentro(desplazamientoFinal(t))], t.ganador.nombre);
+    assert.ok(t.tira.length > t.indiceGanador + 3, 'quedan nombres por encima del ganador');
+    if (n > 1) {
+      assert.notEqual(t.tira[t.indiceGanador - 1], t.ganador.nombre, 'el anterior no es el ganador');
+      for (let j = 1; j < t.indiceGanador; j++) assert.notEqual(t.tira[j], t.tira[j - 1], 'sin repetidos seguidos');
+    }
   }
+});
+
+test('en la tira sale más quien tiene más papeletas', () => {
+  const segs = [{ nombre: 'Mucho', papeletas: 50 }, { nombre: 'Poco', papeletas: 1 }, { nombre: 'Medio', papeletas: 10 }];
+  const { tira } = N.construirTira(segs, 1, 2000);
+  const cuenta = (x) => tira.filter((n) => n === x).length;
+  assert.ok(cuenta('Mucho') > cuenta('Medio') && cuenta('Medio') > cuenta('Poco'));
 });

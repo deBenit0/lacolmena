@@ -1,7 +1,7 @@
 {
-  "name": "sorteo-colmena",
-  "version": "2.0.0",
-  "description": "Sorteos para directos de Twitch en el navegador: la gente entra escribiendo en el chat y quien gasta (bits, subs, regalos, Hype Chat) recibe papeletas extra. Ruleta animada para OBS.",
+  "name": "sorteo-fundillo",
+  "version": "3.0.0",
+  "description": "Sorteos para directos de Twitch en el navegador: la gente entra escribiendo en el chat y quien gasta (bits, subs, regalos, Hype Chat) recibe papeletas extra. Animación de nombres cayendo para OBS.",
   "private": true,
   "scripts": {
     "test": "node --test"

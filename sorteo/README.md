@@ -1,16 +1,16 @@
-# 🐝 Sorteo de La Colmena
+# Sorteo del Fundillo
 
 Sorteos para directos de **Twitch** que funcionan **en el navegador**, sin instalar nada.
 
 - La gente **entra escribiendo una palabra en el chat** (por defecto `!sorteo`).
 - Quien **gasta dinero recibe papeletas extra** automáticamente: bits, subs, subs regaladas y Hype Chat.
   También entra aunque no haya escrito la palabra (se puede desactivar).
-- El ganador sale con una **ruleta animada** en la que cada persona ocupa un trozo proporcional a sus papeletas,
-  con sonido, confeti y cartel del ganador, lista para **OBS**.
+- El ganador sale con una animación sobre **fondo negro con los nombres cayendo de arriba abajo**, cada vez más
+  despacio, hasta pararse en el ganador. Quien tiene más papeletas aparece más veces. Con sonido y confeti, lista para **OBS**.
 
 ![Panel](docs/panel.png)
 
-![Ruleta en OBS](docs/escena-ruleta.png)
+![Nombres cayendo en OBS](docs/escena-nombres.png)
 
 ![Ganador en OBS](docs/escena-ganador.png)
 
@@ -35,7 +35,7 @@ El ganador se elige con el generador aleatorio criptográfico del navegador, con
 1. Abre `index.html` en Chrome, Edge o Firefox (doble clic vale), o la dirección donde lo tengas publicado (ver abajo).
 2. En **Ajustes**, escribe el nombre de tu canal y pulsa **Guardar**. El punto de arriba se pone verde cuando ya lee el chat.
 3. Durante el directo verás en vivo quién participa, sus papeletas y su probabilidad.
-4. Pulsa **🎲 ¡SORTEAR!**. La ruleta gira en el panel y en OBS a la vez.
+4. Pulsa **🎲 ¡SORTEAR!**. Los nombres empiezan a caer en el panel y en OBS a la vez.
 5. En "Lo que escribe el último ganador" ves sus mensajes, para comprobar que está en el directo.
 
 No hace falta cuenta, contraseña ni crear una app de Twitch: lee el chat como un espectador anónimo, y Twitch ya
@@ -52,7 +52,7 @@ Todo se guarda solo en tu navegador: si cierras la pestaña, al volver sigue don
 
 ## En OBS
 
-La escena (`escena.html`) es transparente y solo aparece cuando sorteas. Para recibir la orden de girar tiene que estar
+La escena (`escena.html`) es transparente y solo aparece (en negro) cuando sorteas. Para recibir la orden de sortear tiene que estar
 **en el mismo navegador que el panel**:
 
 **A · Todo dentro de OBS (recomendado)**
@@ -70,7 +70,7 @@ Opciones de la escena, añadiéndolas a la dirección (y combinándolas con `&`)
 |---|---|
 | `?ranking=5` | Top 5 de papeletas en una esquina |
 | `?anuncio=1` | Barra "Escribe !sorteo para participar" mientras el sorteo está abierto |
-| `?siempre=1` | La ruleta se ve siempre, no solo al sortear |
+| `?siempre=1` | El fondo negro con los nombres se ve siempre, no solo al sortear |
 | `?segundos=20` | Segundos que se queda el ganador en pantalla (15 por defecto) |
 | `?sonido=0` | Sin sonido |
 | `?fondo=verde` | Fondo verde para clave cromática |
@@ -94,5 +94,5 @@ Quedaría en `https://debenit0.github.io/lacolmena/sorteo/`.
 
 - `index.html`: panel · `escena.html`: escena para OBS
 - `js/nucleo.js`: reglas del sorteo y lectura de mensajes de Twitch
-- `js/chat.js`: conexión al chat · `js/rueda.js`: ruleta, sonido y confeti · `js/enlace.js`: comunicación panel ↔ escena
+- `js/chat.js`: conexión al chat · `js/rodillo.js`: animación de nombres, sonido y confeti · `js/enlace.js`: comunicación panel ↔ escena
 - `test/`: tests (`npm test`, necesita Node.js; solo para desarrollo)
