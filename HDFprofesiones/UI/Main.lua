@@ -7,7 +7,8 @@ ns.UI = UI
 local panel
 local hosts = {}
 local PAGES = {
-  { id = "recipes", label = "Recetas" },
+  { id = "materials", label = "Pedir materiales" },
+  { id = "equipment", label = "Pedir equipo" },
   { id = "requests", label = "Peticiones" },
   { id = "mine", label = "Mis cosas" },
 }
@@ -38,8 +39,8 @@ local function createPanel()
 
   panel.tabs = {}
   for i, p in ipairs(PAGES) do
-    local b = W.Button(panel, p.label, 120, 22, function() UI.ShowPage(p.id) end)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 126, -40)
+    local b = W.Button(panel, p.label, 140, 22, function() UI.ShowPage(p.id) end)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 146, -40)
     panel.tabs[p.id] = b
   end
 
@@ -69,7 +70,8 @@ end
 
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
-  panel.title:SetText(ns.TITLE .. " - Profesiones")
+  panel.title:SetText(ns.TITLE .. " - Profesiones"
+    .. (ns.db and ns.db.settings.demo and "  |cffff8040(MODO DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
   panel.noGuild:SetShown(not inGuild)
   for id, f in pairs(panel.pageFrames) do
@@ -82,8 +84,16 @@ end
 function UI.ShowPage(id)
   if not panel then createPanel() end
   UI.current = id
+  -- La pestaña activa se queda con el brillo del botón encendido (no gris, que parece bloqueada).
   for pid, b in pairs(panel.tabs) do
-    if pid == id then b:Disable() else b:Enable() end
+    local fs = b.GetFontString and b:GetFontString()
+    if pid == id then
+      b:LockHighlight()
+      if fs then fs:SetTextColor(1, 1, 1) end
+    else
+      b:UnlockHighlight()
+      if fs then fs:SetTextColor(1, 0.82, 0) end
+    end
   end
   UI.Refresh()
 end
@@ -113,7 +123,7 @@ function UI.Open(pageId, selectId, host)
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
   end
   panel:Show()
-  UI.ShowPage(pageId or UI.current or "recipes")
+  UI.ShowPage(pageId or UI.current or "materials")
   if selectId then
     local f = panel.pageFrames[UI.current]
     if f and f.SelectById then f:SelectById(selectId) end

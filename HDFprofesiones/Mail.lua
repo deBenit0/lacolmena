@@ -54,6 +54,17 @@ function Mail.Prepare(r, amount)
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName(r.k)))
   end
+  -- Si la petición ofrece oro, el correo va contra reembolso: se le cobra al recogerlo.
+  local cod = r.g and math.floor(r.g * amount / r.q) or 0
+  if cod > 0 then
+    if SendMailCODButton and SendMailMoney and MoneyInputFrame_SetCopper then
+      SendMailCODButton:Click()
+      MoneyInputFrame_SetCopper(SendMailMoney, cod)
+    elseif SetSendMailCOD then
+      SetSendMailCOD(cod)
+    end
+    ns.Print("correo contra reembolso de %s: se le cobrará al recogerlo.", ns.FormatMoney(cod))
+  end
   return true
 end
 

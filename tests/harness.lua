@@ -169,6 +169,9 @@ function Frame:Disable() self._enabled = false end
 function Frame:SetEnabled(v) self._enabled = v and true or false end
 function Frame:IsEnabled() return self._enabled end
 function Frame:GetFrameLevel() return 1 end
+function Frame:SetID(id) self._id = id end
+function Frame:GetID() return rawget(self, "_id") or 0 end
+function Frame:IsMouseOver() return false end
 function Frame:CreateTexture() return newFrame(nil, "Texture", nil, self) end
 function Frame:CreateFontString() return newFrame(nil, "FontString", nil, self) end
 function Frame:Click()
@@ -236,8 +239,8 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Alerts.lua",
-  "UI/Widgets.lua", "UI/Main.lua", "UI/Recipes.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
+  "Core.lua", "Codec.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Demo.lua", "Prices.lua", "Alerts.lua",
+  "UI/Widgets.lua", "UI/Main.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
 }
 
 local function itemLink(id) return "|cff1eff00|Hitem:" .. id .. ":0:0:0|h[Objeto " .. id .. "]|h|r" end
@@ -252,6 +255,7 @@ local function makeEnv(client)
     tostring = tostring, tonumber = tonumber, select = select, pcall = pcall, xpcall = xpcall,
     error = error, setmetatable = setmetatable, getmetatable = getmetatable, next = next,
     rawget = rawget, rawset = rawset, unpack = unpack, print = print, assert = assert,
+    _G = nil, -- se pone abajo: el propio entorno
     -- extras de WoW
     wipe = function(t) for k in pairs(t) do t[k] = nil end return t end,
     tinsert = table.insert,
@@ -437,6 +441,7 @@ local function makeEnv(client)
     end,
   }
   setmetatable(env, { __index = base })
+  base._G = env
   return env
 end
 

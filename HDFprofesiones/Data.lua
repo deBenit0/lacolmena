@@ -313,7 +313,9 @@ function Data.InfoKey(pk, key)
 end
 
 function Data.GetInfo(ik)
-  return ns.db and ns.db.info[ik]
+  local real = ns.db and ns.db.info[ik]
+  if real or not ns.Demo then return real end
+  return ns.Demo.GetInfo(ik)
 end
 
 local function sanitizeReagents(r)

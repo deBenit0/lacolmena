@@ -33,6 +33,11 @@ ns.UI.RegisterPage("mine", function(page)
   end)
   page.sound:SetPoint("TOPLEFT", 4, -288)
 
+  page.demo = W.Check(page, "Modo demostración (jugadores de ejemplo, solo los ves tú)", function(checked)
+    ns.Demo.Set(checked)
+  end)
+  page.demo:SetPoint("TOPLEFT", 4, -314)
+
   page.statsTitle = W.Text(page, "GameFontNormal")
   page.statsTitle:SetPoint("TOPLEFT", 320, -6)
   page.statsTitle:SetText("Hermandad")
@@ -69,6 +74,7 @@ ns.UI.RegisterPage("mine", function(page)
     page.unavailable:SetChecked(c.u and true or false)
     page.alerts:SetChecked(ns.db.settings.alerts and true or false)
     page.sound:SetChecked(ns.db.settings.sound and true or false)
+    page.demo:SetChecked(ns.db.settings.demo and true or false)
 
     local crafters, online = 0, 0
     for name in pairs(g.entries) do

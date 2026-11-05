@@ -38,35 +38,50 @@ guildFrame:Hide()
 H.ok(not panel:IsShown(), "al cerrar la hermandad se cierra")
 guildFrame:Show()
 
--- Página de recetas.
-ns.UI.Open("recipes")
+-- Página "Pedir equipo": la coraza (de nivel bajo) solo sale al quitar el filtro.
+ns.UI.Open("equipment")
 H.Advance(1)
-local recipes = panel.pageFrames.recipes
-H.ok(recipes:IsShown(), "página de recetas visible")
-local function countItems()
+local equipment = panel.pageFrames.equipment
+H.ok(equipment:IsShown(), "página de equipo visible")
+local function countItems(page)
   local n, headers = 0, 0
-  for _, item in ipairs(recipes.list.items) do
+  for _, item in ipairs(page.list.items) do
     if item.header then headers = headers + 1 else n = n + 1 end
   end
   return n, headers
 end
-local n, headers = countItems()
-H.eq(headers, 1, "una cabecera: Alquimia")
-H.ok(n == 2, "2 objetos visibles (la coraza de nivel bajo está oculta): " .. n)
+H.eq((countItems(equipment)), 0, "la coraza de nivel bajo está oculta")
 ns.db.settings.hideLowGear = false
+equipment:Refresh()
+H.eq((countItems(equipment)), 1, "equipo: la coraza")
+equipment.list.rows[2]:Click()
+H.Advance(10)
+equipment:RefreshDetail()
+local slot1 = equipment.detail.slots[1]
+H.ok(slot1:IsShown() and slot1.itemID == 2840, "casilla 1 del equipo: material 2840")
+H.eq(slot1.need:GetText(), "4", "necesita 4")
+
+-- Página "Pedir materiales": Bea no tiene recetas, así que hay que ver todo.
+ns.UI.ShowPage("materials")
+local recipes = panel.pageFrames.materials
+H.ok(recipes:IsShown(), "página de materiales visible")
+H.eq((countItems(recipes)), 0, "solo lo de mis recetas: nada (Bea no tiene profesiones)")
+ns.db.settings.onlyMyReagents = false
 recipes:Refresh()
-H.eq((countItems()), 3, "3 objetos al desactivar el filtro")
+local n, headers = countItems(recipes)
+H.eq(headers, 1, "una cabecera: Alquimia")
+H.eq(n, 2, "materiales: poción y arcanita (la coraza es equipo)")
 
 -- Plegar y desplegar la profesión.
 recipes.list.rows[1]:Click()
-H.eq((countItems()), 0, "Alquimia plegada")
+H.eq((countItems(recipes)), 0, "Alquimia plegada")
 recipes.list.rows[1]:Click()
-H.eq((countItems()), 3, "Alquimia desplegada")
+H.eq((countItems(recipes)), 2, "Alquimia desplegada")
 
 -- Búsqueda.
 recipes.search:SetText("13443")
 recipes.search:GetScript("OnTextChanged")(recipes.search, true)
-H.eq((countItems()), 1, "búsqueda por nombre")
+H.eq((countItems(recipes)), 1, "búsqueda por nombre")
 recipes.search:SetText("")
 recipes.search:GetScript("OnTextChanged")(recipes.search, true)
 
@@ -84,20 +99,15 @@ recipes.profButton:Click()
 menu.buttons[1]:Click()
 H.eq(recipes.state.prof, nil, "filtro: todas")
 
--- Elegir la poción: pide los materiales (Bea no los conoce) y los recibe de Ana.
+-- Elegir la poción: precio de subasta y quién la da.
+bea.env.HDFProfesionesDB.prices = { [13443] = { p = 12000, t = ns.Now() } }
 local potionRow
 for _, row in ipairs(recipes.list.rows) do
   if row.item and row.item.key == "i13443" then potionRow = row end
 end
 H.ok(potionRow ~= nil, "fila de la poción")
 potionRow:Click()
-H.Advance(10)
-recipes:RefreshDetail()
-local slot1 = recipes.detail.slots[1]
-H.ok(slot1:IsShown() and slot1.itemID == 8838, "casilla 1: material 8838")
-H.eq(slot1.need:GetText(), "3", "necesita 3")
-H.ok(slot1.have:GetText():find("1/3", 1, true) ~= nil, "tengo 1 de 3: " .. slot1.have:GetText())
-H.ok(not recipes.detail.slots[3]:IsShown(), "solo 2 casillas")
+H.ok(recipes.detail.price:GetText():find("12000c", 1, true), "precio de subasta: " .. recipes.detail.price:GetText())
 -- Cantidad con + y -.
 H.eq(recipes.detail.qty:GetText(), "1", "cantidad inicial")
 recipes.detail.plus:Click()
@@ -118,8 +128,11 @@ H.ok(dialog and dialog:IsShown(), "se abre la ventana de petición")
 H.eq(dialog.key, "i13443", "con el objeto elegido")
 H.eq(dialog.to, "Ana-Reino", "para Ana")
 H.eq(dialog.qty:GetText(), "2", "la cantidad elegida pasa a la petición")
+H.eq(dialog.gold:GetText() .. "o" .. dialog.silver:GetText(), "2o16", "oferta sugerida: 2 x 1o20p menos un 10% = 2o16p")
+H.ok(dialog.priceText:GetText():find("Subasta", 1, true), "muestra el precio de subasta")
 dialog.qty:SetText("4")
 dialog.gold:SetText("2")
+dialog.silver:SetText("")
 dialog.payRows[1].link:SetText(H.itemLink(12360))
 dialog.payRows[1].count:SetText("1")
 dialog:Publish()
@@ -169,7 +182,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.5.1", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.6.0", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine

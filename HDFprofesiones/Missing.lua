@@ -283,5 +283,98 @@ local function addButton(frame, createButton)
   buttons[frame] = b
 end
 
-ns.On("TRADE_SKILL_SHOW", function() addButton(TradeSkillFrame, TradeSkillCreateButton) end)
-ns.On("CRAFT_SHOW", function() addButton(CraftFrame, CraftCreateButton) end)
+---------------------------------------------------------------------------
+-- Botón "Pedir" al pasar el ratón por un material de la receta elegida
+---------------------------------------------------------------------------
+local hover = {}
+
+local function reagentOfSlot(slot)
+  local r = slot:GetID()
+  if slot.hdfCraft then
+    local i = GetCraftSelectionIndex and GetCraftSelectionIndex()
+    if not i or i == 0 then return nil end
+    local _, _, count = GetCraftReagentInfo(i, r)
+    return itemIdFromLink(GetCraftReagentItemLink(i, r)), count or 1, 1
+  end
+  local i = GetTradeSkillSelectionIndex and GetTradeSkillSelectionIndex()
+  if not i or i == 0 then return nil end
+  local _, _, count = GetTradeSkillReagentInfo(i, r)
+  local times = TradeSkillInputBox and tonumber(TradeSkillInputBox:GetText()) or 1
+  return itemIdFromLink(GetTradeSkillReagentItemLink(i, r)), count or 1, math.max(1, times or 1)
+end
+
+-- Abre la petición de ese material con lo que falta (o 1 si ya lo tienes todo).
+function Missing.AskReagent(slot)
+  if not ns.G() then
+    ns.Print("no estás en ninguna hermandad.")
+    return
+  end
+  local id, need, times = reagentOfSlot(slot)
+  if not id then return end
+  local key = "i" .. id
+  local missing = math.max(1, need * times - ns.Scan.Have(id))
+  ns.UI.OpenRequestDialog({ k = key, pk = Data.SingleProfession(key), q = missing })
+end
+
+local function hoverButton()
+  if hover.button then return hover.button end
+  local b = CreateFrame("Button", "HDFProfReagentAsk", UIParent, "UIPanelButtonTemplate")
+  b:SetSize(56, 18)
+  b:SetText("Pedir")
+  b:Hide()
+  b:SetScript("OnClick", function(self)
+    self:Hide()
+    if hover.slot then ns.SafeCall(Missing.AskReagent, hover.slot) end
+  end)
+  b:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Pedir en la hermandad")
+    GameTooltip:AddLine("Pide este material a la hermandad (con el precio de la subasta).", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  -- Se oculta cuando el ratón ya no está ni en el botón ni en el material.
+  b:SetScript("OnUpdate", function(self, elapsed)
+    local over = self:IsMouseOver() or (hover.slot and hover.slot:IsVisible() and hover.slot:IsMouseOver())
+    if over == true then
+      self.away = 0
+    else
+      self.away = (self.away or 0) + (elapsed or 0)
+      if self.away > 0.4 then self:Hide() end
+    end
+  end)
+  hover.button = b
+  return b
+end
+
+local function showHover(slot)
+  local b = hoverButton()
+  hover.slot = slot
+  b:SetParent(slot)
+  b:ClearAllPoints()
+  b:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
+  b:SetFrameStrata(slot:GetFrameStrata() or "HIGH")
+  b:SetFrameLevel(slot:GetFrameLevel() + 10)
+  b.away = 0
+  b:Show()
+end
+
+local function hookReagents(prefix, isCraft)
+  for i = 1, (MAX_TRADE_SKILL_REAGENTS or 8) do
+    local slot = _G[prefix .. i]
+    if slot and not slot.hdfHooked then
+      slot.hdfHooked = true
+      slot.hdfCraft = isCraft
+      slot:HookScript("OnEnter", function(self) ns.SafeCall(showHover, self) end)
+    end
+  end
+end
+
+ns.On("TRADE_SKILL_SHOW", function()
+  addButton(TradeSkillFrame, TradeSkillCreateButton)
+  hookReagents("TradeSkillReagent", false)
+end)
+ns.On("CRAFT_SHOW", function()
+  addButton(CraftFrame, CraftCreateButton)
+  hookReagents("CraftReagent", true)
+end)

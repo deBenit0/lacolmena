@@ -1,5 +1,6 @@
--- Página "Recetas": todo lo que se puede fabricar en la hermandad, al estilo de la ventana
--- de profesiones del juego: lista por profesiones, materiales en casillas y "Pedir" con cantidad.
+-- Páginas para pedir: "Pedir materiales" (lo que usan tus recetas y da la hermandad,
+-- fabricándolo o recolectándolo) y "Pedir equipo" (armas, armaduras, bolsas y encantamientos
+-- que fabrica la hermandad). Al estilo de la ventana de profesiones del juego.
 local _, ns = ...
 local W, Data, Guild = ns.W, ns.Data, ns.Guild
 
@@ -41,13 +42,19 @@ local function statusText(row, now)
 end
 
 -- Fabricantes de una receta, ordenados: disponibles, en línea, vistos hace poco.
-local function crafterRows(key)
+local function crafterRows(key, withGatherers)
   local rec = Data.GetIndex()[key]
   local g = ns.G()
-  if not rec or not g then return {} end
+  if not g then return {} end
   local now = ns.Now()
   local byName, rows = {}, {}
-  for _, cr in ipairs(rec.crafters) do
+  local list = {}
+  for _, cr in ipairs(rec and rec.crafters or {}) do list[#list + 1] = cr end
+  if withGatherers then
+    local gatherers, skill = Data.GatherersOf(key)
+    for _, name in ipairs(gatherers) do list[#list + 1] = { n = name, p = skill, gather = true } end
+  end
+  for _, cr in ipairs(list) do
     local e = g.entries[cr.n]
     local row = byName[cr.n]
     if not row then
@@ -67,6 +74,7 @@ local function crafterRows(key)
     end
     local p = e and e.p and e.p[cr.p]
     row.profs[#row.profs + 1] = { pk = cr.p, r = p and p.r, m = p and p.m }
+    if cr.gather then p = nil end
     local cd = p and p.cd and p.cd[key]
     if cd and cd > now then row.cdLeft = cd - now end
     if Data.IsCooldownRecipe(Data.InfoKey(cr.p, key)) then row.cdRecipe = true end
@@ -91,8 +99,36 @@ end
 
 local MAX_REAGENTS = 8
 
-ns.UI.RegisterPage("recipes", function(page)
-  local state = { search = "", prof = nil, key = nil, pk = nil, collapsed = {} }
+-- Materiales que usan mis recetas: [objeto] = { claves de mis recetas que lo usan }.
+local function myReagents()
+  local c, out = ns.MyChar(), {}
+  for pk, prof in pairs(c and c.profs or {}) do
+    for key in pairs(prof.recipes or {}) do
+      local info = Data.GetInfo(Data.InfoKey(pk, key))
+      for _, var in ipairs(info and info.v or {}) do
+        for id in pairs(var.r) do
+          out[id] = out[id] or {}
+          out[id][key] = true
+        end
+      end
+    end
+  end
+  return out
+end
+
+local NON_EQUIP = { [""] = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true }
+
+-- ¿Es equipo? (armas, armaduras, bolsas... y los encantamientos, que se ponen al equipo)
+local function isEquipment(key)
+  local kind = ns.ParseKey(key)
+  if kind == "e" then return true end
+  local _, _, _, _, _, equipLoc = ns.KeyInfo(key)
+  return equipLoc ~= nil and not NON_EQUIP[equipLoc]
+end
+
+local function buildCatalog(page, mode)
+  local materials = mode == "materials"
+  local state = { search = "", prof = nil, key = nil, pk = nil, collapsed = {}, gatherOnly = {} }
 
   -- Barra superior: búsqueda, profesión y filtro de equipo bajo.
   local search = W.Input(page, 160)
@@ -152,10 +188,12 @@ ns.UI.RegisterPage("recipes", function(page)
   end)
   page:HookScript("OnHide", function() menu:Hide() end)
 
-  local lowCheck = W.Check(page, "Ocultar equipo de nivel bajo", function(checked)
-    ns.db.settings.hideLowGear = checked
-    page:Refresh()
-  end)
+  local filterSetting = materials and "onlyMyReagents" or "hideLowGear"
+  local lowCheck = W.Check(page, materials and "Solo lo que usan mis recetas" or "Ocultar equipo de nivel bajo",
+    function(checked)
+      ns.db.settings[filterSetting] = checked
+      page:Refresh()
+    end)
   lowCheck:SetPoint("LEFT", profButton, "RIGHT", 10, 0)
 
   -- Lista agrupada por profesión, con cabeceras plegables como en la ventana de profesiones.
@@ -226,8 +264,13 @@ ns.UI.RegisterPage("recipes", function(page)
   detail.sub:SetPoint("TOPLEFT", detail.name, "BOTTOMLEFT", 0, -4)
   detail.sub:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
 
+  detail.price = W.Text(detail, "GameFontHighlightSmall")
+  detail.price:SetPoint("TOPLEFT", detail.sub, "BOTTOMLEFT", 0, -2)
+  detail.price:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
+  detail.price:SetWordWrap(false)
+
   detail.matsLabel = W.Text(detail, "GameFontNormalSmall")
-  detail.matsLabel:SetPoint("TOPLEFT", 12, -54)
+  detail.matsLabel:SetPoint("TOPLEFT", 12, -62)
   detail.matsLabel:SetText("Materiales necesarios:")
 
   -- Casillas de materiales (2 columnas), como en la ventana de profesiones.
@@ -236,7 +279,7 @@ ns.UI.RegisterPage("recipes", function(page)
     local slot = CreateFrame("Button", nil, detail)
     slot:SetSize(160, 28)
     local col, line = (i - 1) % 2, math.floor((i - 1) / 2)
-    slot:SetPoint("TOPLEFT", 10 + col * 166, -70 - line * 30)
+    slot:SetPoint("TOPLEFT", 10 + col * 166, -78 - line * 30)
     slot.icon = slot:CreateTexture(nil, "ARTWORK")
     slot.icon:SetSize(26, 26)
     slot.icon:SetPoint("LEFT", 0, 0)
@@ -252,13 +295,15 @@ ns.UI.RegisterPage("recipes", function(page)
     detail.slots[i] = slot
   end
   detail.matsNote = W.Text(detail, "GameFontHighlightSmall")
-  detail.matsNote:SetPoint("TOPLEFT", 12, -72)
+  detail.matsNote:SetPoint("TOPLEFT", 12, -78)
   detail.matsNote:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
+  detail.matsNote:SetHeight(110)
+  detail.matsNote:SetJustifyV("TOP")
   detail.matsNote:SetTextColor(0.75, 0.75, 0.75)
 
   detail.craftersLabel = W.Text(detail, "GameFontNormalSmall")
   detail.craftersLabel:SetPoint("TOPLEFT", 12, -194)
-  detail.craftersLabel:SetText("Quién lo fabrica")
+  detail.craftersLabel:SetText(materials and "Quién lo da" or "Quién lo fabrica")
 
   local crafters = W.List(detail, 334, 94, {
     rows = 4,
@@ -398,8 +443,9 @@ ns.UI.RegisterPage("recipes", function(page)
   function page:RefreshDetail(newSelection)
     local key = state.key
     local rec = key and Data.GetIndex()[key]
-    local hasKey = rec ~= nil
+    local hasKey = key ~= nil and (rec ~= nil or state.gatherOnly[key] ~= nil)
     local regions = {
+      detail.price,
       detail.icon, detail.name, detail.sub, detail.matsLabel, detail.craftersLabel, crafters,
       detail.qtyLabel, detail.minus, detail.qty, detail.plus, detail.made,
       detail.askAll, detail.askOne, detail.whisper,
@@ -409,57 +455,125 @@ ns.UI.RegisterPage("recipes", function(page)
     if not hasKey then
       for _, slot in ipairs(detail.slots) do slot:Hide() end
       detail.matsNote:Hide()
-      detail.empty:SetText(next(Data.GetIndex()) and "Elige un objeto de la lista."
-        or "Aún no hay recetas. Cada miembro debe abrir la ventana de sus profesiones una vez para publicarlas.")
+      if #list.items > 0 then
+        detail.empty:SetText("Elige un objeto de la lista.")
+      elseif materials and ns.db.settings.onlyMyReagents then
+        detail.empty:SetText("No hay materiales de tus recetas que dé la hermandad. Abre tus profesiones "
+          .. "para que el addon sepa qué usas, o desmarca \"Solo lo que usan mis recetas\".")
+      else
+        detail.empty:SetText("Aún no hay nada. Cada miembro debe abrir la ventana de sus profesiones una vez.")
+      end
       return
     end
-    local pk = (state.pk and rec.profs[state.pk]) and state.pk or Data.SingleProfession(key) or next(rec.profs)
+    local profs = rec and rec.profs or {}
+    local pk = (state.pk and profs[state.pk]) and state.pk or Data.SingleProfession(key) or next(profs)
     local name, icon, link = ns.KeyInfo(key)
     detail.iconTex:SetTexture(icon)
     detail.name:SetText(link or name or ns.KeyName(key))
     local profNames = {}
-    for p in pairs(rec.profs) do profNames[#profNames + 1] = ns.ProfessionName(p) end
+    for p in pairs(profs) do profNames[#profNames + 1] = ns.ProfessionName(p) end
+    local _, skill = Data.GatherersOf(key)
+    if materials and skill and #(Data.GatherersOf(key)) > 0 then profNames[#profNames + 1] = ns.ProfessionName(skill) end
     table.sort(profNames)
     detail.sub:SetText(table.concat(profNames, ", "))
-    detail.matsLabel:SetText("Materiales necesarios:")
-    local made = showMaterials(key, pk)
+    -- Precio en la subasta (Auctionator si está instalado).
+    local kind, itemID = ns.ParseKey(key)
+    local unit, source
+    if kind == "i" then unit, source = ns.Prices.Get(itemID) end
+    if unit then
+      detail.price:SetText("En subasta: " .. ns.FormatMoney(unit) .. " cada uno |cff999999(" .. source .. ")|r")
+    else
+      detail.price:SetText("|cff999999Sin precio de subasta (abre la subasta o usa Auctionator)|r")
+      if kind == "i" then ns.Prices.Query(itemID) end
+    end
+    local made = 1
+    if materials then
+      -- En materiales: para qué recetas tuyas sirve.
+      for _, slot in ipairs(detail.slots) do slot:Hide() end
+      detail.matsLabel:SetText("Lo usas en:")
+      local uses, names = myReagents()[itemID or 0], {}
+      for k in pairs(uses or {}) do names[#names + 1] = ns.KeyName(k) end
+      table.sort(names)
+      detail.matsNote:SetText(#names > 0 and table.concat(names, "\n") or "Ninguna receta tuya conocida.")
+      detail.matsNote:Show()
+      state.step = 1
+      detail.made:SetText("")
+      if pk then
+        local var = recipeInfo(key, pk)
+        made = var and var.m or 1
+      end
+    else
+      detail.matsLabel:SetText("Materiales necesarios:")
+      made = showMaterials(key, pk)
+    end
     if newSelection then setQuantity(made) end
-    local rows = crafterRows(key)
+    local rows = crafterRows(key, materials)
     crafters:SetItems(rows)
-    detail.craftersLabel:SetText("Quién lo fabrica (" .. #rows .. ")")
+    detail.craftersLabel:SetText((materials and "Quién lo da (" or "Quién lo fabrica (") .. #rows .. ")")
     page:RefreshButtons()
   end
 
   function page:Refresh()
-    lowCheck:SetChecked(ns.db.settings.hideLowGear)
+    if ns.db.settings[filterSetting] == nil then ns.db.settings[filterSetting] = true end
+    lowCheck:SetChecked(ns.db.settings[filterSetting])
     local index = Data.GetIndex()
     local profSet, groups = {}, {}
     local playerLevel = UnitLevel("player") or 60
-    for key, rec in pairs(index) do
+    local mine = materials and myReagents() or nil
+    local onlyMine = materials and ns.db.settings.onlyMyReagents
+    wipe(state.gatherOnly)
+
+    local function add(key, pk, rec)
       local name, icon, _, quality, minLevel, equipLoc = ns.KeyInfo(key)
       local label = name or ns.KeyName(key)
       local lower = label:lower()
-      local visible = state.search == "" or lower:find(state.search, 1, true) ~= nil
-      if visible and ns.db.settings.hideLowGear and isLowGear(minLevel, equipLoc, playerLevel) then visible = false end
-      for pk in pairs(rec.profs) do
-        profSet[pk] = true
-        if visible and (not state.prof or state.prof == pk) then
-          local seen, count, online = {}, 0, 0
-          for _, cr in ipairs(rec.crafters) do
-            if cr.p == pk and not seen[cr.n] then
-              seen[cr.n] = true
-              count = count + 1
-              if Guild.IsOnline(cr.n) then online = online + 1 end
-            end
+      if state.search ~= "" and not lower:find(state.search, 1, true) then return end
+      if not materials and ns.db.settings.hideLowGear and isLowGear(minLevel, equipLoc, playerLevel) then return end
+      profSet[pk] = true
+      if state.prof and state.prof ~= pk then return end
+      local seen, count, online = {}, 0, 0
+      if rec then
+        for _, cr in ipairs(rec.crafters) do
+          if cr.p == pk and not seen[cr.n] then
+            seen[cr.n] = true
+            count = count + 1
+            if Guild.IsOnline(cr.n) then online = online + 1 end
           end
-          groups[pk] = groups[pk] or {}
-          table.insert(groups[pk], {
-            id = tostring(pk) .. ":" .. key, key = key, pk = pk, sort = lower, icon = icon,
-            count = count, online = online, label = qualityColor(quality) .. label .. "|r",
-          })
+        end
+      else
+        for _, who in ipairs((Data.GatherersOf(key))) do
+          count = count + 1
+          if Guild.IsOnline(who) then online = online + 1 end
+        end
+      end
+      groups[pk] = groups[pk] or {}
+      table.insert(groups[pk], {
+        id = tostring(pk) .. ":" .. key, key = key, pk = pk, sort = lower, icon = icon,
+        count = count, online = online, label = qualityColor(quality) .. label .. "|r",
+      })
+    end
+
+    -- Lo que fabrica la hermandad (materiales o equipo, según la página).
+    for key, rec in pairs(index) do
+      local _, id = ns.ParseKey(key)
+      if isEquipment(key) ~= materials and (not onlyMine or mine[id]) then
+        for pk in pairs(rec.profs) do add(key, pk, rec) end
+      end
+    end
+    -- Materiales de mis recetas que solo se consiguen recolectando.
+    if materials then
+      for id in pairs(mine) do
+        local key = "i" .. id
+        if not index[key] then
+          local gatherers, skill = Data.GatherersOf(key)
+          if skill and #gatherers > 0 then
+            state.gatherOnly[key] = skill
+            add(key, skill, nil)
+          end
         end
       end
     end
+
     local profList = {}
     for pk in pairs(profSet) do profList[#profList + 1] = pk end
     table.sort(profList, function(a, b) return ns.ProfessionName(a) < ns.ProfessionName(b) end)
@@ -486,4 +600,7 @@ ns.UI.RegisterPage("recipes", function(page)
     list:SetItems(items)
     page:RefreshDetail()
   end
-end)
+end
+
+ns.UI.RegisterPage("materials", function(page) buildCatalog(page, "materials") end)
+ns.UI.RegisterPage("equipment", function(page) buildCatalog(page, "equipment") end)

@@ -10,6 +10,7 @@ end
 
 local function setKey(key, pk)
   dialog.key = key
+  if dialog.UpdatePrice and dialog:IsShown() then dialog:UpdatePrice() end
   dialog.pk = pk or (key and Data.SingleProfession(key)) or nil
   if key then
     local name, icon, link = ns.KeyInfo(key)
@@ -93,6 +94,13 @@ local function create()
   dialog.qty:SetPoint("LEFT", qtyLabel, "RIGHT", 14, 0)
   dialog.qty:SetMaxLetters(4)
 
+  -- Precio en la subasta y oferta sugerida (un poco menos).
+  dialog.priceText = W.Text(dialog, "GameFontHighlightSmall")
+  dialog.priceText:SetPoint("LEFT", dialog.qty, "RIGHT", 12, 0)
+  dialog.priceText:SetPoint("RIGHT", dialog, "RIGHT", -20, 0)
+  dialog.priceText:SetWordWrap(false)
+  dialog.qty:HookScript("OnTextChanged", function() dialog:UpdatePrice() end)
+
   dialog.mats = W.Check(dialog, "Aporto yo los materiales")
   dialog.mats:SetPoint("TOPLEFT", 20, -132)
 
@@ -157,6 +165,33 @@ local function create()
   local cancel = W.Button(dialog, "Cancelar", 86, 22, function() dialog:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
 
+  -- Pone la oferta sugerida en el pago, salvo que el jugador lo haya cambiado a mano.
+  local function payTouched(self, userInput)
+    if userInput then dialog.payTouched = true end
+  end
+  dialog.gold:HookScript("OnTextChanged", payTouched)
+  dialog.silver:HookScript("OnTextChanged", payTouched)
+
+  function dialog:UpdatePrice()
+    local kind, id = ns.ParseKey(self.key)
+    if kind ~= "i" then
+      self.priceText:SetText("")
+      return
+    end
+    local q = math.max(1, tonumber(self.qty:GetText()) or 1)
+    local offer, unit = ns.Prices.Suggest(id, q)
+    if not unit then
+      self.priceText:SetText("|cff999999Sin precio de subasta|r")
+      return
+    end
+    self.priceText:SetText(string.format("Subasta: %s c/u. Ofreces %s", ns.FormatMoney(unit), ns.FormatMoney(offer or 0)))
+    if not self.payTouched and offer then
+      self.gold:SetText(tostring(math.floor(offer / 10000)))
+      local silver = math.floor(offer / 100) % 100
+      self.silver:SetText(silver > 0 and tostring(silver) or "")
+    end
+  end
+
   function dialog:Publish()
     if not self.key then
       ns.Print("elige primero qué necesitas (mayús+clic en un objeto).")
@@ -196,6 +231,7 @@ function ns.UI.OpenRequestDialog(opts)
   setTarget(opts.to)
   dialog.qty:SetText(tostring(opts.q or 1))
   dialog:SetExpanded(opts.to ~= nil)
+  dialog.payTouched = false
   dialog.mats:SetChecked(true)
   dialog.gold:SetText("")
   dialog.silver:SetText("")
@@ -206,6 +242,9 @@ function ns.UI.OpenRequestDialog(opts)
   local open = Data.CountOpenBy(ns.Me(), ns.Now())
   dialog.info:SetText(string.format("Tienes %d de %d peticiones abiertas.", open, Data.MAX_OPEN))
   dialog:Show()
+  dialog:UpdatePrice()
+  local kind, id = ns.ParseKey(opts.k)
+  if kind == "i" then ns.Prices.Query(id) end -- si la subasta está abierta, precio al momento
   if not opts.k then dialog.itemInput:SetFocus() end
 end
 
@@ -218,3 +257,7 @@ if ChatEdit_InsertLink then
     end
   end)
 end
+
+ns.Listen("PRICES_CHANGED", function()
+  if dialog and dialog:IsShown() then dialog:UpdatePrice() end
+end)

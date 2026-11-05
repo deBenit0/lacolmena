@@ -13,7 +13,8 @@ end
 
 function Guild.IsOnline(name)
   local r = roster[name]
-  return r and r.online or false
+  if r then return r.online end
+  return ns.Demo and ns.Demo.IsOnline(name) or false
 end
 
 function Guild.Info(name)
@@ -29,6 +30,7 @@ end
 function Guild.LastSeen(name)
   local r = roster[name]
   if r and r.online then return ns.Now() end
+  if ns.Demo and ns.Demo.IsDemo(name) then return ns.Demo.LastSeen(name) end
   local g = ns.G()
   local seen = g and g.seen[name]
   local fromRoster = r and r.seen
@@ -39,6 +41,7 @@ end
 -- ¿Aceptamos datos de este personaje? Si vemos la lista completa, solo de miembros.
 function Guild.Accepts(name)
   if name == ns.Me() then return true end
+  if ns.Demo and ns.Demo.IsDemo(name) then return false end -- nadie puede hacerse pasar por uno de ejemplo
   if not Guild.full then return true end
   return roster[name] ~= nil
 end
@@ -57,14 +60,14 @@ local function cleanup()
   local g = ns.G()
   if not g or not Guild.full then return end
   local removed = false
-  for name in pairs(g.entries) do
-    if not roster[name] then
+  for name, e in pairs(g.entries) do
+    if not roster[name] and not e.demo then
       g.entries[name] = nil
       removed = true
     end
   end
   for id, r in pairs(g.requests) do
-    if not roster[r.a] then
+    if not roster[r.a] and not r.demo then
       g.requests[id] = nil
       removed = true
     end

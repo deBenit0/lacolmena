@@ -95,7 +95,7 @@ end
 function Sync.PushEntry(name, priority, since)
   local g = ns.G()
   local e = g and g.entries[name]
-  if not e then return end
+  if not e or e.demo then return end
   cancel("P", name)
   Comm.Send("P", name .. "~" .. Codec.EncodeUInt(e.v) .. "~" .. Codec.Serialize(e), "GUILD", nil, priority,
     since and entryAlreadySent(name, since) or nil)
@@ -104,7 +104,7 @@ end
 function Sync.PushRequest(id, priority, since)
   local g = ns.G()
   local r = g and g.requests[id]
-  if not r then return end
+  if not r or r.demo then return end
   cancel("Q", id)
   Comm.Send("Q", id .. "~" .. Data.RequestHash(r) .. "~" .. Codec.Serialize(r), "GUILD", nil, priority,
     since and requestAlreadySent(id, since) or nil)
@@ -157,8 +157,12 @@ end
 function Sync.BuildDigest()
   local g, realm = ns.G(), ns.Realm()
   local e, r = {}, {}
-  for name, ent in pairs(g.entries) do e[compress(name, realm)] = ent.v end
-  for id, req in pairs(g.requests) do r[compress(id, realm)] = Data.RequestHash(req) end
+  for name, ent in pairs(g.entries) do
+    if not ent.demo then e[compress(name, realm)] = ent.v end
+  end
+  for id, req in pairs(g.requests) do
+    if not req.demo then r[compress(id, realm)] = Data.RequestHash(req) end
+  end
   return { pv = ns.PROTOCOL, av = ns.VERSION, e = e, r = r }
 end
 

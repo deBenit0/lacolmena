@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.5.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.6.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -22,18 +22,26 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
   Encantamiento), sin filtros puestos. Cada vez que la abras se actualizan tus recetas y
   cooldowns. Para que se cuente lo que tienes en el banco, ábrelo una vez.
 
-### Recetas
-Todo lo que se puede fabricar en la hermandad, al estilo de la ventana de profesiones:
-**agrupado por profesión** con [+]/[-] para plegar cada grupo. Puedes buscar por nombre,
-filtrar por profesión (menú desplegable) y ocultar el equipo de nivel bajo. Al elegir un objeto ves:
-- los **materiales en casillas** con su icono y **tienes/necesitas** (bolsas + banco);
-- **quién lo fabrica**: primero los disponibles y conectados, después por última conexión;
-  con el **cooldown** si la receta lo tiene y los **encargos completados** de cada uno;
-- la **cantidad** con − y + (de lo que salga por vez) y los botones **Pedir a todos**,
-  **Pedir a [nombre]** y **Susurrar**.
+### Pedir materiales
+Lo que **usan tus recetas** y alguien de la hermandad fabrica o consigue recolectando, agrupado
+por profesión ([+]/[-] para plegar). Puedes buscar, filtrar por profesión (menú desplegable) o
+desmarcar "Solo lo que usan mis recetas" para ver todo. Al elegir uno ves para qué recetas tuyas
+sirve, el **precio en la subasta**, quién lo da, la cantidad con − y +, y los botones **Pedir a
+todos**, **Pedir a [nombre]** y **Susurrar**.
+
+### Pedir equipo
+Armas, armaduras, bolsas y encantamientos que fabrica la hermandad, con sus **materiales en
+casillas** (tienes/necesitas), quién lo fabrica y los mismos botones para pedir.
+
+### Precio y pago
+- El precio de la subasta sale de **Auctionator** (recomendado); si no lo tienes, de TSM o de lo
+  que el addon apunta al mirar la subasta. La petición propone pagar **un 10% menos**.
+- Si la petición ofrece oro, al **Preparar correo** el envío va **contra reembolso**: el juego
+  le cobra al que pidió cuando recoge el objeto.
 
 ### Pedir en la hermandad (desde tu ventana de profesión)
-Elige lo que quieres fabricar y pulsa **Pedir en la hermandad**. Se abre una ventana con
+Al pasar el ratón por un material de la receta aparece un botón **Pedir** para pedir solo ese.
+Para pedir varios a la vez, pulsa **Pedir en la hermandad**. Se abre una ventana con
 los materiales que te faltan (contando bolsas y banco):
 - **Veces a fabricar** con − y +: las cantidades se recalculan solas.
 - Cada material con su **casilla** y **cantidad editable**, y una nota: quién lo da en la
@@ -61,7 +69,8 @@ los materiales que te faltan (contando bolsas y banco):
   terminadas se siguen viendo 2 días. Máximo **10 abiertas** por jugador.
 
 ### Mis cosas
-Tus profesiones publicadas, el modo **No disponible** (sin avisos y apareces el último),
+Tus profesiones publicadas, el **modo demostración** (jugadores y peticiones de ejemplo que solo
+ves tú, para probar cómo queda), el modo **No disponible** (sin avisos y apareces el último),
 los avisos y el sonido, y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
 
 ## Primera prueba en la hermandad: qué mirar

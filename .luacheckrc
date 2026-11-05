@@ -36,5 +36,8 @@ read_globals = {
   "MailFrameTab_OnClick", "SendMailNameEditBox", "SendMailSubjectEditBox",
   -- Ventanas de profesión
   "TradeSkillFrame", "TradeSkillCreateButton", "TradeSkillInputBox", "GetTradeSkillSelectionIndex",
-  "CraftFrame", "CraftCreateButton", "GetCraftSelectionIndex",
+  "CraftFrame", "CraftCreateButton", "GetCraftSelectionIndex", "MAX_TRADE_SKILL_REAGENTS",
+  -- Subasta y precios
+  "Auctionator", "TSM_API", "GetNumAuctionItems", "GetAuctionItemInfo", "AuctionFrame", "QueryAuctionItems",
+  "CanSendAuctionQuery", "SendMailCODButton", "SendMailMoney", "MoneyInputFrame_SetCopper", "SetSendMailCOD",
 }
