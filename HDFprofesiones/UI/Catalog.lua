@@ -119,6 +119,26 @@ end
 
 local NON_EQUIP = { [""] = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true }
 
+-- Tipos de material (subclases de "Objetos comerciables" en Classic).
+local MATERIAL_TYPES = {
+  [0] = "Varios", [1] = "Piezas de ingeniería", [2] = "Explosivos", [3] = "Dispositivos",
+  [4] = "Joyería", [5] = "Telas", [6] = "Cueros", [7] = "Metales y piedras", [8] = "Carne",
+  [9] = "Hierbas", [10] = "Elementales", [11] = "Otros", [12] = "Encantamiento",
+}
+
+-- Grupo de material de un objeto ("t:6", "Cueros"...), o nil si no es un material.
+local function materialGroup(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return nil end
+  local _, classID, subclassID = ns.ItemInstant(id)
+  if classID == 5 then return "t:r", "Componentes" end
+  if classID == 7 then
+    subclassID = MATERIAL_TYPES[subclassID] and subclassID or 11
+    return "t:" .. subclassID, MATERIAL_TYPES[subclassID]
+  end
+  return nil
+end
+
 -- ¿Es equipo? (armas, armaduras, bolsas... y los encantamientos, que se ponen al equipo)
 local function isEquipment(key)
   local kind, id = ns.ParseKey(key)
@@ -421,7 +441,7 @@ local function buildCatalog(page, mode)
   function page:SetAllCollapsed(value)
     page:Refresh() -- recalcular qué profesiones hay con los filtros actuales
     local saved = savedCollapsed()
-    for _, pk in ipairs(page.profList or {}) do saved[pk] = value end
+    for _, k in ipairs(page.groupKeys or {}) do saved[k] = value end
     saved.fav = value
     page:Refresh()
   end
@@ -563,52 +583,77 @@ local function buildCatalog(page, mode)
     end
     wipe(state.gatherOnly)
 
-    local function add(key, pk, rec)
+    local groupLabels = {}
+
+    -- Añade un objeto a un grupo (tipo de material en materiales, profesión en equipo).
+    local function add(key, pk, rec, groupKey, groupLabel)
       local name, icon, _, quality, minLevel, equipLoc = ns.KeyInfo(key)
       local label = name or ns.KeyName(key)
       local lower = label:lower()
       if state.search ~= "" and not lower:find(state.search, 1, true) then return end
       if not materials and ns.db.settings.hideLowGear and isLowGear(minLevel, equipLoc, playerLevel) then return end
-      profSet[pk] = true
-      if state.prof and state.prof ~= pk then return end
       local seen, count, online = {}, 0, 0
-      if rec then
-        for _, cr in ipairs(rec.crafters) do
-          if cr.p == pk and not seen[cr.n] then
-            seen[cr.n] = true
-            count = count + 1
-            if Guild.IsOnline(cr.n) then online = online + 1 end
-          end
-        end
-      else
-        for _, who in ipairs((Data.GatherersOf(key))) do
+      local function countWho(who)
+        if not seen[who] then
+          seen[who] = true
           count = count + 1
           if Guild.IsOnline(who) then online = online + 1 end
         end
       end
-      groups[pk] = groups[pk] or {}
-      table.insert(groups[pk], {
-        id = tostring(pk) .. ":" .. key, key = key, pk = pk, sort = lower, icon = icon,
+      for _, cr in ipairs(rec and rec.crafters or {}) do
+        if materials or cr.p == pk then countWho(cr.n) end
+      end
+      if materials or not rec then
+        for _, who in ipairs((Data.GatherersOf(key))) do countWho(who) end
+      end
+      groupKey = groupKey or pk
+      groupLabels[groupKey] = groupLabel or ns.ProfessionName(pk)
+      groups[groupKey] = groups[groupKey] or {}
+      table.insert(groups[groupKey], {
+        id = tostring(groupKey) .. ":" .. key, key = key, pk = pk, sort = lower, icon = icon,
         count = count, online = online, label = qualityColor(quality) .. label .. "|r",
       })
     end
 
-    -- Lo que fabrica la hermandad (materiales o equipo, según la página).
-    for key, rec in pairs(index) do
-      local _, id = ns.ParseKey(key)
-      if isEquipment(key) ~= materials and (not onlyMine or mine[id]) then
-        for pk in pairs(rec.profs) do add(key, pk, rec) end
-      end
-    end
-    -- Materiales de mis recetas que solo se consiguen recolectando.
     if materials then
+      -- Solo materiales de verdad, una vez cada uno, agrupados por tipo.
+      for key, rec in pairs(index) do
+        local _, id = ns.ParseKey(key)
+        local groupKey, groupLabel = materialGroup(key)
+        if groupKey and (not onlyMine or mine[id]) then
+          local profs = {}
+          for pk in pairs(rec.profs) do
+            profSet[pk] = true
+            profs[#profs + 1] = pk
+          end
+          table.sort(profs, function(x, y) return tostring(x) < tostring(y) end)
+          if not state.prof or rec.profs[state.prof] then
+            add(key, rec.profs[state.prof or false] and state.prof or profs[1], rec, groupKey, groupLabel)
+          end
+        end
+      end
+      -- Materiales de mis recetas que solo se consiguen recolectando.
       for id in pairs(mine) do
         local key = "i" .. id
         if not index[key] then
           local gatherers, skill = Data.GatherersOf(key)
           if skill and #gatherers > 0 then
             state.gatherOnly[key] = skill
-            add(key, skill, nil)
+            profSet[skill] = true
+            local groupKey, groupLabel = materialGroup(key)
+            if not state.prof or state.prof == skill then
+              add(key, skill, nil, groupKey or "t:11", groupLabel or "Otros")
+            end
+          end
+        end
+      end
+    else
+      -- Equipo, agrupado por profesión.
+      for key, rec in pairs(index) do
+        if isEquipment(key) then
+          for pk in pairs(rec.profs) do
+            profSet[pk] = true
+            if not state.prof or state.prof == pk then add(key, pk, rec) end
           end
         end
       end
@@ -616,21 +661,27 @@ local function buildCatalog(page, mode)
 
     local profList = {}
     for pk in pairs(profSet) do profList[#profList + 1] = pk end
-    table.sort(profList, function(a, b) return ns.ProfessionName(a) < ns.ProfessionName(b) end)
+    table.sort(profList, function(x, y) return ns.ProfessionName(x) < ns.ProfessionName(y) end)
     page.profList = profList
     if state.prof and not profSet[state.prof] then state.prof = nil end
     profButton:SetText("Profesión: " .. (state.prof and ns.ProfessionName(state.prof) or "todas"))
 
-    -- Cabecera por profesión y sus objetos debajo (si no está plegada).
+    -- Grupos ordenados por nombre.
+    local groupKeys = {}
+    for k in pairs(groups) do groupKeys[#groupKeys + 1] = k end
+    table.sort(groupKeys, function(x, y) return groupLabels[x] < groupLabels[y] end)
+    page.groupKeys = groupKeys
+
+    -- Cabecera de cada grupo y sus objetos debajo (si no está plegado).
     local saved, favs = savedCollapsed(), favorites()
-    local function isCollapsed(pk, default)
+    local function isCollapsed(k, default)
       if state.search ~= "" then return false end -- al buscar, todo abierto
-      if saved[pk] ~= nil then return saved[pk] end
+      if saved[k] ~= nil then return saved[k] end
       return default
     end
     local items, favItems = {}, {}
-    for _, pk in ipairs(profList) do
-      for _, item in ipairs(groups[pk] or {}) do
+    for _, k in ipairs(groupKeys) do
+      for _, item in ipairs(groups[k]) do
         if favs[item.key] then
           item.label = "|cffffd100*|r " .. item.label
           favItems[#favItems + 1] = {
@@ -641,33 +692,31 @@ local function buildCatalog(page, mode)
       end
     end
     if #favItems > 0 then
-      table.sort(favItems, function(a, b) return a.sort < b.sort end)
+      table.sort(favItems, function(x, y) return x.sort < y.sort end)
       local collapsed = isCollapsed("fav", false)
       items[#items + 1] = { id = "h:fav", header = true, pk = "fav", label = "Favoritos", count = #favItems, collapsed = collapsed }
       if not collapsed then
         for _, item in ipairs(favItems) do items[#items + 1] = item end
       end
     end
-    for _, pk in ipairs(profList) do
-      local group = groups[pk]
-      if group then
-        table.sort(group, function(a, b) return a.sort < b.sort end)
-        -- abierto por defecto si da algo que usan tus recetas (en materiales)
-        local useful = false
-        if materials then
-          for _, item in ipairs(group) do
-            local _, id = ns.ParseKey(item.key)
-            if mine[id] then useful = true break end
-          end
+    for _, k in ipairs(groupKeys) do
+      local group = groups[k]
+      table.sort(group, function(x, y) return x.sort < y.sort end)
+      -- abierto por defecto si tiene algo que usan tus recetas (en materiales)
+      local useful = false
+      if materials then
+        for _, item in ipairs(group) do
+          local _, id = ns.ParseKey(item.key)
+          if mine[id] then useful = true break end
         end
-        local collapsed = isCollapsed(pk, not useful)
-        items[#items + 1] = {
-          id = "h:" .. tostring(pk), header = true, pk = pk, label = ns.ProfessionName(pk),
-          count = #group, collapsed = collapsed,
-        }
-        if not collapsed then
-          for _, item in ipairs(group) do items[#items + 1] = item end
-        end
+      end
+      local collapsed = isCollapsed(k, not useful)
+      items[#items + 1] = {
+        id = "h:" .. tostring(k), header = true, pk = k, label = groupLabels[k],
+        count = #group, collapsed = collapsed,
+      }
+      if not collapsed then
+        for _, item in ipairs(group) do items[#items + 1] = item end
       end
     end
     list:SetItems(items)

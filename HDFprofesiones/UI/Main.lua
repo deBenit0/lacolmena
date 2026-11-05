@@ -8,7 +8,7 @@ local panel
 local hosts = {}
 local PAGES = {
   { id = "materials", label = "Pedir materiales" },
-  { id = "equipment", label = "Pedir equipo" },
+  -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
   { id = "requests", label = "Peticiones" },
   { id = "mine", label = "Mis cosas" },
 }

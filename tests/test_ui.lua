@@ -12,6 +12,7 @@ local ALCHEMY = {
   },
 }
 H.gear = { [2000] = { equipLoc = "INVTYPE_CHEST", minLevel = 10 } }
+H.itemClass = { [12360] = { 7, 7 } } -- la arcanita es un material (metal); la poción no
 
 local ana = H.Login("Ana", { class = "MAGE", bags = { [8838] = 10 } })
 local bea = H.Login("Bea", { bags = { [8838] = 1, [8839] = 5 } })
@@ -38,11 +39,6 @@ guildFrame:Hide()
 H.ok(not panel:IsShown(), "al cerrar la hermandad se cierra")
 guildFrame:Show()
 
--- Página "Pedir equipo": la coraza (de nivel bajo) solo sale al quitar el filtro.
-ns.UI.Open("equipment")
-H.Advance(1)
-local equipment = panel.pageFrames.equipment
-H.ok(equipment:IsShown(), "página de equipo visible")
 local function countItems(page)
   local n, headers = 0, 0
   for _, item in ipairs(page.list.items) do
@@ -50,18 +46,7 @@ local function countItems(page)
   end
   return n, headers
 end
-H.eq((countItems(equipment)), 0, "la coraza de nivel bajo está oculta")
-ns.db.settings.hideLowGear = false
-equipment:Refresh()
-H.eq((countItems(equipment)), 0, "en equipo las profesiones salen plegadas")
-equipment:SetAllCollapsed(false)
-H.eq((countItems(equipment)), 1, "equipo: la coraza")
-equipment.list.rows[2]:Click()
-H.Advance(10)
-equipment:RefreshDetail()
-local slot1 = equipment.detail.slots[1]
-H.ok(slot1:IsShown() and slot1.itemID == 2840, "casilla 1 del equipo: material 2840")
-H.eq(slot1.need:GetText(), "4", "necesita 4")
+H.ok(panel.pageFrames.equipment == nil, "sin pestaña de equipo (por ahora)")
 
 -- Página "Pedir materiales": Bea no tiene recetas, así que hay que ver todo.
 ns.UI.ShowPage("materials")
@@ -76,17 +61,18 @@ H.ok(recipes.list.items[1] and true, "hay filas")
 ns.db.settings.onlyMyReagents = false
 recipes:SetAllCollapsed(false)
 local n, headers = countItems(recipes)
-H.eq(headers, 1, "una cabecera: Alquimia")
-H.eq(n, 2, "materiales: poción y arcanita (la coraza es equipo)")
+H.eq(headers, 1, "un grupo de tipo de material")
+H.eq(recipes.list.items[1].label, "Metales y piedras", "agrupado por tipo: Metales y piedras")
+H.eq(n, 1, "solo materiales de verdad: la arcanita (ni la poción ni la coraza)")
 
 -- Plegar y desplegar la profesión.
 recipes.list.rows[1]:Click()
-H.eq((countItems(recipes)), 0, "Alquimia plegada")
+H.eq((countItems(recipes)), 0, "grupo plegado")
 recipes.list.rows[1]:Click()
-H.eq((countItems(recipes)), 2, "Alquimia desplegada")
+H.eq((countItems(recipes)), 1, "grupo desplegado")
 
 -- Búsqueda.
-recipes.search:SetText("13443")
+recipes.search:SetText("12360")
 recipes.search:GetScript("OnTextChanged")(recipes.search, true)
 H.eq((countItems(recipes)), 1, "búsqueda por nombre")
 recipes.search:SetText("")
@@ -106,23 +92,23 @@ recipes.profButton:Click()
 menu.buttons[1]:Click()
 H.eq(recipes.state.prof, nil, "filtro: todas")
 
--- Elegir la poción: precio de subasta y quién la da.
-bea.env.HDFProfesionesDB.prices = { [13443] = { p = 12000, t = ns.Now() } }
+-- Elegir la arcanita: precio de subasta y quién la da.
+bea.env.HDFProfesionesDB.prices = { [12360] = { p = 12000, t = ns.Now() } }
 local potionRow
 for _, row in ipairs(recipes.list.rows) do
-  if row.item and row.item.key == "i13443" then potionRow = row end
+  if row.item and row.item.key == "i12360" then potionRow = row end
 end
-H.ok(potionRow ~= nil, "fila de la poción")
+H.ok(potionRow ~= nil, "fila de la arcanita")
 potionRow:Click()
 H.ok(recipes.detail.price:GetText():find("12000c", 1, true), "precio de subasta: " .. recipes.detail.price:GetText())
--- Favoritos: la poción sube arriba del todo.
+-- Favoritos: la arcanita sube arriba del todo.
 recipes.detail.fav:Click()
 H.eq(recipes.list.items[1].label, "Favoritos", "grupo Favoritos arriba")
-H.eq(recipes.list.items[2].key, "i13443", "la poción en favoritos")
+H.eq(recipes.list.items[2].key, "i12360", "la arcanita en favoritos")
 H.eq(recipes.detail.fav:GetText(), "- Favorito", "el botón permite quitarla")
 recipes.detail.fav:Click()
 H.ok(recipes.list.items[1].label ~= "Favoritos", "quitada de favoritos")
-recipes.state.key = "i13443"
+recipes.state.key = "i12360"
 recipes:RefreshDetail(true)
 -- Cantidad con + y -.
 H.eq(recipes.detail.qty:GetText(), "1", "cantidad inicial")
@@ -141,7 +127,7 @@ H.ok(recipes.detail.askOne:IsEnabled(), "botón Pedir a Ana activo")
 recipes.detail.askOne:Click()
 local dialog = env.HDFProfRequestDialog
 H.ok(dialog and dialog:IsShown(), "se abre la ventana de petición")
-H.eq(dialog.key, "i13443", "con el objeto elegido")
+H.eq(dialog.key, "i12360", "con el objeto elegido")
 H.eq(dialog.to, "Ana-Reino", "para Ana")
 H.eq(dialog.qty:GetText(), "2", "la cantidad elegida pasa a la petición")
 H.eq(dialog.gold:GetText() .. "o" .. dialog.silver:GetText(), "2o16", "oferta sugerida: 2 x 1o20p menos un 10% = 2o16p")
@@ -198,7 +184,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.9.1", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.10.0", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

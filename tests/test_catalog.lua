@@ -3,6 +3,12 @@ local H = ...
 -- cada profesión aunque nadie lo haya publicado todavía.
 H.AddMember("Pepe")
 H.equipIDs = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/equip_ids.lua")
+-- Categorías de algunos materiales reales (en el juego las da GetItemInfoInstant).
+H.itemClass = {}
+for _, id in ipairs({ 2318, 2319, 4234, 4304, 8170 }) do H.itemClass[id] = { 7, 6, "Cuero" } end
+for _, id in ipairs({ 2840, 3576, 3575, 3860, 12359, 2841, 3859, 6037, 12360 }) do H.itemClass[id] = { 7, 7 } end
+for _, id in ipairs({ 2996, 2997, 4305, 4339, 14048, 14342 }) do H.itemClass[id] = { 7, 5 } end
+for _, id in ipairs({ 4357, 4364, 4377, 10505, 15992, 4359, 4361, 4371 }) do H.itemClass[id] = { 7, 1 } end
 local pepe = H.Login("Pepe", { recipeDB = true })
 H.Advance(20)
 local ns = pepe.ns
@@ -20,16 +26,12 @@ local n0 = count(mats)
 H.eq(n0, 0, "al abrir, todo plegado (Pepe no tiene recetas)")
 mats:SetAllCollapsed(false)
 local n, headers, keys = count(mats)
-H.ok(n > 300, "muchos materiales disponibles: " .. n)
-H.ok(#headers >= 8, "agrupados por profesión: " .. table.concat(headers, ", "))
+H.ok(n >= 25 and n < 60, "solo materiales de verdad: " .. n)
+local labels = table.concat(headers, ", ")
+H.ok(labels:find("Cueros", 1, true) and labels:find("Telas", 1, true) and labels:find("Metales y piedras", 1, true)
+  and labels:find("Piezas de ingeniería", 1, true), "agrupados por tipo: " .. labels)
 H.ok(keys.i2318 and keys.i4234, "están el cuero ligero y el cuero pesado")
-ns.UI.ShowPage("equipment")
-local equip = panel.pageFrames.equipment
-ns.db.settings.hideLowGear = false
-equip:SetAllCollapsed(false)
-local ne, _, ekeys = count(equip)
-H.ok(ne > 300, "mucho equipo disponible: " .. ne)
-H.ok(ekeys.e20034, "encantamiento cruzado en equipo")
+H.ok(not keys.i13443, "las pociones no salen en materiales")
 -- Elegir uno sin fabricantes conocidos: se puede pedir igual.
 ns.UI.ShowPage("materials")
 local row
@@ -63,5 +65,5 @@ viejo.ns.UI.Open("materials")
 local vm = viejo.env.HDFProfPanel.pageFrames.materials
 local headersOnly = 0
 for _, item in ipairs(vm.list.items) do if item.header then headersOnly = headersOnly + 1 end end
-H.ok(headersOnly >= 8, "la lista de materiales muestra las profesiones: " .. headersOnly)
+H.ok(headersOnly >= 4, "la lista de materiales muestra los grupos: " .. headersOnly)
 H.eq(#H.errors, 0, "sin errores de Lua (actualización)")

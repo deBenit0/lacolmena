@@ -6,6 +6,7 @@ local BLACKSMITHING = {
   name = "Herrería", rank = 300, max = 300, selected = 1,
   rows = { { name = "Coraza de torio", item = 12405, reagents = { { 4234, 4 }, { 2840, 2 } } } },
 }
+H.itemClass = { [4234] = { 7, 6 }, [2840] = { 7, 7 } }
 local pepe = H.Login("Pepe", { bags = { [4234] = 1 } })
 local ana = H.Login("Ana")
 H.Advance(15)

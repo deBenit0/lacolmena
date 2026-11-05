@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.9.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.10.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -23,22 +23,19 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
   cooldowns. Para que se cuente lo que tienes en el banco, ábrelo una vez.
 
 ### Pedir materiales
-**Todo lo que se puede fabricar en Classic** que no es equipo (materiales, pociones, comida...),
-agrupado por profesión ([+]/[-] para plegar), aunque nadie de la hermandad lo haya publicado aún
-(el addon trae la lista de recetas de cada profesión). Puedes buscar, filtrar por profesión (menú
-desplegable) o marcar "Solo lo que usan mis recetas". Al entrar al juego, el addon carga en segundo
-plano los nombres de todos los objetos (unos 40 segundos la primera vez) para que el buscador los
-encuentre.
+**Solo materiales de verdad** (cueros, telas, barras, piezas, elementales, esencias...; sin pociones,
+comida ni vendas) de todo lo que se puede fabricar en Classic, **agrupados por tipo**: Cueros, Telas,
+Metales y piedras, Hierbas, Elementales, Piezas de ingeniería... Salen aunque nadie de la hermandad
+los haya publicado aún. Puedes buscar, filtrar por profesión que lo fabrica (menú desplegable) o
+marcar "Solo lo que usan mis recetas". Al entrar al juego, el addon carga en segundo plano los
+nombres de todos los objetos para que el buscador los encuentre.
 
-Las profesiones salen **plegadas**, salvo las que dan materiales que usan tus recetas, y el addon
-recuerda cuáles dejas abiertas. Con **+ Favorito** marcas lo que pides a menudo: sale arriba del
-todo, en el grupo Favoritos. Al elegir uno ves para qué recetas tuyas
-sirve, el **precio en la subasta**, quién lo da, la cantidad con − y +, y los botones **Pedir a
-todos**, **Pedir a [nombre]** y **Susurrar**.
+Los grupos salen **plegados**, salvo los que tienen materiales que usan tus recetas, y el addon
+recuerda cuáles dejas abiertos. Con **+ Favorito** marcas lo que pides a menudo: sale arriba del
+todo. Al elegir un material ves para qué recetas tuyas sirve, el **precio en la subasta**, quién lo
+da, la cantidad con − y +, y los botones **Pedir a todos**, **Pedir a [nombre]** y **Susurrar**.
 
-### Pedir equipo
-Todas las armas, armaduras, bolsas y encantamientos que se pueden fabricar, con sus **materiales en
-casillas** (tienes/necesitas), quién lo fabrica y los mismos botones para pedir.
+*(La pestaña "Pedir equipo" está retirada de momento: se rehará más adelante.)*
 
 ### Precio y pago
 - El precio de la subasta sale de **Auctionator** (recomendado); si no lo tienes, de TSM o de lo
