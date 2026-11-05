@@ -88,13 +88,8 @@ ns.UI.RegisterPage("requests", function(page)
     page:Refresh()
   end)
 
-  local newButton = W.Button(page, "Nueva petición", 130, 22, function()
-    ns.UI.OpenRequestDialog({})
-  end)
-  newButton:SetPoint("TOPRIGHT", -4, -2)
-
   local counter = W.Text(page, "GameFontHighlightSmall", "RIGHT")
-  counter:SetPoint("RIGHT", newButton, "LEFT", -10, 0)
+  counter:SetPoint("TOPRIGHT", -8, -6)
 
   local list = W.List(page, 280, 368, {
     rows = 10,

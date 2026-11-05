@@ -1,4 +1,5 @@
--- Ventana "Nueva petición".
+-- Ventana de petición. Solo se abre con el objeto ya elegido: desde la ventana de
+-- profesión ("Pedir") o desde las páginas "Pedir materiales" y "Pedir equipo".
 local _, ns = ...
 local W, Data = ns.W, ns.Data
 
@@ -35,14 +36,6 @@ local function linkInput(parent, width)
   return edit
 end
 
-local function takeCursorItem()
-  local kind, id = GetCursorInfo()
-  if kind == "item" and id then
-    ClearCursor()
-    setKey("i" .. id)
-  end
-end
-
 local function create()
   dialog = W.Panel("HDFProfRequestDialog", UIParent, 400, 366)
   dialog:SetFrameStrata("DIALOG")
@@ -58,7 +51,7 @@ local function create()
 
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
-  title:SetText("Nueva petición")
+  title:SetText("Pedir en la hermandad")
   local close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
@@ -71,20 +64,11 @@ local function create()
   dialog.itemButton:SetPoint("TOPLEFT", 24, -62)
   dialog.iconTex = dialog.itemButton:CreateTexture(nil, "ARTWORK")
   dialog.iconTex:SetAllPoints()
-  dialog.itemButton:SetScript("OnReceiveDrag", takeCursorItem)
-  dialog.itemButton:SetScript("OnClick", takeCursorItem)
   W.KeyTooltip(dialog.itemButton, function() return dialog.key end)
   dialog.itemName = W.Text(dialog, "GameFontHighlight")
   dialog.itemName:SetPoint("TOPLEFT", dialog.itemButton, "TOPRIGHT", 8, -1)
   dialog.itemName:SetPoint("RIGHT", dialog, "RIGHT", -24, 0)
   dialog.itemName:SetWordWrap(false)
-  dialog.itemInput = linkInput(dialog, 290)
-  dialog.itemInput:SetPoint("TOPLEFT", dialog.itemButton, "TOPRIGHT", 12, -14)
-  dialog.itemInput:SetScript("OnTextChanged", function(self)
-    local key = ns.KeyFromLink(self:GetText())
-    if key then setKey(key) end
-  end)
-  W.Placeholder(dialog.itemInput, "Mayús+clic en un objeto, o arrástralo al icono")
 
   -- Cantidad y materiales
   local qtyLabel = W.Text(dialog, "GameFontNormalSmall")
@@ -224,9 +208,9 @@ function ns.UI.OpenRequestDialog(opts)
     ns.Print("no estás en ninguna hermandad.")
     return
   end
-  if not dialog then create() end
   opts = opts or {}
-  dialog.itemInput:SetText("")
+  if not ns.ParseKey(opts.k) then return end -- sin objeto elegido no hay petición
+  if not dialog then create() end
   setKey(opts.k, opts.pk)
   setTarget(opts.to)
   dialog.qty:SetText(tostring(opts.q or 1))
@@ -245,7 +229,6 @@ function ns.UI.OpenRequestDialog(opts)
   dialog:UpdatePrice()
   local kind, id = ns.ParseKey(opts.k)
   if kind == "i" then ns.Prices.Query(id) end -- si la subasta está abierta, precio al momento
-  if not opts.k then dialog.itemInput:SetFocus() end
 end
 
 -- Mayús+clic en un objeto mientras escribes en una de nuestras cajas: pegar el enlace ahí.

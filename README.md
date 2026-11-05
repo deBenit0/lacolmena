@@ -3,7 +3,7 @@
 Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
 fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
 
-Esta es la **fase 1** (versión 0.6.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.6.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -50,9 +50,8 @@ los materiales que te faltan (contando bolsas y banco):
 - Vienen marcados solo los que da la hermandad y tú no puedes conseguir.
 
 ### Peticiones
-- **Nueva petición:** mayús+clic en un objeto (o arrástralo al icono), cantidad, si aportas
-  los materiales; el pago en oro u objetos y el destinatario están en **Más opciones**. Los encantamientos se piden desde
-  la página de Recetas, porque no son objetos.
+- Solo se pide desde **tu ventana de profesión** (botón "Pedir" en cada material o "Pedir en la
+  hermandad") o desde las pestañas **Pedir materiales** y **Pedir equipo**.
 - Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
   Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.

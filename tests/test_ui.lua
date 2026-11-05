@@ -182,7 +182,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.6.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.6.1", 1, true) ~= nil, "muestra la versión")
 local anaMine
 ana.ns.UI.ShowPage("mine")
 anaMine = anaPanel.pageFrames.mine
@@ -192,10 +192,9 @@ anaMine.unavailable:GetScript("OnClick")(anaMine.unavailable)
 H.Advance(10)
 H.ok(ns.G().entries["Ana-Reino"].u == true, "Bea ve a Ana como no disponible")
 
--- Nueva petición sin objeto: no se publica.
-ns.UI.OpenRequestDialog({})
-dialog:Publish()
-H.ok(dialog:IsShown(), "sin objeto no se publica")
+-- Sin objeto elegido no se abre la ventana de petición (no se pide con mayús+clic).
 dialog:Hide()
+ns.UI.OpenRequestDialog({})
+H.ok(not dialog:IsShown(), "sin objeto no se abre")
 
 H.eq(#H.errors, 0, "sin errores de Lua en la interfaz")
