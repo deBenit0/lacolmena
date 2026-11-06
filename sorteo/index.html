@@ -63,9 +63,13 @@
   .ajustes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 14px; margin-top: 12px; }
   .ajustes label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--suave); }
   .ajustes label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--texto); font-size: 13px; }
+  .probador { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--borde); border-radius: 10px; }
+  .probador label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--suave); }
+  .probador .det { margin-top: 6px; font-size: 13px; }
   .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--acento); }
   .aviso { background: #2a1f40; border: 1px solid var(--acento); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
-  .modos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .modos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+  @media (max-width: 1200px) { .modos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 560px) { .modos { grid-template-columns: repeat(2, 1fr); } }
   .modos button { padding: 10px 8px; line-height: 1.2; text-align: center; }
   .modos button b { display: block; font-size: 14px; }
@@ -95,7 +99,7 @@
   <div class="stats">
     <div>Participantes<b id="nPart">0</b></div>
     <div>Papeletas<b id="nPap">0</b></div>
-    <div>Gastado<b id="nEur">0 €</b></div>
+    <div><span id="lblEur">Gastado</span><b id="nEur">0 €</b></div>
   </div>
   <button id="btnEscena" title="Abre la escena para capturarla en OBS">🎬 Abrir escena</button>
 </header>
@@ -142,7 +146,7 @@
       <p class="det" id="reglas" style="margin-top:-4px"></p>
       <div class="scroll">
         <table>
-          <thead><tr><th>Persona</th><th>Sub</th><th class="num">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
+          <thead><tr><th>Persona</th><th>Sub</th><th class="num" id="thEur">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
           <tbody id="tabla"></tbody>
         </table>
       </div>
@@ -169,6 +173,12 @@
         <summary>Ajustes</summary>
         <form id="formAjustes">
           <div class="ajustes" id="camposAjustes"></div>
+          <div class="probador">
+            <label>🧪 Prueba un aviso de donación: pega aquí un mensaje real de tu bot de StreamElements
+              <input type="text" id="probarAviso" placeholder="Ejemplo: ElPepe just tipped €5.00 PogChamp">
+            </label>
+            <div class="det" id="resultadoAviso">Usa el formato guardado. Si cambias el formato, pulsa Guardar antes de probar.</div>
+          </div>
           <div class="fila" style="margin-top:14px">
             <button class="acento" type="submit">Guardar</button>
             <span class="det" id="ajustesOk"></span>
@@ -201,6 +211,7 @@
           <button data-sim="regalo">+Sub regalada</button>
           <button data-sim="regalo5">+5 regaladas de una persona</button>
           <button data-sim="hypechat">+Hype Chat 5 €</button>
+          <button data-sim="donacion">+Donación StreamElements 10 €</button>
         </div>
         <p></p>
         <div class="fila">
@@ -238,7 +249,14 @@ let girando = false;
 let chatEstado = { conectado: false, texto: 'Sin conectar' };
 
 let tGuardar = null;
-function guardar() { clearTimeout(tGuardar); tGuardar = setTimeout(() => escribir(claveEstado(), estado), 400); }
+// Guarda como mucho una vez por segundo, aunque el chat no pare nunca (portada).
+function guardar() {
+  if (tGuardar) return;
+  tGuardar = setTimeout(() => { tGuardar = null; escribir(claveEstado(), estado); }, 1000);
+}
+function guardarYa() { clearTimeout(tGuardar); tGuardar = null; escribir(claveEstado(), estado); }
+window.addEventListener('pagehide', guardarYa);
+document.addEventListener('visibilitychange', () => { if (document.hidden) guardarYa(); });
 
 // --- Chat ----------------------------------------------------------------
 const chat = new ChatTwitch({
@@ -252,8 +270,10 @@ const chat = new ChatTwitch({
     }
     const acciones = Nucleo.accionesDesdeMensaje(msg, aj);
     if (!acciones.length) return;
-    acciones.forEach((a) => Nucleo.registrar(estado, a, aj));
-    guardar(); pintar();
+    let visible = false;
+    acciones.forEach((a) => { if (Nucleo.registrar(estado, a, aj)) visible = true; });
+    guardar();
+    if (visible) pintar(); // anotar el tier de un sub no necesita repintar
   },
 });
 
@@ -268,6 +288,7 @@ function detalle(p) {
   if (d.subs) t.push(d.subs + (d.subs > 1 ? ' subs' : ' sub'));
   if (d.regalos) t.push(d.regalos + (d.regalos > 1 ? ' regaladas' : ' regalada'));
   if (d.hypechat) t.push('Hype Chat ' + eur(d.hypechat));
+  if (d.donaciones) t.push('donó ' + eur(d.donaciones));
   if (d.manual) t.push('manual ' + eur(d.manual));
   return t.join(' · ');
 }
@@ -294,7 +315,10 @@ function pintarYa() {
   const l = Nucleo.lista(estado, aj);
   $('nPart').textContent = l.participantes.filter((p) => p.papeletas > 0).length;
   $('nPap').textContent = l.totalPapeletas;
-  $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + p.euros, 0));
+  const subathon = aj.modo === 'subathon';
+  const dinero = (p) => (subathon ? p.donado || 0 : p.euros);
+  $('lblEur').textContent = $('thEur').textContent = subathon ? 'Donado' : 'Gastado';
+  $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + dinero(p), 0));
   const palabra = (aj.palabraClave || '').trim();
   pintarModos();
   $('chkBonus').checked = !!aj.bonusTop;
@@ -306,11 +330,17 @@ function pintarYa() {
     soloSubs: ['Solo para subs: escribe ', pal(), ' en el chat (si no eres sub, no cuenta)'],
     gasto: ['Para participar: escribe ', pal(), ' en el chat · bits, subs y regalos dan papeletas extra'],
   }[aj.modo] || [];
-  $('comoEntrar').replaceChildren(...(palabra ? como : ['Sin palabra para entrar: solo entra quien gasta (bits, subs, regalos, Hype Chat)']));
+  if (aj.modo === 'subathon') $('comoEntrar').replaceChildren('Subathon: entra quien ', el('b', { textContent: 'regala subs o dona' }), ' (bits, Hype Chat, StreamElements) · cuanto más dona, más papeletas');
+  else $('comoEntrar').replaceChildren(...(palabra ? como : ['Sin palabra para entrar: solo entra quien gasta (bits, subs, regalos, Hype Chat)']));
   const partes = [];
   if (aj.modo === 'igual') partes.push('1 por persona');
   else if (aj.modo === 'subs') partes.push(`no sub: ${aj.papeletasNoSub}`, `Tier 1: ${aj.papeletasTier1}`, `Tier 2: ${aj.papeletasTier2}`, `Tier 3: ${aj.papeletasTier3}`);
   else if (aj.modo === 'soloSubs') partes.push('1 por sub · quien no es sub se queda con 0');
+  else if (aj.modo === 'subathon') {
+    partes.push(`1 por cada ${eur(aj.eurosPorPapeleta)} donado`);
+    if (aj.subathonMinimo > 0) partes.push(`hay que donar al menos ${eur(aj.subathonMinimo)} en total`);
+    partes.push('la sub propia no cuenta');
+  }
   else {
     if (palabra) partes.push(`${aj.papeletasPorEscribir} por escribir ${palabra}`);
     partes.push(`+1 por cada ${eur(aj.eurosPorPapeleta)} gastado`);
@@ -322,7 +352,7 @@ function pintarYa() {
     lista.length ? lista.map((t) => `${MEDALLA[t.puesto]} ${t.nombre} (${t.cantidad.toLocaleString('es-ES')} ${unidad(t.cantidad)})`).join('  ') : 'nadie todavía'];
   $('tops').classList.toggle('visible', !!aj.bonusTop);
   $('tops').replaceChildren(...lineaTop('Top subs regaladas', l.tops.regalos, (n) => n === 1 ? 'regalada' : 'regaladas'), el('br'), ...lineaTop('Top bits', l.tops.bits, (n) => n === 1 ? 'bit' : 'bits'));
-  if (palabra) partes.push(aj.gastanEntranSinEscribir ? 'quien gasta entra sin escribir' : 'quien gasta también tiene que escribir');
+  if (palabra && aj.modo !== 'subathon') partes.push(aj.gastanEntranSinEscribir ? 'quien gasta entra sin escribir' : 'quien gasta también tiene que escribir');
   $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
 
   rodillo.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => p.nombre));
@@ -330,16 +360,18 @@ function pintarYa() {
 
   const tabla = $('tabla');
   tabla.replaceChildren();
-  if (!l.participantes.length) tabla.append(el('tr', {}, el('td', { colSpan: 6, className: 'vacio', textContent: palabra ? `Nadie todavía. Que escriban ${palabra} en el chat.` : 'Todavía nadie ha gastado nada.' })));
-  const max = Math.max(1, ...l.participantes.map((p) => p.papeletas));
-  for (const p of l.participantes) {
+  const filas = aj.modo === 'subathon' ? l.participantes.filter((p) => p.papeletas > 0 || p.excluido) : l.participantes;
+  const vacio = aj.modo === 'subathon' ? 'Nadie ha regalado subs ni donado todavía.' : palabra ? `Nadie todavía. Que escriban ${palabra} en el chat.` : 'Todavía nadie ha gastado nada.';
+  if (!filas.length) tabla.append(el('tr', {}, el('td', { colSpan: 6, className: 'vacio', textContent: vacio })));
+  const max = Math.max(1, ...filas.map((p) => p.papeletas));
+  for (const p of filas) {
     const btn = el('button', { textContent: p.excluido ? 'Readmitir' : 'Excluir' });
     btn.onclick = () => { estado.participantes[p.login].excluido = !p.excluido; guardar(); pintar(); };
     tabla.append(el('tr', { className: p.excluido ? 'excluido' : (p.papeletas ? '' : 'sin') },
       el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p) }),
         ...(aj.bonusTop ? [el('div', {}, ...etiquetasTop(p))] : [])),
       el('td', { className: 'det', textContent: p.tier ? 'Tier ' + p.tier : '—' }),
-      el('td', { className: 'num', textContent: p.euros ? eur(p.euros) : '—' }),
+      el('td', { className: 'num', textContent: dinero(p) ? eur(dinero(p)) : '—' }),
       el('td', { className: 'num' }, el('div', { textContent: p.papeletas }), el('div', { className: 'barra' }, el('i', { style: `width:${(p.papeletas / max) * 100}%` }))),
       el('td', { className: 'num', textContent: (p.probabilidad * 100).toFixed(1) + ' %' }),
       el('td', { className: 'num' }, btn)));
@@ -380,6 +412,7 @@ const DESC_MODOS = {
   subs: 'abierto a todos, más para subs',
   soloSubs: 'solo participan subs',
   gasto: 'bits, subs y regalos suman',
+  subathon: 'solo quien regala subs o dona',
 };
 $('chkBonus').onchange = (e) => {
   if (girando) { e.target.checked = !!aj.bonusTop; return; }
@@ -472,6 +505,12 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
     regalo5: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
     hypechat: () => ({ tipo: 'hypechat', cantidad: 5, euros: 5, texto: 'Hype Chat 5 EUR (prueba)' }),
   }[tipo];
+  if (tipo === 'donacion') {
+    const n = nombre();
+    const linea = `@id=prueba-don-${Date.now()}-${nSim++} :streamelements!streamelements@streamelements.tmi.twitch.tv PRIVMSG #${aj.canal || 'canal'} :${n} just tipped €10.00 PogChamp`;
+    Nucleo.accionesDesdeMensaje(Nucleo.parseLine(linea), aj).forEach((a) => Nucleo.registrar(estado, a, aj));
+    guardar(); pintar(); return;
+  }
   if (tipo === 'subs') {
     for (const tier of [1, 2, 3]) {
       const n = nombre(), login = n.toLowerCase();
@@ -521,9 +560,15 @@ const CAMPOS = [
   ['bonusTop1', 'Papeletas extra al 1º', 'number'],
   ['bonusTop2', 'Papeletas extra al 2º', 'number'],
   ['bonusTop3', 'Papeletas extra al 3º', 'number'],
+  ['h', 'Modo «Subathon»'],
+  ['subathonMinimo', 'Donado mínimo en total para entrar (€, 0 = cualquiera)', 'number'],
+  ['eurosPorPapeleta', '€ por cada papeleta (también en «Más gasto»)', 'number'],
+  ['h', 'Donaciones de StreamElements / Streamlabs (aviso del bot en el chat)'],
+  ['botsDonaciones', 'Cuentas del bot que anuncia las donaciones (separadas por comas)', 'lista'],
+  ['plantillasDonacion', 'Formato del aviso: {usuario} y {cantidad}, varios separados por ;', 'text'],
+  ['monedaPorDefecto', 'Moneda si el aviso no la indica (EUR, USD…)', 'text'],
   ['h', 'Modo «Más gasto, más papeletas»'],
   ['papeletasPorEscribir', 'Papeletas por escribir la palabra', 'number'],
-  ['eurosPorPapeleta', '€ por cada papeleta extra', 'number'],
   ['minimaSiHaGastado', 'Mínimo de papeletas si gasta algo', 'number'],
   ['subsRegaladasCuentanParaQuienRegala', 'Las subs regaladas cuentan para quien regala', 'check'],
   ['h', 'Cuánto vale cada cosa (€)'],
@@ -537,7 +582,7 @@ const CAMPOS = [
   ['quitarGanador', 'Quitar al ganador de los siguientes sorteos', 'check'],
   ['duracionSorteo', 'Segundos que tardan en pasar los nombres', 'number'],
   ['sonidoPanel', 'Sonido también en este panel', 'check'],
-  ['ignorar', 'Cuentas ignoradas (separadas por comas)', 'text'],
+  ['ignorar', 'Cuentas ignoradas (separadas por comas)', 'lista'],
 ];
 const obtener = (ruta) => ruta.split('.').reduce((o, k) => o[k], aj);
 function fijar(ruta, v) { const ks = ruta.split('.'); const ult = ks.pop(); ks.reduce((o, k) => o[k], aj)[ult] = v; }
@@ -548,9 +593,9 @@ function construirAjustes() {
   for (const [ruta, texto, tipo] of CAMPOS) {
     if (ruta === 'h') { caja.append(el('h3', { textContent: texto })); continue; }
     let v = obtener(ruta);
-    if (ruta === 'ignorar') v = v.join(', ');
+    if (tipo === 'lista') v = v.join(', ');
     if (tipo === 'check') caja.append(el('label', { className: 'check' }, el('input', { type: 'checkbox', name: ruta, checked: !!v }), texto));
-    else caja.append(el('label', {}, texto, el('input', { type: tipo, name: ruta, value: v, step: 'any', min: tipo === 'number' ? 0 : undefined, placeholder: ruta === 'canal' ? 'nombre_de_tu_canal' : '' })));
+    else caja.append(el('label', ruta === 'plantillasDonacion' ? { style: 'grid-column: 1 / -1' } : {}, texto, el('input', { type: tipo === 'lista' ? 'text' : tipo, name: ruta, value: v, step: 'any', min: tipo === 'number' ? 0 : undefined, placeholder: ruta === 'canal' ? 'nombre_de_tu_canal' : '' })));
   }
 }
 
@@ -562,7 +607,8 @@ $('formAjustes').onsubmit = (ev) => {
     const inp = ev.target.elements[ruta];
     if (tipo === 'check') fijar(ruta, inp.checked);
     else if (tipo === 'number') fijar(ruta, Math.max(0, Number(inp.value) || 0));
-    else if (ruta === 'ignorar') fijar(ruta, inp.value.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+    else if (tipo === 'lista') fijar(ruta, inp.value.split(',').map((s) => s.trim().toLowerCase().replace(/^@/, '')).filter(Boolean));
+    else if (ruta === 'monedaPorDefecto') fijar(ruta, inp.value.trim().toUpperCase() || 'EUR');
     else if (ruta === 'canal') fijar(ruta, inp.value.trim().toLowerCase().replace(/^#/, '').replace(/^https?:\/\/(www\.)?twitch\.tv\//, '').split(/[/?]/)[0]);
     else fijar(ruta, inp.value.trim());
   }
@@ -578,6 +624,17 @@ $('formAjustes').onsubmit = (ev) => {
   $('ajustesOk').textContent = '✔ Guardado';
   setTimeout(() => { $('ajustesOk').textContent = ''; }, 2000);
   pintar();
+};
+
+$('probarAviso').oninput = (e) => {
+  const texto = e.target.value.trim();
+  const caja = $('resultadoAviso');
+  if (!texto) { caja.textContent = 'Usa el formato guardado. Si cambias el formato, pulsa Guardar antes de probar.'; caja.style.color = ''; return; }
+  const d = Nucleo.leerDonacion(texto, aj);
+  if (!d) { caja.textContent = '✖ No lo reconoce. Añade el formato de tu aviso en «Formato del aviso» (por ejemplo: {usuario} ha donado {cantidad}) y guarda.'; caja.style.color = 'var(--mal)'; return; }
+  const tasa = aj.conversionMonedas[d.moneda];
+  caja.textContent = `✔ Lo reconoce: ${d.usuario} dona ${d.importe} ${d.moneda}` + (d.moneda !== 'EUR' ? ` (≈ ${eur(d.importe * (tasa == null ? 1 : tasa))})` : '');
+  caja.style.color = 'var(--ok)';
 };
 
 // --- Arranque ---------------------------------------------------------------

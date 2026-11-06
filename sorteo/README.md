@@ -10,6 +10,8 @@ Sorteos para directos de **Twitch** que funcionan **en el navegador**, sin insta
 
 ![Panel](docs/panel.png)
 
+![Panel en modo Subathon](docs/panel-subathon.png)
+
 ![Nombres cayendo en OBS](docs/escena-nombres.png)
 
 ![Ganador en OBS](docs/escena-ganador.png)
@@ -25,9 +27,30 @@ se recalculan al instante y nadie desaparece de la lista.
 | **Subs más papeletas** | Todo el que escriba `!sorteo` | No sub 1 · Tier 1/Prime 2 · Tier 2 3 · Tier 3 4 |
 | **Solo subs** | Solo suscriptores que escriban `!sorteo` | 1 cada uno |
 | **Más gasto, más papeletas** | Todo el que escriba `!sorteo` | 1 + 1 por cada euro gastado (mínimo 1 si gasta algo) |
+| **Subathon** | Solo quien regala subs o dona (bits, Hype Chat, StreamElements, a mano). Escribir `!sorteo` o suscribirse uno mismo **no** cuenta | 1 por cada euro donado (hay que donar al menos 1 € en total) |
 
 En todos los modos, quien gasta (bits, subs, regalos, Hype Chat) entra aunque no escriba la palabra (se puede desactivar).
 Las papeletas de cada tier, el máximo por persona y el resto se cambian en **Ajustes**.
+
+### Subathon y donaciones de StreamElements
+
+En el modo **Subathon** entra en el sorteo quien regala subs o dona, y cuanto más dona, más papeletas tiene.
+Cada sub regalada vale su precio (Tier 1 = 3,99 € → 3 papeletas), cada 100 bits = 1 €, y los Hype Chats
+y las donaciones cuentan su importe. Suscribirse uno mismo no cuenta. El mínimo para entrar (1 € por defecto)
+y los euros por papeleta se cambian en Ajustes.
+
+**Donaciones de StreamElements:** el programa lee el aviso que pone el bot de StreamElements en el chat cuando alguien
+dona (por ejemplo `ElPepe just tipped €5.00`). Para que funcione:
+1. En StreamElements, activa los avisos de donaciones (*tips*) en el chat del bot (*Chat bot → Chat alerts*).
+2. En el panel, abre **Ajustes** y pega un aviso real de tu bot en **🧪 Prueba un aviso de donación**. Si sale
+   ✔, está listo. Si sale ✖, escribe tu formato en «Formato del aviso» usando `{usuario}` y `{cantidad}`
+   (por ejemplo `¡Gracias {usuario} por tus {cantidad}!`) y pulsa Guardar.
+
+El nombre que cuenta es el que el donante escribe al donar en StreamElements: si no coincide con su usuario de Twitch,
+aparecerá como otra persona. Lo puedes corregir con **Añadir a mano** (sumando a uno y restando al otro).
+
+Mientras dure el subathon deja el panel abierto y el sorteo **abierto** (punto verde), o no contará lo que se done.
+Puedes hacer varios sorteos seguidos: con «Quitar al ganador» marcado, quien gana no repite.
 
 ### ⭐ Extra para el top de regaladores
 

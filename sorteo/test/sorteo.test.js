@@ -212,3 +212,48 @@ test('bonus para el top 3 de regaladores de subs y de bits', () => {
   assert.deepEqual(tops.regalos.map((t) => [t.login, t.puesto]), [['reina', 1], ['duque', 2], ['rey', 2]]);
   assert.deepEqual(tops.bits.map((t) => [t.login, t.cantidad, t.puesto]), [['bitero', 1000, 1], ['reina', 500, 2], ['poco', 100, 3]]);
 });
+
+test('modo subathon: solo regalos y donaciones, más papeletas a quien más dona', () => {
+  const sub = { ...aj, modo: 'subathon' };
+  const e = N.estadoVacio();
+  const meter = (linea) => acc(linea, sub).forEach((a) => N.registrar(e, a, sub));
+  meter(priv('id=a1', 'mirona', '!sorteo'));                                                         // escribir no mete
+  meter('@login=propia;id=a2;msg-id=sub;msg-param-sub-plan=1000 :tmi.twitch.tv USERNOTICE #prueba');  // sub propia no cuenta
+  meter('@login=regalona;display-name=Regalona;id=a3;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-user-name=x :tmi.twitch.tv USERNOTICE #prueba');
+  meter('@login=regalona;display-name=Regalona;id=a4;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-user-name=y :tmi.twitch.tv USERNOTICE #prueba');
+  meter(priv('bits=500;id=a5', 'bitera', 'Cheer500'));
+  meter(priv('bits=50;id=a6', 'tacana', 'Cheer50'));                                                 // 0,50 €: no llega al mínimo de 1 €
+  meter(priv('id=a7', 'streamelements', 'Donante just tipped €12.50 PogChamp'));
+  meter(priv('id=a8', 'streamelements', 'Donante ha donado 2,50 €'));
+  meter(priv('id=a9', 'streamelements', '¡Gracias por seguir el canal!'));                           // no es donación
+  const l = N.lista(e, sub);
+  const pap = Object.fromEntries(l.participantes.map((p) => [p.login, p.papeletas]));
+  assert.deepEqual(pap, { donante: 15, regalona: 7, bitera: 5, tacana: 0, propia: 0 });
+  assert.equal(e.participantes.mirona, undefined);
+  assert.equal(e.participantes.donante.detalle.donaciones, 15);
+  // con mínimo 0 entra cualquiera que haya donado algo
+  assert.equal(N.lista(e, { ...sub, subathonMinimo: 0 }).participantes.find((p) => p.login === 'tacana').papeletas, 1);
+  // regalos cuentan en el subathon aunque esté desactivado para el modo gasto
+  const e2 = N.estadoVacio();
+  acc('@login=r;id=b1;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-user-name=z :tmi.twitch.tv USERNOTICE #prueba', { ...sub, subsRegaladasCuentanParaQuienRegala: false })
+    .forEach((a) => N.registrar(e2, a, sub));
+  assert.equal(N.lista(e2, sub).participantes[0].papeletas, 3);
+});
+
+test('lectura de avisos de donación', () => {
+  const d = (t) => N.leerDonacion(t, aj);
+  assert.deepEqual(d('ElPepe just tipped €5.00 PogChamp'), { usuario: 'ElPepe', importe: 5, moneda: 'EUR' });
+  assert.deepEqual(d('lucia_gg just tipped $10.50!'), { usuario: 'lucia_gg', importe: 10.5, moneda: 'USD' });
+  assert.deepEqual(d('Rocio ha donado 7,50 € ❤'), { usuario: 'Rocio', importe: 7.5, moneda: 'EUR' });
+  assert.deepEqual(d('gracias @Chusqui por donar 3€'), { usuario: 'Chusqui', importe: 3, moneda: 'EUR' });
+  assert.deepEqual(d('Tomasito donó 1.000,00 EUR'), { usuario: 'Tomasito', importe: 1000, moneda: 'EUR' });
+  assert.equal(d('hola a todos'), null);
+  assert.deepEqual(N.leerDonacion('💸 Nuevo donativo de Pepa: 4 €', { ...aj, plantillasDonacion: 'Nuevo donativo de {usuario}: {cantidad}' }), { usuario: 'Pepa', importe: 4, moneda: 'EUR' });
+});
+
+test('top 3 con más de 3 personas y empates', () => {
+  const ps = [['a', 9], ['b', 7], ['c', 7], ['d', 5], ['e', 5], ['f', 1]].map(([login, bits]) => ({ login, nombre: login, detalle: { bits } }));
+  assert.deepEqual(N.top3(ps, 'bits').map((t) => [t.login, t.puesto]), [['a', 1], ['b', 2], ['c', 2]]);
+  const ps2 = [['a', 9], ['b', 7], ['c', 5], ['d', 5], ['e', 1]].map(([login, bits]) => ({ login, nombre: login, detalle: { bits } }));
+  assert.deepEqual(N.top3(ps2, 'bits').map((t) => [t.login, t.puesto]), [['a', 1], ['b', 2], ['c', 3], ['d', 3]]);
+});

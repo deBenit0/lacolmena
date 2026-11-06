@@ -12,6 +12,8 @@
     //  'subs'     abierto a todos, los subs tienen más papeletas según su tier
     //  'soloSubs' solo participan los suscriptores (1 papeleta cada uno)
     //  'gasto'    más gasto (bits, subs, regalos, Hype Chat), más papeletas
+    //  'subathon' solo quien regala subs o dona (bits, Hype Chat, StreamElements…);
+    //             suscribirse uno mismo o escribir la palabra no cuenta
     modo: 'igual',
     papeletasNoSub: 1,
     papeletasTier1: 2,
@@ -28,6 +30,13 @@
     eurosPorPapeleta: 1,
     minimaSiHaGastado: 1,
     maximo: 0,
+    // Subathon: donado mínimo (en €) para entrar. 0 = cualquier cantidad.
+    subathonMinimo: 1,
+    // Donaciones de StreamElements/Streamlabs leídas del aviso que pone su bot en el chat.
+    // Plantillas separadas por ";" con {usuario} y {cantidad}.
+    botsDonaciones: ['streamelements', 'streamlabs'],
+    plantillasDonacion: '{usuario} just tipped {cantidad}; {usuario} tipped {cantidad}; {usuario} ha donado {cantidad}; {usuario} donó {cantidad}; {usuario} dono {cantidad}; gracias {usuario} por (?:la donación|donar) de {cantidad}; gracias {usuario} por donar {cantidad}',
+    monedaPorDefecto: 'EUR',
     valores: { bit: 0.01, subPrime: 0, subTier1: 3.99, subTier2: 7.99, subTier3: 19.99 },
     subsRegaladasCuentanParaQuienRegala: true,
     conversionMonedas: { EUR: 1, USD: 0.92, GBP: 1.18, MXN: 0.05, ARS: 0.001, CLP: 0.001, COP: 0.00023 },
@@ -101,7 +110,67 @@
     subs: 'Subs más papeletas',
     soloSubs: 'Solo subs',
     gasto: 'Más gasto, más papeletas',
+    subathon: 'Subathon',
   };
+
+  // --- Donaciones anunciadas por un bot (StreamElements, Streamlabs) -----------
+  // Importe con símbolo o código de moneda delante o detrás: "€5.00", "5,00 €", "$10", "10.50 EUR", "5 euros".
+  const MONEDAS = [
+    [/^(€|eur|euros?)$/i, 'EUR'], [/^(\$|usd|d[oó]lar(?:es)?)$/i, 'USD'], [/^(£|gbp)$/i, 'GBP'],
+    [/^mxn$/i, 'MXN'], [/^ars$/i, 'ARS'], [/^clp$/i, 'CLP'], [/^cop$/i, 'COP'],
+  ];
+  const RE_SIMBOLO = '(?:€|\\$|£|EUR|USD|GBP|MXN|ARS|CLP|COP|euros?|d[oó]lar(?:es)?)';
+  const RE_CANTIDAD = `((?:${RE_SIMBOLO}\\s?)?\\d[\\d.,]*(?:\\s?${RE_SIMBOLO})?)`;
+  const RE_USUARIO = '@?([\\p{L}\\p{N}_]{2,25})';
+
+  function numeroDe(texto) {
+    const t = texto.replace(/[^\d.,]/g, '');
+    const ultimo = Math.max(t.lastIndexOf('.'), t.lastIndexOf(','));
+    if (ultimo === -1) return parseFloat(t);
+    const dec = t.slice(ultimo + 1);
+    if (dec.length === 3 && (t.match(/[.,]/g) || []).length >= 1 && !/[.,]\d{1,2}$/.test(t)) {
+      return parseFloat(t.replace(/[.,]/g, '')); // "1.000" o "1,000" = mil
+    }
+    return parseFloat(t.slice(0, ultimo).replace(/[.,]/g, '') + '.' + dec);
+  }
+
+  function monedaDe(texto, porDefecto) {
+    const partes = texto.match(/€|\$|£|[A-Za-zóÓ]+/g) || [];
+    for (const parte of partes) for (const [re, codigo] of MONEDAS) if (re.test(parte)) return codigo;
+    return porDefecto || 'EUR';
+  }
+
+  const cacheRegex = new Map();
+  function regexDePlantilla(plantilla) {
+    if (!cacheRegex.has(plantilla)) {
+      let fuente = plantilla.trim().split(/(\{usuario\}|\{cantidad\}|\(\?:[^)]*\))/).map((trozo) => {
+        if (trozo === '{usuario}') return RE_USUARIO;
+        if (trozo === '{cantidad}') return RE_CANTIDAD;
+        if (/^\(\?:/.test(trozo)) return trozo; // grupos opcionales escritos a mano
+        return trozo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      }).join('');
+      let re = null;
+      try { re = new RegExp(fuente, 'iu'); } catch (e) { re = null; }
+      cacheRegex.set(plantilla, { re, usuarioPrimero: plantilla.indexOf('{usuario}') < plantilla.indexOf('{cantidad}') });
+    }
+    return cacheRegex.get(plantilla);
+  }
+
+  // Intenta leer una donación en el texto de un aviso. Devuelve { usuario, importe, moneda } o null.
+  function leerDonacion(texto, aj) {
+    const plantillas = String(aj.plantillasDonacion || '').split(';').map((x) => x.trim()).filter((x) => x.includes('{usuario}') && x.includes('{cantidad}'));
+    for (const pl of plantillas) {
+      const { re, usuarioPrimero } = regexDePlantilla(pl);
+      const m = re && re.exec(texto);
+      if (!m) continue;
+      const usuario = usuarioPrimero ? m[1] : m[2];
+      const cantidad = usuarioPrimero ? m[2] : m[1];
+      const importe = numeroDe(cantidad);
+      if (!(importe > 0)) continue;
+      return { usuario, importe, moneda: monedaDe(cantidad, aj.monedaPorDefecto) };
+    }
+    return null;
+  }
 
   // Tier de suscripción a partir de las insignias del mensaje (0 = no es sub).
   // Twitch numera la insignia de sub con los meses (0, 3, 6…) en Tier 1/Prime,
@@ -125,6 +194,15 @@
 
     if (msg.command === 'PRIVMSG') {
       const { login, nombre } = autor(msg);
+      if ((aj.botsDonaciones || []).some((b) => b.toLowerCase() === login)) {
+        const d = leerDonacion(texto(msg), aj);
+        if (d) {
+          const tasa = aj.conversionMonedas && aj.conversionMonedas[d.moneda];
+          res.push({ tipo: 'donacion', id: id && id + ':don', login: d.usuario.toLowerCase(), nombre: d.usuario, cantidad: d.importe,
+            euros: d.importe * (tasa == null ? 1 : tasa), texto: `dona ${d.importe} ${d.moneda} (${nombre})` });
+        }
+        return res; // los mensajes del bot no cuentan para nada más
+      }
       const bits = parseInt(t.bits, 10);
       if (bits > 0) {
         res.push({ tipo: 'bits', id: id && id + ':bits', login, nombre, cantidad: bits,
@@ -162,7 +240,7 @@
         if (receptor) res.push({ tipo: 'tier', login: receptor, nombre: t['msg-param-recipient-display-name'] || receptor, tier: tierDePlan(plan) });
         // Un regalo masivo (submysterygift) llega además como N "subgift": solo
         // contamos estos para no duplicar.
-        if (aj.subsRegaladasCuentanParaQuienRegala) {
+        if (aj.subsRegaladasCuentanParaQuienRegala || aj.modo === 'subathon') {
           const para = t['msg-param-recipient-display-name'] || t['msg-param-recipient-user-name'] || '?';
           res.push({ tipo: 'regalo', id, login, nombre, cantidad: 1, euros: valorSub(plan, aj),
             texto: `regala sub ${NOMBRE_PLAN[plan] || ''} a ${para}`.replace(/\s+/g, ' ') });
@@ -178,8 +256,16 @@
 
   // --- Papeletas --------------------------------------------------------------
   // ¿Está apuntado? Escribió la palabra, o gastó y quien gasta entra sin escribir.
+  // Lo donado sin contar la sub propia: regalos, bits, Hype Chat, donaciones y ajustes a mano.
+  const donadoDe = (p) => Math.max(0, Number(p.donado) || 0);
+
   function participa(p, aj) {
-    return !!p && !p.excluido && (p.escribio || (p.euros > 0 && !!aj.gastanEntranSinEscribir));
+    if (!p || p.excluido) return false;
+    if (aj.modo === 'subathon') {
+      const minimo = Math.max(0, Number(aj.subathonMinimo) || 0);
+      return donadoDe(p) > 0 && donadoDe(p) + 1e-9 >= minimo;
+    }
+    return p.escribio || (p.euros > 0 && !!aj.gastanEntranSinEscribir);
   }
 
   // `extra`: papeletas de bonus (top de regaladores). Solo se suman a quien ya
@@ -192,6 +278,11 @@
     switch (aj.modo) {
       case 'subs': n = num([aj.papeletasNoSub, aj.papeletasTier1, aj.papeletasTier2, aj.papeletasTier3][tier]); break;
       case 'soloSubs': n = tier > 0 ? 1 : 0; break;
+      case 'subathon': {
+        const epp = Number(aj.eurosPorPapeleta) || 1;
+        n = Math.max(1, Math.floor(donadoDe(p) / epp + 1e-9));
+        break;
+      }
       case 'gasto': {
         const base = p.escribio ? num(aj.papeletasPorEscribir) : 0;
         let extra = 0;
@@ -243,7 +334,8 @@
     if (!login) return null;
     if (ac.tipo === 'tier') {
       // Solo se anota el tier (no es un evento visible). Se queda con el mayor visto.
-      if (ac.tier > 0) {
+      // En el subathon no hace falta, y así no crece con cada sub que escribe en un chat enorme.
+      if (ac.tier > 0 && aj.modo !== 'subathon') {
         if (!estado.tiers) estado.tiers = {};
         estado.tiers[login] = Math.max(estado.tiers[login] || 0, ac.tier);
       }
@@ -262,19 +354,24 @@
     else if (aj.canal && login === String(aj.canal).toLowerCase()) ev.motivo = 'es el dueño del canal';
     else if (!estado.abierto) ev.motivo = 'sorteo cerrado';
     else if (ac.tipo === 'entrada' && existente && existente.escribio) return null; // repetir la palabra no hace nada
+    else if (ac.tipo === 'entrada' && aj.modo === 'subathon') return null; // en el subathon escribir no mete a nadie
     else if (ac.tipo !== 'entrada' && ac.tipo !== 'manual' && !(ac.euros > 0)) ev.motivo = 'sin valor en euros';
     else {
-      const p = existente || { login, nombre: ev.nombre, euros: 0, escribio: false, excluido: false,
-        detalle: { bits: 0, subs: 0, regalos: 0, hypechat: 0, manual: 0 } };
+      const p = existente || { login, nombre: ev.nombre, euros: 0, donado: 0, escribio: false, excluido: false,
+        detalle: { bits: 0, subs: 0, regalos: 0, hypechat: 0, manual: 0, donaciones: 0 } };
       p.nombre = ev.nombre;
+      if (p.donado == null) p.donado = 0;
+      if (p.detalle.donaciones == null) p.detalle.donaciones = 0;
       if (ac.tipo === 'entrada') p.escribio = true;
       else {
         p.euros = redondear(p.euros + ac.euros);
+        if (ac.tipo !== 'sub') p.donado = Math.max(0, redondear(p.donado + ac.euros));
         if (ac.tipo === 'bits') p.detalle.bits += ac.cantidad;
         else if (ac.tipo === 'sub') p.detalle.subs += 1;
         else if (ac.tipo === 'regalo') p.detalle.regalos += 1;
         else if (ac.tipo === 'hypechat') p.detalle.hypechat = redondear(p.detalle.hypechat + ac.euros);
         else if (ac.tipo === 'manual') p.detalle.manual = redondear(p.detalle.manual + ac.euros);
+        else if (ac.tipo === 'donacion') p.detalle.donaciones = redondear(p.detalle.donaciones + ac.euros);
         if (p.euros < 0) p.euros = 0;
       }
       if (p.euros <= 0 && !p.escribio) delete estado.participantes[login];
@@ -292,10 +389,13 @@
     const orden = participantes.filter((p) => p.detalle && p.detalle[campo] > 0)
       .sort((a, b) => b.detalle[campo] - a.detalle[campo] || a.nombre.localeCompare(b.nombre));
     const res = [];
-    orden.forEach((p, i) => {
-      const puesto = i > 0 && p.detalle[campo] === orden[i - 1].detalle[campo] ? res[i - 1].puesto : i + 1;
-      if (puesto <= 3) res.push({ login: p.login, nombre: p.nombre, cantidad: p.detalle[campo], puesto });
-    });
+    let puesto = 0;
+    for (let i = 0; i < orden.length; i++) {
+      const p = orden[i];
+      if (i === 0 || p.detalle[campo] !== orden[i - 1].detalle[campo]) puesto = i + 1;
+      if (puesto > 3) break;
+      res.push({ login: p.login, nombre: p.nombre, cantidad: p.detalle[campo], puesto });
+    }
     return res;
   }
 
@@ -369,7 +469,7 @@
     return { tira, indiceGanador, ganador, duracionMs };
   }
 
-  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, top3, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
+  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, top3, leerDonacion, numeroDe, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
     papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear, construirTira };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo;

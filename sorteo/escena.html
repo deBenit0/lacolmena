@@ -68,8 +68,9 @@ function pintarEstado(s) {
       subs: ['Escribe ', b(), ' para entrar al sorteo · los subs tienen más opciones de ganar'],
       soloSubs: ['Sorteo solo para subs · escribe ', b(), ' para entrar'],
       gasto: ['Escribe ', b(), ' para entrar al sorteo · bits y subs te dan más opciones de ganar'],
+      subathon: ['Sorteo del subathon: ', Object.assign(document.createElement('b'), { textContent: 'regala subs o dona' }), ' para entrar · cuanto más dones, más opciones'],
     };
-    a.replaceChildren(...(palabra ? (textos[s.modo] || textos.igual) : ['Bits, subs y regalos te meten en el sorteo']),
+    a.replaceChildren(...(s.modo === 'subathon' ? textos.subathon : palabra ? (textos[s.modo] || textos.igual) : ['Bits, subs y regalos te meten en el sorteo']),
       ...(s.bonusTop ? [' · ', Object.assign(document.createElement('b'), { textContent: 'el top de regaladores tiene premio extra' })] : []));
   }
 }
