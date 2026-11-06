@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="320 40 600 1200" width="600" height="1200">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff0a0"/>
+      <stop offset="0.45" stop-color="#ffd100"/>
+      <stop offset="1" stop-color="#e08a00"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="1300" height="1300">
+      <rect x="0" y="0" width="1300" height="1300" fill="black"/>
+      <g fill="white">
+        <!-- pomo -->
+        <circle cx="627" cy="120" r="66"/>
+        <!-- empuñadura -->
+        <polygon points="596,186 658,186 674,338 580,338"/>
+        <!-- guarda -->
+        <path d="M410,370 L443,330 Q470,352 525,352 Q590,352 627,342 Q664,352 729,352 Q784,352 811,330 L845,370 L808,412 Q784,388 729,388 Q672,388 627,432 Q582,388 525,388 Q470,388 446,412 Z"/>
+        <!-- escudo con la N -->
+        <path d="M347,432 L900,432 L900,520 Q925,560 905,605 Q930,690 915,780 Q912,840 880,885 L850,900 L722,985 L722,915 L540,632 L536,985 L500,985 L443,942 L373,890 Q340,840 345,780 Q320,700 327,620 Q322,560 347,497 Z"/>
+        <!-- hoja de la espada -->
+        <path d="M562,405 Q600,408 627,432 Q654,408 692,405 L690,662 L566,470 Z"/>
+        <polygon points="553,682 688,895 688,1040 620,1166 552,1040"/>
+      </g>
+      <g fill="black">
+        <circle cx="627" cy="120" r="38"/>
+        <!-- hueco de la parte alta de la hoja -->
+        <polygon points="532,432 728,432 728,770"/>
+      </g>
+      <g fill="white">
+        <circle cx="627" cy="120" r="29"/>
+        <path d="M562,405 Q600,408 627,432 Q654,408 692,405 L690,662 L566,470 Z"/>
+      </g>
+      <g fill="none" stroke="black" stroke-linecap="round">
+        <!-- bandas de la empuñadura -->
+        <path d="M585,241 Q627,233 669,241" stroke-width="9"/>
+        <path d="M583,294 Q627,286 671,294" stroke-width="9"/>
+        <!-- llamas: izquierda -->
+        <path d="M335,503 Q420,478 486,510" stroke-width="16"/>
+        <path d="M318,630 Q365,562 437,546" stroke-width="18"/>
+        <path d="M336,790 Q378,692 460,658" stroke-width="18"/>
+        <path d="M432,952 Q418,852 464,786" stroke-width="18"/>
+        <!-- llamas: derecha -->
+        <path d="M912,525 Q880,486 836,478" stroke-width="16"/>
+        <path d="M915,610 Q865,530 786,497" stroke-width="18"/>
+        <path d="M922,785 Q885,680 818,632" stroke-width="18"/>
+        <path d="M878,892 Q860,800 780,742" stroke-width="18"/>
+      </g>
+    </mask>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.85"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="300" y="0" width="700" height="1300" fill="url(#gold)" mask="url(#m)"/>
+  </g>
+</svg>

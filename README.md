@@ -3,13 +3,15 @@
 Addon de WoW Forever para **Los hijos del Fundillo** (*«Mi vida por el fundillo»*): un addon
 para todo lo que necesita la hermandad. Al abrirlo sale el **Inicio**, que explica cómo
 funciona, con el lema y un resumen (pedidos abiertos, nuevos, los que puedes hacer y tus encargos
-por enviar). Desde ahí vas a cada sección:
+por enviar), y el **logo de NorrisPlay** con el enlace a sus directos en Twitch (el juego no
+puede abrir el navegador: pulsa *Ver los directos* y copia el enlace con Ctrl+C). Desde ahí vas a
+cada sección:
 
 - **Pedidos** (la que está hecha): cada miembro pide lo que necesita a quien sabe fabricarlo o
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.15.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.16.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
