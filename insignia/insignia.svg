@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+  <!-- Insignia «Regalador del Subathon del Fundillo»: pañal sobre fondo oscuro con borde amarillo -->
+  <rect x="2" y="2" width="68" height="68" rx="16" fill="#121216" stroke="#facc15" stroke-width="4"/>
+  <!-- pañal -->
+  <path d="M13 20 H59 V29 C59 47 47 58 36 58 C25 58 13 47 13 29 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M13 28 H59" stroke="#d4d4d8" stroke-width="2.5"/>
+  <!-- cintas -->
+  <rect x="9" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <rect x="54" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <!-- corazón en el centro -->
+  <path d="M36 50 C29 45 26 41 26 37.5 C26 34.5 28.3 32.5 31 32.5 C33 32.5 34.7 33.6 36 35.4 C37.3 33.6 39 32.5 41 32.5 C43.7 32.5 46 34.5 46 37.5 C46 41 43 45 36 50 Z" fill="#facc15" stroke="#0a0a0c" stroke-width="1.8" stroke-linejoin="round"/>
+</svg>
