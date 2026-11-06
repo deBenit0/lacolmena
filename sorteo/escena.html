@@ -62,9 +62,14 @@ function pintarEstado(s) {
     const a = $('anuncio');
     a.style.display = s.abierto ? 'block' : 'none';
     const palabra = (s.palabraClave || '').trim();
-    a.replaceChildren(...(palabra
-      ? ['Escribe ', Object.assign(document.createElement('b'), { textContent: palabra }), ' para entrar al sorteo · bits y subs te dan más opciones de ganar']
-      : ['Bits, subs y regalos te meten en el sorteo']));
+    const b = () => Object.assign(document.createElement('b'), { textContent: palabra });
+    const textos = {
+      igual: ['Escribe ', b(), ' para entrar al sorteo'],
+      subs: ['Escribe ', b(), ' para entrar al sorteo · los subs tienen más opciones de ganar'],
+      soloSubs: ['Sorteo solo para subs · escribe ', b(), ' para entrar'],
+      gasto: ['Escribe ', b(), ' para entrar al sorteo · bits y subs te dan más opciones de ganar'],
+    };
+    a.replaceChildren(...(palabra ? (textos[s.modo] || textos.igual) : ['Bits, subs y regalos te meten en el sorteo']));
   }
 }
 

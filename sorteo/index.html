@@ -43,6 +43,7 @@
   th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
   th { font-size: 11px; color: var(--suave); font-weight: 600; text-transform: uppercase; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.sin td { opacity: .4; } tr.sin td:last-child { opacity: 1; }
   tr.excluido td { opacity: .45; } tr.excluido td:first-child { text-decoration: line-through; } tr.excluido td:last-child { opacity: 1; }
   .det { color: var(--suave); font-size: 12px; }
   .barra { height: 5px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
@@ -64,6 +65,13 @@
   .ajustes label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--texto); font-size: 13px; }
   .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--acento); }
   .aviso { background: #2a1f40; border: 1px solid var(--acento); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .modos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  @media (max-width: 560px) { .modos { grid-template-columns: repeat(2, 1fr); } }
+  .modos button { padding: 10px 8px; line-height: 1.2; text-align: center; }
+  .modos button b { display: block; font-size: 14px; }
+  .modos button span { display: block; font-size: 11px; color: var(--suave); margin-top: 3px; }
+  .modos button.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
+  .modos button.activo span { color: #efe6ff; }
   .entrada-chat { text-align: center; font-size: 14px; color: var(--suave); margin-top: 8px; }
   .entrada-chat b { color: var(--acento2); font-size: 16px; }
   .ayuda { font-size: 13px; color: var(--suave); }
@@ -92,6 +100,7 @@
         <canvas id="lienzo"></canvas>
         <canvas id="confeti"></canvas>
       </div>
+      <div class="modos" id="modos" role="group" aria-label="Modo del sorteo"></div>
       <div class="entrada-chat" id="comoEntrar"></div>
       <button class="acento btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
       <div class="error" id="errSortear"></div>
@@ -120,7 +129,7 @@
       <p class="det" id="reglas" style="margin-top:-4px"></p>
       <div class="scroll">
         <table>
-          <thead><tr><th>Persona</th><th class="num">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
+          <thead><tr><th>Persona</th><th>Sub</th><th class="num">Gastado</th><th class="num">Papeletas</th><th class="num">Prob.</th><th></th></tr></thead>
           <tbody id="tabla"></tbody>
         </table>
       </div>
@@ -173,6 +182,7 @@
         <p class="det">Mete eventos falsos para probar sin que nadie gaste. Reinicia antes del sorteo de verdad.</p>
         <div class="fila">
           <button data-sim="entrada">+5 escriben la palabra</button>
+          <button data-sim="subs">+3 subs (T1, T2, T3) escriben</button>
           <button data-sim="bits">+500 bits</button>
           <button data-sim="sub">+Sub</button>
           <button data-sim="regalo">+Sub regalada</button>
@@ -249,7 +259,7 @@ function detalle(p) {
 }
 
 function resumenParaEscena(l) {
-  return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave,
+  return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave, modo: aj.modo,
     totalPapeletas: l.totalPapeletas, participantes: l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ nombre: p.nombre, papeletas: p.papeletas })) };
 }
 
@@ -265,15 +275,26 @@ function pintarYa() {
   $('nPap').textContent = l.totalPapeletas;
   $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + p.euros, 0));
   const palabra = (aj.palabraClave || '').trim();
-  $('comoEntrar').replaceChildren(...(palabra
-    ? ['Para participar: escribe ', el('b', { textContent: palabra }), ' en el chat' + (aj.soloSuscriptores ? ' (solo subs)' : '') + ' · bits, subs y regalos dan papeletas extra']
-    : ['Solo participa quien gasta: bits, subs, subs regaladas y Hype Chat']));
+  pintarModos();
+  const pal = () => el('b', { textContent: palabra });
+  const como = {
+    igual: ['Para participar: escribe ', pal(), ' en el chat · todos con las mismas opciones'],
+    subs: ['Para participar: escribe ', pal(), ' en el chat · los subs tienen más papeletas'],
+    soloSubs: ['Solo para subs: escribe ', pal(), ' en el chat (si no eres sub, no cuenta)'],
+    gasto: ['Para participar: escribe ', pal(), ' en el chat · bits, subs y regalos dan papeletas extra'],
+  }[aj.modo] || [];
+  $('comoEntrar').replaceChildren(...(palabra ? como : ['Sin palabra para entrar: solo entra quien gasta (bits, subs, regalos, Hype Chat)']));
   const partes = [];
-  if (palabra) partes.push(`${aj.papeletasPorEscribir} por escribir ${palabra}`);
-  partes.push(`+1 por cada ${eur(aj.eurosPorPapeleta)} gastado`);
-  if (aj.minimaSiHaGastado) partes.push(`mínimo ${aj.minimaSiHaGastado} si gasta algo`);
+  if (aj.modo === 'igual') partes.push('1 por persona');
+  else if (aj.modo === 'subs') partes.push(`no sub: ${aj.papeletasNoSub}`, `Tier 1: ${aj.papeletasTier1}`, `Tier 2: ${aj.papeletasTier2}`, `Tier 3: ${aj.papeletasTier3}`);
+  else if (aj.modo === 'soloSubs') partes.push('1 por sub · quien no es sub se queda con 0');
+  else {
+    if (palabra) partes.push(`${aj.papeletasPorEscribir} por escribir ${palabra}`);
+    partes.push(`+1 por cada ${eur(aj.eurosPorPapeleta)} gastado`);
+    if (aj.minimaSiHaGastado) partes.push(`mínimo ${aj.minimaSiHaGastado} si gasta algo`);
+  }
   if (aj.maximo) partes.push(`máximo ${aj.maximo} por persona`);
-  if (palabra && !aj.gastanEntranSinEscribir) partes.push('quien gasta también tiene que escribir la palabra');
+  if (palabra) partes.push(aj.gastanEntranSinEscribir ? 'quien gasta entra sin escribir' : 'quien gasta también tiene que escribir');
   $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
 
   rodillo.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => p.nombre));
@@ -281,13 +302,14 @@ function pintarYa() {
 
   const tabla = $('tabla');
   tabla.replaceChildren();
-  if (!l.participantes.length) tabla.append(el('tr', {}, el('td', { colSpan: 5, className: 'vacio', textContent: palabra ? `Nadie todavía. Que escriban ${palabra} en el chat.` : 'Todavía nadie ha gastado nada.' })));
+  if (!l.participantes.length) tabla.append(el('tr', {}, el('td', { colSpan: 6, className: 'vacio', textContent: palabra ? `Nadie todavía. Que escriban ${palabra} en el chat.` : 'Todavía nadie ha gastado nada.' })));
   const max = Math.max(1, ...l.participantes.map((p) => p.papeletas));
   for (const p of l.participantes) {
     const btn = el('button', { textContent: p.excluido ? 'Readmitir' : 'Excluir' });
     btn.onclick = () => { estado.participantes[p.login].excluido = !p.excluido; guardar(); pintar(); };
-    tabla.append(el('tr', { className: p.excluido ? 'excluido' : '' },
+    tabla.append(el('tr', { className: p.excluido ? 'excluido' : (p.papeletas ? '' : 'sin') },
       el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p) })),
+      el('td', { className: 'det', textContent: p.tier ? 'Tier ' + p.tier : '—' }),
       el('td', { className: 'num', textContent: p.euros ? eur(p.euros) : '—' }),
       el('td', { className: 'num' }, el('div', { textContent: p.papeletas }), el('div', { className: 'barra' }, el('i', { style: `width:${(p.papeletas / max) * 100}%` }))),
       el('td', { className: 'num', textContent: (p.probabilidad * 100).toFixed(1) + ' %' }),
@@ -323,6 +345,34 @@ function pintarYa() {
 // --- Animación ---------------------------------------------------------------
 const rodillo = new Animacion.Rodillo($('lienzo'));
 Animacion.Sonido.activo = !!aj.sonidoPanel;
+
+const DESC_MODOS = {
+  igual: 'misma papeleta para todos',
+  subs: 'abierto a todos, más para subs',
+  soloSubs: 'solo participan subs',
+  gasto: 'bits, subs y regalos suman',
+};
+function pintarModos() {
+  const caja = $('modos');
+  if (!caja.children.length) {
+    for (const [clave, nombre] of Object.entries(Nucleo.MODOS)) {
+      const b = el('button', { type: 'button' }, el('b', { textContent: nombre }), el('span', { textContent: DESC_MODOS[clave] }));
+      b.dataset.modo = clave;
+      b.onclick = () => {
+        if (girando || aj.modo === clave) return;
+        aj.modo = clave;
+        escribir('fundillo-ajustes', aj);
+        pintar();
+      };
+      caja.append(b);
+    }
+  }
+  for (const b of caja.children) {
+    const activo = b.dataset.modo === aj.modo;
+    b.classList.toggle('activo', activo);
+    b.setAttribute('aria-pressed', activo);
+  }
+}
 
 $('btnSortear').onclick = async () => {
   if (girando) return;
@@ -384,6 +434,14 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
     regalo: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
     hypechat: () => ({ tipo: 'hypechat', cantidad: 5, euros: 5, texto: 'Hype Chat 5 EUR (prueba)' }),
   }[tipo];
+  if (tipo === 'subs') {
+    for (const tier of [1, 2, 3]) {
+      const n = nombre(), login = n.toLowerCase();
+      Nucleo.registrar(estado, { tipo: 'tier', login, tier }, aj);
+      Nucleo.registrar(estado, { id: 'prueba-' + Date.now() + '-' + nSim++, login, nombre: n, tipo: 'entrada', texto: `escribe ${aj.palabraClave || '!sorteo'} (prueba, sub Tier ${tier})` }, aj);
+    }
+    guardar(); pintar(); return;
+  }
   for (let i = 0; i < (tipo === 'entrada' ? 5 : 1); i++) {
     const n = nombre();
     Nucleo.registrar(estado, Object.assign({ id: 'prueba-' + Date.now() + '-' + nSim++, login: n.toLowerCase(), nombre: n }, crea()), aj);
@@ -411,15 +469,18 @@ $('fImportar').onchange = async (e) => {
 const CAMPOS = [
   ['h', 'Canal'],
   ['canal', 'Tu canal de Twitch', 'text'],
-  ['h', 'Entrar escribiendo en el chat'],
+  ['h', 'Entrar al sorteo'],
   ['palabraClave', 'Palabra para entrar (vacío = solo quien gasta)', 'text'],
-  ['papeletasPorEscribir', 'Papeletas por escribirla', 'number'],
-  ['soloSuscriptores', 'Solo suscriptores pueden entrar escribiendo', 'check'],
-  ['h', 'Papeletas por gastar'],
+  ['gastanEntranSinEscribir', 'Quien gasta (bits, subs, regalos…) entra aunque no escriba la palabra', 'check'],
+  ['h', 'Modo «Subs más papeletas»'],
+  ['papeletasNoSub', 'Papeletas si no es sub', 'number'],
+  ['papeletasTier1', 'Papeletas Tier 1 / Prime', 'number'],
+  ['papeletasTier2', 'Papeletas Tier 2', 'number'],
+  ['papeletasTier3', 'Papeletas Tier 3', 'number'],
+  ['h', 'Modo «Más gasto, más papeletas»'],
+  ['papeletasPorEscribir', 'Papeletas por escribir la palabra', 'number'],
   ['eurosPorPapeleta', '€ por cada papeleta extra', 'number'],
   ['minimaSiHaGastado', 'Mínimo de papeletas si gasta algo', 'number'],
-  ['maximo', 'Máximo por persona (0 = sin tope)', 'number'],
-  ['gastanEntranSinEscribir', 'Quien gasta entra aunque no escriba la palabra', 'check'],
   ['subsRegaladasCuentanParaQuienRegala', 'Las subs regaladas cuentan para quien regala', 'check'],
   ['h', 'Cuánto vale cada cosa (€)'],
   ['valores.bit', '1 bit', 'number'],
@@ -428,6 +489,7 @@ const CAMPOS = [
   ['valores.subTier3', 'Sub Tier 3', 'number'],
   ['valores.subPrime', 'Sub Prime', 'number'],
   ['h', 'Sorteo'],
+  ['maximo', 'Máximo de papeletas por persona (0 = sin tope)', 'number'],
   ['quitarGanador', 'Quitar al ganador de los siguientes sorteos', 'check'],
   ['duracionSorteo', 'Segundos que tardan en pasar los nombres', 'number'],
   ['sonidoPanel', 'Sonido también en este panel', 'check'],

@@ -3,8 +3,8 @@
 Sorteos para directos de **Twitch** que funcionan **en el navegador**, sin instalar nada.
 
 - La gente **entra escribiendo una palabra en el chat** (por defecto `!sorteo`).
-- Quien **gasta dinero recibe papeletas extra** automáticamente: bits, subs, subs regaladas y Hype Chat.
-  También entra aunque no haya escrito la palabra (se puede desactivar).
+- **Cuatro modos de sorteo** que se eligen con un botón: *Todos por igual*, *Subs más papeletas*, *Solo subs*
+  y *Más gasto, más papeletas* (bits, subs, regalos y Hype Chat suman papeletas).
 - El ganador sale con una animación sobre **fondo negro con los nombres cayendo de arriba abajo**, cada vez más
   despacio, hasta pararse en el ganador. Quien tiene más papeletas aparece más veces. Con sonido y confeti, lista para **OBS**.
 
@@ -14,19 +14,30 @@ Sorteos para directos de **Twitch** que funcionan **en el navegador**, sin insta
 
 ![Ganador en OBS](docs/escena-ganador.png)
 
-## Cómo se reparten las papeletas
+## Modos de sorteo
 
-Por defecto (todo se cambia en **Ajustes**, dentro del panel):
+Se eligen con los botones que hay encima de **¡SORTEAR!**. Puedes cambiar de modo en cualquier momento: las papeletas
+se recalculan al instante y nadie desaparece de la lista.
 
-| Qué hace la persona | Papeletas |
-|---|---|
-| Escribe `!sorteo` en el chat | 1 |
-| Gasta dinero | +1 por cada euro (mínimo 1 si gasta algo) |
+| Modo | Quién participa | Papeletas (por defecto) |
+|---|---|---|
+| **Todos por igual** | Todo el que escriba `!sorteo` | 1 cada uno |
+| **Subs más papeletas** | Todo el que escriba `!sorteo` | No sub 1 · Tier 1/Prime 2 · Tier 2 3 · Tier 3 4 |
+| **Solo subs** | Solo suscriptores que escriban `!sorteo` | 1 cada uno |
+| **Más gasto, más papeletas** | Todo el que escriba `!sorteo` | 1 + 1 por cada euro gastado (mínimo 1 si gasta algo) |
 
-Cuánto vale cada cosa: bit 0,01 € · sub Tier 1 3,99 € · Tier 2 7,99 € · Tier 3 19,99 € · Prime 0 €.
-Las subs regaladas cuentan para quien regala. Los Hype Chats cuentan su importe pasado a euros.
+En todos los modos, quien gasta (bits, subs, regalos, Hype Chat) entra aunque no escriba la palabra (se puede desactivar).
+Las papeletas de cada tier, el máximo por persona y el resto se cambian en **Ajustes**.
 
-Ejemplos: escribe `!sorteo` y tira 500 bits → 1 + 5 = **6 papeletas**. No escribe pero se suscribe con Tier 1 → **3 papeletas**.
+**Cómo sabe si alguien es sub y de qué tier:** por la insignia de sub que Twitch manda con cada mensaje del chat
+(Tier 2 y Tier 3 llevan su propia numeración de insignia), y por los avisos de sub, resub y sub regalada que salen
+durante el directo. Una sub regalada convierte en sub a quien la recibe. Los fundadores cuentan como Tier 1.
+
+El dueño del canal no participa nunca.
+
+En el modo **Más gasto, más papeletas**, cada cosa vale: bit 0,01 € · sub Tier 1 3,99 € · Tier 2 7,99 € ·
+Tier 3 19,99 € · Prime 0 €. Las subs regaladas cuentan para quien regala. Los Hype Chats cuentan su importe en euros.
+Ejemplo: escribe `!sorteo` y tira 500 bits → 1 + 5 = **6 papeletas**.
 
 El ganador se elige con el generador aleatorio criptográfico del navegador, con probabilidad proporcional a las papeletas.
 

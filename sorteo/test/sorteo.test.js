@@ -7,7 +7,7 @@ globalThis.window = globalThis;
 require('../js/rodillo.js');
 const { desplazamientoFinal, indiceEnCentro } = window.Animacion._interno;
 
-const aj = N.mezclarAjustes({ canal: 'prueba', conversionMonedas: { USD: 0.9 } });
+const aj = N.mezclarAjustes({ canal: 'prueba', modo: 'gasto', conversionMonedas: { USD: 0.9 } });
 const acc = (linea, a = aj) => N.accionesDesdeMensaje(N.parseLine(linea), a);
 const priv = (tags, usuario, texto) => `@${tags} :${usuario}!${usuario}@${usuario}.tmi.twitch.tv PRIVMSG #prueba :${texto}`;
 
@@ -32,11 +32,50 @@ test('palabra clave: solo como primera palabra y sin distinguir mayúsculas', ()
   assert.equal(acc(priv('id=d', 'pepe', '!sorteo'), { ...aj, palabraClave: '' }).length, 0);
 });
 
-test('palabra clave solo para suscriptores', () => {
-  const soloSubs = { ...aj, soloSuscriptores: true };
-  assert.equal(acc(priv('subscriber=0;id=a', 'pepe', '!sorteo'), soloSubs)[0].rechazo, 'solo suscriptores');
-  assert.equal(acc(priv('subscriber=1;id=b', 'pepe', '!sorteo'), soloSubs)[0].rechazo, undefined);
-  assert.equal(acc(priv('badges=founder/0;id=c', 'pepe', '!sorteo'), soloSubs)[0].rechazo, undefined);
+test('tier de sub sacado de las insignias', () => {
+  assert.equal(N.tierDeEtiquetas({ badges: 'moderator/1' }), 0);
+  assert.equal(N.tierDeEtiquetas({ badges: 'subscriber/0' }), 1);
+  assert.equal(N.tierDeEtiquetas({ badges: 'vip/1,subscriber/12' }), 1);
+  assert.equal(N.tierDeEtiquetas({ badges: 'subscriber/2003,premium/1' }), 2);
+  assert.equal(N.tierDeEtiquetas({ badges: 'subscriber/3024' }), 3);
+  assert.equal(N.tierDeEtiquetas({ badges: 'founder/0' }), 1);
+  assert.equal(N.tierDeEtiquetas({ subscriber: '1' }), 1);
+});
+
+test('los mensajes, subs y regalos anotan el tier', () => {
+  const e = N.estadoVacio();
+  const meter = (linea) => acc(linea).forEach((a) => N.registrar(e, a, aj));
+  meter(priv('badges=subscriber/2006;id=t1', 'ana', 'hola'));
+  meter('@login=luis;id=t2;msg-id=resub;msg-param-sub-plan=3000 :tmi.twitch.tv USERNOTICE #prueba');
+  meter('@login=gen;id=t3;msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-user-name=suertudo :tmi.twitch.tv USERNOTICE #prueba');
+  meter(priv('badges=subscriber/0;id=t4', 'ana', 'otra vez')); // no baja el tier
+  assert.deepEqual(e.tiers, { ana: 2, luis: 3, suertudo: 1 });
+  assert.equal(e.eventos.length, 2, 'el tier no ensucia la actividad');
+});
+
+test('modos de sorteo', () => {
+  const e = N.estadoVacio();
+  const entra = (login, tier, euros) => {
+    N.registrar(e, { id: login, login, nombre: login, tipo: 'entrada', texto: '' }, aj);
+    if (tier) N.registrar(e, { tipo: 'tier', login, tier }, aj);
+    if (euros) N.registrar(e, { id: login + 'b', login, tipo: 'bits', cantidad: euros * 100, euros, texto: '' }, aj);
+  };
+  entra('nosub', 0, 10); entra('t1', 1); entra('t2', 2); entra('t3', 3);
+  const papeletas = (modo) => Object.fromEntries(N.lista(e, { ...aj, modo }).participantes.map((p) => [p.login, p.papeletas]));
+  assert.deepEqual(papeletas('igual'), { nosub: 1, t1: 1, t2: 1, t3: 1 });
+  assert.deepEqual(papeletas('subs'), { nosub: 1, t1: 2, t2: 3, t3: 4 });
+  assert.deepEqual(papeletas('soloSubs'), { nosub: 0, t1: 1, t2: 1, t3: 1 });
+  assert.deepEqual(papeletas('gasto'), { nosub: 11, t1: 1, t2: 1, t3: 1 });
+  // En solo subs, el que no es sub nunca puede ganar
+  for (let i = 0; i < 50; i++) {
+    const copia = JSON.parse(JSON.stringify(e));
+    assert.notEqual(N.sortear(copia, { ...aj, modo: 'soloSubs' }).ganador.login, 'nosub');
+  }
+});
+
+test('el dueño del canal no participa', () => {
+  const e = N.estadoVacio();
+  assert.equal(N.registrar(e, { id: 'x', login: 'prueba', tipo: 'entrada', texto: '' }, aj).motivo, 'es el dueño del canal');
 });
 
 test('cheer que además escribe la palabra da las dos cosas', () => {
@@ -45,7 +84,7 @@ test('cheer que además escribe la palabra da las dos cosas', () => {
 });
 
 test('subs, regalos, upgrades y prime', () => {
-  const un = (t) => acc(`@${t} :tmi.twitch.tv USERNOTICE #prueba`)[0];
+  const un = (t) => acc(`@${t} :tmi.twitch.tv USERNOTICE #prueba`).find((x) => x.tipo !== 'tier');
   assert.equal(un('login=z;id=1;msg-id=sub;msg-param-sub-plan=1000').euros, 3.99);
   assert.equal(un('login=z;id=2;msg-id=resub;msg-param-sub-plan=3000').euros, 19.99);
   assert.equal(un('login=z;id=3;msg-id=sub;msg-param-sub-plan=Prime').euros, 0);

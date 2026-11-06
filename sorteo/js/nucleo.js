@@ -7,8 +7,17 @@
     canal: '',
     // Entrar escribiendo en el chat
     palabraClave: '!sorteo',
+    // Modo del sorteo:
+    //  'igual'    todos por igual (1 papeleta cada uno)
+    //  'subs'     abierto a todos, los subs tienen más papeletas según su tier
+    //  'soloSubs' solo participan los suscriptores (1 papeleta cada uno)
+    //  'gasto'    más gasto (bits, subs, regalos, Hype Chat), más papeletas
+    modo: 'igual',
+    papeletasNoSub: 1,
+    papeletasTier1: 2,
+    papeletasTier2: 3,
+    papeletasTier3: 4,
     papeletasPorEscribir: 1,
-    soloSuscriptores: false,
     // Gasto
     gastanEntranSinEscribir: true,
     eurosPorPapeleta: 1,
@@ -82,9 +91,24 @@
   const NOMBRE_PLAN = { Prime: 'Prime', 1000: 'Tier 1', 2000: 'Tier 2', 3000: 'Tier 3' };
   const valorSub = (plan, aj) => Number(aj.valores[PLANES[plan] || 'subTier1']) || 0;
 
-  function esSuscriptor(tags) {
-    return tags.subscriber === '1' || /(^|,)(subscriber|founder|broadcaster)\//.test(tags.badges || '');
+  const MODOS = {
+    igual: 'Todos por igual',
+    subs: 'Subs más papeletas',
+    soloSubs: 'Solo subs',
+    gasto: 'Más gasto, más papeletas',
+  };
+
+  // Tier de suscripción a partir de las insignias del mensaje (0 = no es sub).
+  // Twitch numera la insignia de sub con los meses (0, 3, 6…) en Tier 1/Prime,
+  // y con 2000+ y 3000+ en Tier 2 y Tier 3. La de fundador cuenta como Tier 1.
+  function tierDeEtiquetas(tags) {
+    const badges = tags.badges || '';
+    const m = /(?:^|,)subscriber\/(\d+)/.exec(badges);
+    if (m) { const v = parseInt(m[1], 10); return v >= 3000 ? 3 : v >= 2000 ? 2 : 1; }
+    if (/(?:^|,)founder\//.test(badges)) return 1;
+    return tags.subscriber === '1' ? 1 : 0;
   }
+  const tierDePlan = (plan) => (plan === '3000' ? 3 : plan === '2000' ? 2 : 1);
 
   // Devuelve una lista (posiblemente vacía) de acciones:
   //  { tipo: 'bits'|'sub'|'regalo'|'hypechat', id, login, nombre, cantidad, euros, texto }
@@ -113,14 +137,10 @@
       const palabra = (aj.palabraClave || '').trim().toLowerCase();
       if (palabra) {
         const primera = texto(msg).trim().split(/\s+/)[0].toLowerCase();
-        if (primera === palabra) {
-          if (aj.soloSuscriptores && !esSuscriptor(t)) {
-            res.push({ tipo: 'entrada', id, login, nombre, texto: `escribe ${palabra}`, rechazo: 'solo suscriptores' });
-          } else {
-            res.push({ tipo: 'entrada', id, login, nombre, texto: `escribe ${palabra}` });
-          }
-        }
+        if (primera === palabra) res.push({ tipo: 'entrada', id, login, nombre, texto: `escribe ${palabra}` });
       }
+      const tier = tierDeEtiquetas(t);
+      if (tier > 0) res.unshift({ tipo: 'tier', login, nombre, tier });
       return res;
     }
 
@@ -129,9 +149,12 @@
       const { login, nombre } = autor(msg);
       const plan = t['msg-param-sub-plan'];
       if (aviso === 'sub' || aviso === 'resub') {
+        res.push({ tipo: 'tier', login, nombre, tier: tierDePlan(plan) });
         res.push({ tipo: 'sub', id, login, nombre, cantidad: 1, euros: valorSub(plan, aj),
           texto: `${aviso === 'resub' ? 'Resub' : 'Sub'} ${NOMBRE_PLAN[plan] || ''}`.trim() });
       } else if (aviso === 'subgift') {
+        const receptor = (t['msg-param-recipient-user-name'] || '').toLowerCase();
+        if (receptor) res.push({ tipo: 'tier', login: receptor, nombre: t['msg-param-recipient-display-name'] || receptor, tier: tierDePlan(plan) });
         // Un regalo masivo (submysterygift) llega además como N "subgift": solo
         // contamos estos para no duplicar.
         if (aj.subsRegaladasCuentanParaQuienRegala) {
@@ -140,6 +163,7 @@
             texto: `regala sub ${NOMBRE_PLAN[plan] || ''} a ${para}`.replace(/\s+/g, ' ') });
         }
       } else if (aviso === 'giftpaidupgrade' || aviso === 'primepaidupgrade') {
+        res.push({ tipo: 'tier', login, nombre, tier: tierDePlan(plan || '1000') });
         res.push({ tipo: 'sub', id, login, nombre, cantidad: 1, euros: valorSub(plan || '1000', aj),
           texto: 'continúa su sub pagando' });
       }
@@ -148,17 +172,32 @@
   }
 
   // --- Papeletas --------------------------------------------------------------
-  function papeletasDe(p, aj) {
-    if (!p || p.excluido) return 0;
-    const base = p.escribio ? Math.max(0, Number(aj.papeletasPorEscribir) || 0) : 0;
-    let extra = 0;
-    if (p.euros > 0) {
-      const epp = Number(aj.eurosPorPapeleta) || 1;
-      extra = Math.max(Math.floor(p.euros / epp + 1e-9), Number(aj.minimaSiHaGastado) || 0);
-      if (!p.escribio && !aj.gastanEntranSinEscribir) extra = 0;
+  // ¿Está apuntado? Escribió la palabra, o gastó y quien gasta entra sin escribir.
+  function participa(p, aj) {
+    return !!p && !p.excluido && (p.escribio || (p.euros > 0 && !!aj.gastanEntranSinEscribir));
+  }
+
+  function papeletasDe(p, aj, tier) {
+    if (!participa(p, aj)) return 0;
+    tier = tier == null ? (p.tier || 0) : tier;
+    const num = (v) => Math.max(0, Number(v) || 0);
+    let n;
+    switch (aj.modo) {
+      case 'subs': n = num([aj.papeletasNoSub, aj.papeletasTier1, aj.papeletasTier2, aj.papeletasTier3][tier]); break;
+      case 'soloSubs': n = tier > 0 ? 1 : 0; break;
+      case 'gasto': {
+        const base = p.escribio ? num(aj.papeletasPorEscribir) : 0;
+        let extra = 0;
+        if (p.euros > 0) {
+          const epp = Number(aj.eurosPorPapeleta) || 1;
+          extra = Math.max(Math.floor(p.euros / epp + 1e-9), num(aj.minimaSiHaGastado));
+        }
+        n = base + extra;
+        break;
+      }
+      default: n = 1; // 'igual'
     }
-    let n = base + extra;
-    const max = Number(aj.maximo) || 0;
+    const max = num(aj.maximo);
     if (max > 0) n = Math.min(n, max);
     return n;
   }
@@ -185,7 +224,7 @@
 
   // --- Estado del sorteo ------------------------------------------------------
   function estadoVacio() {
-    return { abierto: true, participantes: {}, eventos: [], ganadores: [], idsVistos: [], mensajesGanador: [] };
+    return { abierto: true, participantes: {}, eventos: [], ganadores: [], idsVistos: [], mensajesGanador: [], tiers: {} };
   }
 
   const redondear = (n) => Math.round(n * 100) / 100;
@@ -194,6 +233,14 @@
   function registrar(estado, ac, aj, ahora) {
     const login = (ac.login || '').toLowerCase();
     if (!login) return null;
+    if (ac.tipo === 'tier') {
+      // Solo se anota el tier (no es un evento visible). Se queda con el mayor visto.
+      if (ac.tier > 0) {
+        if (!estado.tiers) estado.tiers = {};
+        estado.tiers[login] = Math.max(estado.tiers[login] || 0, ac.tier);
+      }
+      return null;
+    }
     if (ac.id) {
       if (estado.idsVistos.includes(ac.id)) return null;
       estado.idsVistos.push(ac.id);
@@ -204,8 +251,8 @@
     const existente = estado.participantes[login];
 
     if ((aj.ignorar || []).some((s) => s.toLowerCase() === login)) ev.motivo = 'usuario ignorado';
+    else if (aj.canal && login === String(aj.canal).toLowerCase()) ev.motivo = 'es el dueño del canal';
     else if (!estado.abierto) ev.motivo = 'sorteo cerrado';
-    else if (ac.rechazo) ev.motivo = ac.rechazo;
     else if (ac.tipo === 'entrada' && existente && existente.escribio) return null; // repetir la palabra no hace nada
     else if (ac.tipo !== 'entrada' && ac.tipo !== 'manual' && !(ac.euros > 0)) ev.motivo = 'sin valor en euros';
     else {
@@ -232,7 +279,11 @@
   }
 
   function lista(estado, aj) {
-    const ps = Object.values(estado.participantes).map((p) => Object.assign({}, p, { papeletas: papeletasDe(p, aj) }));
+    const tiers = estado.tiers || {};
+    const ps = Object.values(estado.participantes).map((p) => {
+      const tier = tiers[p.login] || 0;
+      return Object.assign({}, p, { tier, papeletas: papeletasDe(p, aj, tier) });
+    });
     const total = ps.reduce((a, p) => a + p.papeletas, 0);
     ps.forEach((p) => { p.probabilidad = total ? p.papeletas / total : 0; });
     ps.sort((a, b) => b.papeletas - a.papeletas || b.euros - a.euros || a.nombre.localeCompare(b.nombre));
@@ -286,7 +337,7 @@
     return { tira, indiceGanador, ganador, duracionMs };
   }
 
-  const Nucleo = { AJUSTES_DEFECTO, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
+  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
     papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear, construirTira };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo;
