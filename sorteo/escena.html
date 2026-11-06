@@ -69,7 +69,8 @@ function pintarEstado(s) {
       soloSubs: ['Sorteo solo para subs · escribe ', b(), ' para entrar'],
       gasto: ['Escribe ', b(), ' para entrar al sorteo · bits y subs te dan más opciones de ganar'],
     };
-    a.replaceChildren(...(palabra ? (textos[s.modo] || textos.igual) : ['Bits, subs y regalos te meten en el sorteo']));
+    a.replaceChildren(...(palabra ? (textos[s.modo] || textos.igual) : ['Bits, subs y regalos te meten en el sorteo']),
+      ...(s.bonusTop ? [' · ', Object.assign(document.createElement('b'), { textContent: 'el top de regaladores tiene premio extra' })] : []));
   }
 }
 

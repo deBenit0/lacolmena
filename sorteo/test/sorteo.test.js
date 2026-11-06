@@ -181,3 +181,34 @@ test('en la tira sale más quien tiene más papeletas', () => {
   const cuenta = (x) => tira.filter((n) => n === x).length;
   assert.ok(cuenta('Mucho') > cuenta('Medio') && cuenta('Medio') > cuenta('Poco'));
 });
+
+test('bonus para el top 3 de regaladores de subs y de bits', () => {
+  const e = N.estadoVacio();
+  const meter = (login, tipo, cantidad, veces = 1) => {
+    for (let i = 0; i < veces; i++) N.registrar(e, { id: `${login}${tipo}${i}`, login, nombre: login, tipo, cantidad, euros: tipo === 'bits' ? cantidad / 100 : 3.99, texto: '' }, aj);
+  };
+  meter('reina', 'regalo', 1, 10);   // top 1 regalos
+  meter('rey', 'regalo', 1, 5);      // top 2 regalos (empata con duque)
+  meter('duque', 'regalo', 1, 5);    // top 2 regalos
+  meter('conde', 'regalo', 1, 1);    // puesto 4 -> nada
+  meter('bitero', 'bits', 1000);     // top 1 bits
+  meter('reina', 'bits', 500);       // top 2 bits
+  meter('poco', 'bits', 100);        // top 3 bits
+  N.registrar(e, { id: 'n', login: 'normal', tipo: 'entrada', texto: '' }, aj);
+
+  const papeletas = (extra) => Object.fromEntries(N.lista(e, { ...aj, modo: 'igual', ...extra }).participantes.map((p) => [p.login, p.papeletas]));
+  assert.deepEqual(papeletas({ bonusTop: false }), { reina: 1, rey: 1, duque: 1, conde: 1, bitero: 1, poco: 1, normal: 1 });
+  // reina: 1 + 3 (top1 regalos) + 2 (top2 bits); rey/duque: 1 + 2; bitero: 1 + 3; poco: 1 + 1
+  assert.deepEqual(papeletas({ bonusTop: true }), { reina: 6, rey: 3, duque: 3, conde: 1, bitero: 4, poco: 2, normal: 1 });
+  assert.deepEqual(papeletas({ bonusTop: true, bonusTop1: 10, bonusTop2: 0, bonusTop3: 0 }).reina, 11 + 0);
+
+  // En "Solo subs" el bonus no mete a quien no es sub
+  N.registrar(e, { tipo: 'tier', login: 'rey', tier: 1 }, aj);
+  const soloSubs = papeletas({ bonusTop: true, modo: 'soloSubs' });
+  assert.equal(soloSubs.reina, 0);
+  assert.equal(soloSubs.rey, 3);
+
+  const { tops } = N.lista(e, { ...aj, bonusTop: true });
+  assert.deepEqual(tops.regalos.map((t) => [t.login, t.puesto]), [['reina', 1], ['duque', 2], ['rey', 2]]);
+  assert.deepEqual(tops.bits.map((t) => [t.login, t.cantidad, t.puesto]), [['bitero', 1000, 1], ['reina', 500, 2], ['poco', 100, 3]]);
+});

@@ -29,6 +29,14 @@ se recalculan al instante y nadie desaparece de la lista.
 En todos los modos, quien gasta (bits, subs, regalos, Hype Chat) entra aunque no escriba la palabra (se puede desactivar).
 Las papeletas de cada tier, el máximo por persona y el resto se cambian en **Ajustes**.
 
+### ⭐ Extra para el top de regaladores
+
+Debajo de los modos hay una casilla **«Más papeletas al top de regaladores»**. Si la marcas, los 3 que más subs han
+regalado y los 3 que más bits han dado durante el sorteo reciben papeletas extra: **+3 al 1º, +2 al 2º y +1 al 3º**
+(se cambia en Ajustes). Quien está en los dos tops suma los dos extras. Si hay empate, comparten puesto.
+Funciona con cualquier modo, pero no mete a nadie que el modo deja fuera (en *Solo subs*, un regalador que no es sub
+sigue sin participar). El panel muestra el top actual y una medalla junto a cada persona.
+
 **Cómo sabe si alguien es sub y de qué tier:** por la insignia de sub que Twitch manda con cada mensaje del chat
 (Tier 2 y Tier 3 llevan su propia numeración de insignia), y por los avisos de sub, resub y sub regalada que salen
 durante el directo. Una sub regalada convierte en sub a quien la recibe. Los fundadores cuentan como Tier 1.

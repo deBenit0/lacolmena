@@ -72,6 +72,14 @@
   .modos button span { display: block; font-size: 11px; color: var(--suave); margin-top: 3px; }
   .modos button.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
   .modos button.activo span { color: #efe6ff; }
+  .bonus { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px; cursor: pointer; background: var(--panel2); }
+  .bonus:has(input:checked) { border-color: var(--acento); background: #2a1f40; }
+  .bonus input { width: 18px; height: 18px; accent-color: var(--acento); flex: none; margin: 0; }
+  .bonus b { font-size: 14px; } .bonus span { display: block; font-size: 12px; color: var(--suave); }
+  .tops { display: none; font-size: 12px; color: var(--suave); margin-top: 6px; line-height: 1.6; }
+  .tops.visible { display: block; }
+  .tops b { color: var(--texto); font-weight: 600; }
+  .tag.top { background: #3d2a00; color: #ffd23f; }
   .entrada-chat { text-align: center; font-size: 14px; color: var(--suave); margin-top: 8px; }
   .entrada-chat b { color: var(--acento2); font-size: 16px; }
   .ayuda { font-size: 13px; color: var(--suave); }
@@ -101,6 +109,11 @@
         <canvas id="confeti"></canvas>
       </div>
       <div class="modos" id="modos" role="group" aria-label="Modo del sorteo"></div>
+      <label class="bonus">
+        <input type="checkbox" id="chkBonus">
+        <div><b>⭐ Más papeletas al top de regaladores</b><span id="bonusDesc"></span></div>
+      </label>
+      <div class="tops" id="tops"></div>
       <div class="entrada-chat" id="comoEntrar"></div>
       <button class="acento btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
       <div class="error" id="errSortear"></div>
@@ -186,6 +199,7 @@
           <button data-sim="bits">+500 bits</button>
           <button data-sim="sub">+Sub</button>
           <button data-sim="regalo">+Sub regalada</button>
+          <button data-sim="regalo5">+5 regaladas de una persona</button>
           <button data-sim="hypechat">+Hype Chat 5 €</button>
         </div>
         <p></p>
@@ -257,9 +271,16 @@ function detalle(p) {
   if (d.manual) t.push('manual ' + eur(d.manual));
   return t.join(' · ');
 }
+const MEDALLA = { 1: '🥇', 2: '🥈', 3: '🥉' };
+function etiquetasTop(p) {
+  const t = [];
+  if (p.top.regalos) t.push(el('span', { className: 'tag top', textContent: `${MEDALLA[p.top.regalos]} top subs regaladas +${aj['bonusTop' + p.top.regalos]}` }));
+  if (p.top.bits) t.push(el('span', { className: 'tag top', textContent: `${MEDALLA[p.top.bits]} top bits +${aj['bonusTop' + p.top.bits]}` }));
+  return t;
+}
 
 function resumenParaEscena(l) {
-  return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave, modo: aj.modo,
+  return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave, modo: aj.modo, bonusTop: !!aj.bonusTop,
     totalPapeletas: l.totalPapeletas, participantes: l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ nombre: p.nombre, papeletas: p.papeletas })) };
 }
 
@@ -276,6 +297,8 @@ function pintarYa() {
   $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + p.euros, 0));
   const palabra = (aj.palabraClave || '').trim();
   pintarModos();
+  $('chkBonus').checked = !!aj.bonusTop;
+  $('bonusDesc').textContent = `Top 3 de subs regaladas y top 3 de bits: +${aj.bonusTop1} / +${aj.bonusTop2} / +${aj.bonusTop3} papeletas`;
   const pal = () => el('b', { textContent: palabra });
   const como = {
     igual: ['Para participar: escribe ', pal(), ' en el chat · todos con las mismas opciones'],
@@ -293,7 +316,12 @@ function pintarYa() {
     partes.push(`+1 por cada ${eur(aj.eurosPorPapeleta)} gastado`);
     if (aj.minimaSiHaGastado) partes.push(`mínimo ${aj.minimaSiHaGastado} si gasta algo`);
   }
+  if (aj.bonusTop) partes.push(`top 3 regaladores de subs y de bits: +${aj.bonusTop1}/+${aj.bonusTop2}/+${aj.bonusTop3}`);
   if (aj.maximo) partes.push(`máximo ${aj.maximo} por persona`);
+  const lineaTop = (titulo, lista, unidad) => [el('b', { textContent: titulo + ': ' }),
+    lista.length ? lista.map((t) => `${MEDALLA[t.puesto]} ${t.nombre} (${t.cantidad.toLocaleString('es-ES')} ${unidad(t.cantidad)})`).join('  ') : 'nadie todavía'];
+  $('tops').classList.toggle('visible', !!aj.bonusTop);
+  $('tops').replaceChildren(...lineaTop('Top subs regaladas', l.tops.regalos, (n) => n === 1 ? 'regalada' : 'regaladas'), el('br'), ...lineaTop('Top bits', l.tops.bits, (n) => n === 1 ? 'bit' : 'bits'));
   if (palabra) partes.push(aj.gastanEntranSinEscribir ? 'quien gasta entra sin escribir' : 'quien gasta también tiene que escribir');
   $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
 
@@ -308,7 +336,8 @@ function pintarYa() {
     const btn = el('button', { textContent: p.excluido ? 'Readmitir' : 'Excluir' });
     btn.onclick = () => { estado.participantes[p.login].excluido = !p.excluido; guardar(); pintar(); };
     tabla.append(el('tr', { className: p.excluido ? 'excluido' : (p.papeletas ? '' : 'sin') },
-      el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p) })),
+      el('td', {}, el('div', { textContent: p.nombre }), el('div', { className: 'det', textContent: detalle(p) }),
+        ...(aj.bonusTop ? [el('div', {}, ...etiquetasTop(p))] : [])),
       el('td', { className: 'det', textContent: p.tier ? 'Tier ' + p.tier : '—' }),
       el('td', { className: 'num', textContent: p.euros ? eur(p.euros) : '—' }),
       el('td', { className: 'num' }, el('div', { textContent: p.papeletas }), el('div', { className: 'barra' }, el('i', { style: `width:${(p.papeletas / max) * 100}%` }))),
@@ -352,6 +381,14 @@ const DESC_MODOS = {
   soloSubs: 'solo participan subs',
   gasto: 'bits, subs y regalos suman',
 };
+$('chkBonus').onchange = (e) => {
+  if (girando) { e.target.checked = !!aj.bonusTop; return; }
+  aj.bonusTop = e.target.checked;
+  escribir('fundillo-ajustes', aj);
+  construirAjustes();
+  pintar();
+};
+
 function pintarModos() {
   const caja = $('modos');
   if (!caja.children.length) {
@@ -432,6 +469,7 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
     bits: () => ({ tipo: 'bits', cantidad: 500, euros: 500 * v.bit, texto: '500 bits (prueba)' }),
     sub: () => ({ tipo: 'sub', cantidad: 1, euros: v.subTier1, texto: 'Sub Tier 1 (prueba)' }),
     regalo: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
+    regalo5: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
     hypechat: () => ({ tipo: 'hypechat', cantidad: 5, euros: 5, texto: 'Hype Chat 5 EUR (prueba)' }),
   }[tipo];
   if (tipo === 'subs') {
@@ -442,8 +480,9 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
     }
     guardar(); pintar(); return;
   }
-  for (let i = 0; i < (tipo === 'entrada' ? 5 : 1); i++) {
-    const n = nombre();
+  const fijo = tipo === 'regalo5' ? nombre() : null;
+  for (let i = 0; i < (tipo === 'entrada' || tipo === 'regalo5' ? 5 : 1); i++) {
+    const n = fijo || nombre();
     Nucleo.registrar(estado, Object.assign({ id: 'prueba-' + Date.now() + '-' + nSim++, login: n.toLowerCase(), nombre: n }, crea()), aj);
   }
   guardar(); pintar();
@@ -477,6 +516,11 @@ const CAMPOS = [
   ['papeletasTier1', 'Papeletas Tier 1 / Prime', 'number'],
   ['papeletasTier2', 'Papeletas Tier 2', 'number'],
   ['papeletasTier3', 'Papeletas Tier 3', 'number'],
+  ['h', 'Extra para el top de regaladores (subs regaladas y bits)'],
+  ['bonusTop', 'Activado (también con la casilla ⭐ de arriba)', 'check'],
+  ['bonusTop1', 'Papeletas extra al 1º', 'number'],
+  ['bonusTop2', 'Papeletas extra al 2º', 'number'],
+  ['bonusTop3', 'Papeletas extra al 3º', 'number'],
   ['h', 'Modo «Más gasto, más papeletas»'],
   ['papeletasPorEscribir', 'Papeletas por escribir la palabra', 'number'],
   ['eurosPorPapeleta', '€ por cada papeleta extra', 'number'],

@@ -17,6 +17,11 @@
     papeletasTier1: 2,
     papeletasTier2: 3,
     papeletasTier3: 4,
+    // Extra para el top 3 de quien más subs regala y quien más bits da
+    bonusTop: false,
+    bonusTop1: 3,
+    bonusTop2: 2,
+    bonusTop3: 1,
     papeletasPorEscribir: 1,
     // Gasto
     gastanEntranSinEscribir: true,
@@ -177,7 +182,9 @@
     return !!p && !p.excluido && (p.escribio || (p.euros > 0 && !!aj.gastanEntranSinEscribir));
   }
 
-  function papeletasDe(p, aj, tier) {
+  // `extra`: papeletas de bonus (top de regaladores). Solo se suman a quien ya
+  // participa en el modo elegido (en "Solo subs", alguien que no es sub sigue fuera).
+  function papeletasDe(p, aj, tier, extra) {
     if (!participa(p, aj)) return 0;
     tier = tier == null ? (p.tier || 0) : tier;
     const num = (v) => Math.max(0, Number(v) || 0);
@@ -197,6 +204,7 @@
       }
       default: n = 1; // 'igual'
     }
+    if (n > 0 && extra > 0) n += extra;
     const max = num(aj.maximo);
     if (max > 0) n = Math.min(n, max);
     return n;
@@ -278,16 +286,40 @@
     return ev;
   }
 
+  // Top 3 por un campo del detalle (regalos o bits). Empates comparten puesto.
+  // Devuelve [{ login, nombre, cantidad, puesto }] con puesto 1..3.
+  function top3(participantes, campo) {
+    const orden = participantes.filter((p) => p.detalle && p.detalle[campo] > 0)
+      .sort((a, b) => b.detalle[campo] - a.detalle[campo] || a.nombre.localeCompare(b.nombre));
+    const res = [];
+    orden.forEach((p, i) => {
+      const puesto = i > 0 && p.detalle[campo] === orden[i - 1].detalle[campo] ? res[i - 1].puesto : i + 1;
+      if (puesto <= 3) res.push({ login: p.login, nombre: p.nombre, cantidad: p.detalle[campo], puesto });
+    });
+    return res;
+  }
+
   function lista(estado, aj) {
     const tiers = estado.tiers || {};
-    const ps = Object.values(estado.participantes).map((p) => {
+    const todos = Object.values(estado.participantes);
+    const tops = { regalos: top3(todos, 'regalos'), bits: top3(todos, 'bits') };
+    const premio = (puesto) => Math.max(0, Number(aj['bonusTop' + puesto]) || 0);
+    const ps = todos.map((p) => {
       const tier = tiers[p.login] || 0;
-      return Object.assign({}, p, { tier, papeletas: papeletasDe(p, aj, tier) });
+      const top = {};
+      let extra = 0;
+      if (aj.bonusTop) {
+        for (const campo of ['regalos', 'bits']) {
+          const t = tops[campo].find((x) => x.login === p.login);
+          if (t) { top[campo] = t.puesto; extra += premio(t.puesto); }
+        }
+      }
+      return Object.assign({}, p, { tier, top, extra, papeletas: papeletasDe(p, aj, tier, extra) });
     });
     const total = ps.reduce((a, p) => a + p.papeletas, 0);
     ps.forEach((p) => { p.probabilidad = total ? p.papeletas / total : 0; });
     ps.sort((a, b) => b.papeletas - a.papeletas || b.euros - a.euros || a.nombre.localeCompare(b.nombre));
-    return { participantes: ps, totalPapeletas: total };
+    return { participantes: ps, totalPapeletas: total, tops };
   }
 
   // Tira de nombres que pasa por pantalla: aparecen más veces quienes tienen
@@ -337,7 +369,7 @@
     return { tira, indiceGanador, ganador, duracionMs };
   }
 
-  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
+  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, top3, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
     papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear, construirTira };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo;
