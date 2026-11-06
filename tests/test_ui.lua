@@ -40,11 +40,7 @@ H.ok(panel.pageFrames.home.help:GetText():find("Tablón", 1, true), "el inicio e
 H.ok(not panel.tabs.board:IsShown(), "en el inicio no salen las pestañas de Pedidos")
 local home = panel.pageFrames.home
 H.ok(home.logoPath:find("norrisplay", 1, true), "logo de NorrisPlay en el inicio")
-H.eq(home.twitchLink:GetText(), "https://www.twitch.tv/norrisplay", "enlace a los directos")
-home.twitchLink:SetText("borrado")
-home.twitchLink:GetScript("OnTextChanged")(home.twitchLink, true)
-H.eq(home.twitchLink:GetText(), "https://www.twitch.tv/norrisplay", "el enlace no se puede borrar")
-home.twitchButton:Click()
+H.eq(home.twitchLink, nil, "sin enlace: solo el logo")
 panel.sections.orders:Click()
 H.ok(panel.pageFrames.board:IsShown(), "al entrar en Pedidos se ve el tablón")
 H.ok(panel.tabs.board:IsShown() and panel.tabs.materials:IsShown(), "pestañas de Pedidos visibles")
@@ -253,7 +249,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.16.1", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.16.2", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

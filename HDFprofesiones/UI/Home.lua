@@ -3,7 +3,6 @@
 local _, ns = ...
 local W = ns.W
 
-local TWITCH_URL = "https://www.twitch.tv/norrisplay"
 local LOGO = "Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay"
 
 local HELP = table.concat({
@@ -40,49 +39,12 @@ ns.UI.RegisterPage("home", function(page)
   page.help:SetSpacing(2)
   page.help:SetText(HELP)
 
-  -- Canal de Twitch: logo y enlace (el juego no abre el navegador: se copia con Ctrl+C).
-  page.logo = CreateFrame("Button", nil, page)
-  page.logo:SetSize(72, 144)
-  page.logo:SetPoint("TOPRIGHT", -40, -62)
-  page.logoTex = page.logo:CreateTexture(nil, "ARTWORK")
-  page.logoTex:SetAllPoints()
-  page.logoTex:SetTexture(LOGO)
+  -- Logo de NorrisPlay.
+  page.logo = page:CreateTexture(nil, "ARTWORK")
+  page.logo:SetSize(80, 160)
+  page.logo:SetPoint("TOPRIGHT", -36, -70)
+  page.logo:SetTexture(LOGO)
   page.logoPath = LOGO
-  page.twitchTitle = W.Text(page, "GameFontNormal", "CENTER")
-  page.twitchTitle:SetPoint("TOP", page.logo, "BOTTOM", 0, -6)
-  page.twitchTitle:SetText("|cffa970ffNorrisPlay|r en Twitch")
-  page.twitchButton = W.Button(page, "Ver los directos", 130, 22)
-  page.twitchButton:SetPoint("TOP", page.twitchTitle, "BOTTOM", 0, -6)
-  page.twitchLink = W.Input(page, 136)
-  page.twitchLink:SetPoint("TOP", page.twitchButton, "BOTTOM", 2, -6)
-  page.twitchLink:SetText(TWITCH_URL)
-  page.twitchLink:SetCursorPosition(0)
-  -- Que no se pueda borrar el enlace: si lo tocan, vuelve a ponerse.
-  page.twitchLink:SetScript("OnTextChanged", function(self, userInput)
-    if userInput and self:GetText() ~= TWITCH_URL then
-      self:SetText(TWITCH_URL)
-      self:HighlightText()
-    end
-  end)
-  page.twitchLink:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-  page.twitchHint = W.Text(page, "GameFontDisableSmall", "CENTER")
-  page.twitchHint:SetPoint("TOP", page.twitchLink, "BOTTOM", -2, -4)
-  page.twitchHint:SetWidth(150)
-  page.twitchHint:SetText("Pulsa el enlace y copia con Ctrl+C")
-  local function showLink()
-    page.twitchLink:SetFocus()
-    page.twitchLink:HighlightText()
-    ns.Print("copia el enlace con Ctrl+C y pégalo en el navegador: " .. TWITCH_URL)
-  end
-  page.twitchButton:SetScript("OnClick", showLink)
-  page.logo:SetScript("OnClick", showLink)
-  page.logo:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("NorrisPlay")
-    GameTooltip:AddLine("Directos en twitch.tv/norrisplay", 1, 1, 1)
-    GameTooltip:Show()
-  end)
-  page.logo:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   page.status = W.Text(page, "GameFontNormal", "CENTER")
   page.status:SetPoint("BOTTOM", 0, 44)
