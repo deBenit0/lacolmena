@@ -68,14 +68,15 @@ Opciones de la escena, añadiéndolas a la dirección (y combinándolas con `&`)
 
 | Opción | Qué hace |
 |---|---|
-| `?ranking=5` | Top 5 de papeletas en una esquina |
 | `?anuncio=1` | Barra "Escribe !sorteo para participar" mientras el sorteo está abierto |
 | `?siempre=1` | El fondo negro con los nombres se ve siempre, no solo al sortear |
 | `?segundos=20` | Segundos que se queda el ganador en pantalla (15 por defecto) |
 | `?sonido=0` | Sin sonido |
 | `?fondo=verde` | Fondo verde para clave cromática |
 
-Ejemplo: `escena.html?ranking=5&anuncio=1`
+Ejemplo: `escena.html?anuncio=1&segundos=20`
+
+En la escena no se muestra cuánta gente participa ni las papeletas de nadie; eso solo lo ves tú en el panel.
 
 ## Publicarlo con una dirección web (opcional)
 

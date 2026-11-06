@@ -7,7 +7,7 @@
 <!--
   Escena para OBS (fuente de navegador 1920×1080). Transparente; al sortear desde
   el panel aparece un fondo negro con los nombres cayendo de arriba abajo.
-  Opciones: ?ranking=5  ?anuncio=1  ?siempre=1  ?segundos=15  ?sonido=0  ?fondo=verde
+  Opciones: ?anuncio=1  ?siempre=1  ?segundos=15  ?sonido=0  ?fondo=verde
 -->
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: system-ui, "Segoe UI", sans-serif; color: #f2f2f5; }
@@ -16,32 +16,24 @@
   #escena.visible { opacity: 1; }
   #titulo { position: absolute; left: 0; right: 0; top: 4vh; text-align: center; font-size: 6vh; font-weight: 900; letter-spacing: .14em; color: #fff;
     text-shadow: 0 0 3vh rgba(169, 112, 255, .8); }
-  #subtitulo { position: absolute; left: 0; right: 0; top: 12.5vh; text-align: center; font-size: 2.6vh; color: #8a8a99; }
   #lienzo { position: absolute; left: 50%; top: 18vh; width: 120vh; height: 72vh; transform: translateX(-50%); }
   #cartel { position: absolute; left: 0; right: 0; bottom: 4vh; text-align: center; opacity: 0; transform: translateY(3vh); transition: opacity .5s, transform .5s; }
   #cartel.visible { opacity: 1; transform: none; }
   #cartel .sup { font-size: 3.6vh; letter-spacing: .2em; text-transform: uppercase; color: #a970ff; font-weight: 800; }
   #cartel .inf { font-size: 2.6vh; color: #a3a3b2; margin-top: .6vh; }
   #confeti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #ranking { position: absolute; right: 3vh; top: 3vh; min-width: 34vh; padding: 1.6vh 2vh; border-radius: 1.4vh; display: none;
-    background: rgba(0, 0, 0, .85); border: .25vh solid #a970ff; font-size: 2.4vh; }
-  #ranking h3 { margin: 0 0 1vh; font-size: 2vh; color: #a970ff; text-transform: uppercase; letter-spacing: .1em; }
-  #ranking div { display: flex; justify-content: space-between; gap: 2vh; padding: .3vh 0; }
-  #ranking b { color: #fff; }
   #anuncio { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); display: none; white-space: nowrap;
     padding: 1.2vh 3vh; border-radius: 999px; background: rgba(0, 0, 0, .88); border: .3vh solid #a970ff; font-size: 3vh; }
   #anuncio b { color: #c4a0ff; }
-  .durante-sorteo #ranking, .durante-sorteo #anuncio { display: none !important; }
+  .durante-sorteo #anuncio { display: none !important; }
 </style>
 </head>
 <body>
 <div id="escena">
   <div id="titulo">SORTEO DEL FUNDILLO</div>
-  <div id="subtitulo"></div>
   <canvas id="lienzo"></canvas>
   <div id="cartel"><div class="sup">¡Tenemos ganador!</div><div class="inf" id="info"></div></div>
 </div>
-<div id="ranking"></div>
 <div id="anuncio"></div>
 <canvas id="confeti"></canvas>
 
@@ -52,7 +44,6 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
-const topN = parseInt(q.get('ranking'), 10) || 0;
 const siempre = q.get('siempre') === '1';
 const anuncio = q.get('anuncio') === '1';
 const segundos = parseInt(q.get('segundos'), 10) || 15;
@@ -66,25 +57,14 @@ if (siempre) $('escena').classList.add('visible');
 function pintarEstado(s) {
   if (girando) return;
   rodillo.mostrar(s.participantes.map((p) => p.nombre));
-  $('subtitulo').textContent = `${s.participantes.length} participantes · ${s.totalPapeletas} papeletas`;
 
-  if (topN) {
-    const top = s.participantes.slice(0, topN);
-    $('ranking').style.display = top.length ? 'block' : 'none';
-    $('ranking').replaceChildren(Object.assign(document.createElement('h3'), { textContent: 'Papeletas' }));
-    for (const p of top) {
-      const f = document.createElement('div');
-      f.append(Object.assign(document.createElement('span'), { textContent: p.nombre }), Object.assign(document.createElement('b'), { textContent: p.papeletas }));
-      $('ranking').append(f);
-    }
-  }
   if (anuncio) {
     const a = $('anuncio');
     a.style.display = s.abierto ? 'block' : 'none';
     const palabra = (s.palabraClave || '').trim();
     a.replaceChildren(...(palabra
-      ? ['Escribe ', Object.assign(document.createElement('b'), { textContent: palabra }), ' para entrar al sorteo · bits y subs dan papeletas extra']
-      : ['Bits, subs y regalos te dan papeletas para el sorteo']));
+      ? ['Escribe ', Object.assign(document.createElement('b'), { textContent: palabra }), ' para entrar al sorteo · bits y subs te dan más opciones de ganar']
+      : ['Bits, subs y regalos te meten en el sorteo']));
   }
 }
 
@@ -94,10 +74,9 @@ async function tirar({ tirada, inicio }) {
   document.body.classList.add('durante-sorteo');
   $('cartel').classList.remove('visible');
   $('escena').classList.add('visible');
-  $('subtitulo').textContent = `${tirada.ganador.participantes} participantes · ${tirada.ganador.totalPapeletas} papeletas`;
   await rodillo.girar(tirada, inicio);
   const g = tirada.ganador;
-  $('info').textContent = `${g.nombre} · ${g.papeletas} de ${g.totalPapeletas} papeletas · ${(g.probabilidad * 100).toFixed(1)} % de probabilidad`;
+  $('info').textContent = `¡Enhorabuena, ${g.nombre}!`;
   $('cartel').classList.add('visible');
   Animacion.confeti($('confeti'), 6000);
   ocultar = setTimeout(() => {
