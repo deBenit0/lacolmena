@@ -1,9 +1,13 @@
 # Los hijos del Fundillo: profesiones
 
-Addon de WoW Forever para **Los hijos del Fundillo**: cada miembro ofrece lo que sabe
-fabricar (a cambio de los materiales) y pide lo que necesita, pagando si quiere.
+Addon de WoW Forever para **Los hijos del Fundillo** (*«Mi vida por el fundillo»*): un addon
+para todo lo que necesita la hermandad. Arriba tiene tres secciones:
 
-Esta es la **fase 1** (versión 0.10.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+- **Pedidos** (la que está hecha): cada miembro pide lo que necesita a quien sabe fabricarlo o
+  recolectarlo, pagando si quiere.
+- **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
+
+Esta es la **fase 1** (versión 0.11.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -55,7 +59,7 @@ los materiales que te faltan (contando bolsas y banco):
 
 ### Peticiones
 - Solo se pide desde **tu ventana de profesión** (botón "Pedir" en cada material o "Pedir en la
-  hermandad") o desde las pestañas **Pedir materiales** y **Pedir equipo**.
+  hermandad") o desde la pestaña **Pedir materiales**.
 - Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
   Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.
@@ -79,9 +83,21 @@ los materiales que te faltan (contando bolsas y banco):
 - Se ve junto a cada nombre, hay una clasificación en Mis cosas y las peticiones de quien tiene
   **más karma salen antes** en las listas.
 
+### Modo demostración (para probar)
+En **Mis cosas**, marca **Modo demostración**: aparecen jugadores de ejemplo con sus recetas y
+peticiones. Solo los ves tú; nunca se envían a la hermandad. Algunas peticiones están hechas a tu
+medida: piden cosas que tú sabes fabricar o recolectar, y una va **dirigida a ti** (te salta el
+aviso con **Lo hago yo**). Para probar todo el proceso:
+1. Pulsa **Lo hago yo** en el aviso o en Peticiones y di cuántos haces. El de ejemplo te
+   contesta en el chat.
+2. Pulsa **Enviar (ejemplo)**: hace como si mandaras el correo (no se envía nada) y la petición
+   se completa.
+3. A los pocos segundos el de ejemplo lo "recibe", te da las gracias y **sube tu karma**.
+
+Al desmarcarlo desaparece todo lo de ejemplo.
+
 ### Mis cosas
-Tus profesiones publicadas, el **modo demostración** (jugadores y peticiones de ejemplo que solo
-ves tú, para probar cómo queda), el modo **No disponible** (sin avisos y apareces el último),
+Tus profesiones publicadas, el **modo demostración**, el modo **No disponible** (sin avisos y apareces el último),
 los avisos y el sonido, un **diagnóstico** (dónde puso la pestaña, si lee tus profesiones, si
 encuentra Auctionator y el correo, versión del juego) y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
 

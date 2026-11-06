@@ -412,7 +412,9 @@ function Sync.CreateRequest(opts)
 end
 
 function Sync.Commit(id, amount)
-  return afterRequestAction(Data.Commit(id, amount, ns.Now()))
+  local r, err = afterRequestAction(Data.Commit(id, amount, ns.Now()))
+  if r and r.demo and ns.Demo then ns.Demo.OnCommit(r) end
+  return r, err
 end
 
 function Sync.Release(id)

@@ -46,6 +46,9 @@ local function countItems(page)
   end
   return n, headers
 end
+H.ok(panel.motto:GetText():find("Mi vida por el fundillo", 1, true), "el lema se ve al abrir")
+H.ok(panel.sections.orders:IsEnabled(), "sección Pedidos activa")
+H.ok(not panel.sections.dungeons:IsEnabled() and not panel.sections.events:IsEnabled(), "Mazmorras y Eventos se ven pero no se pueden pulsar")
 H.ok(panel.pageFrames.equipment == nil, "sin pestaña de equipo (por ahora)")
 
 -- Página "Pedir materiales": Bea no tiene recetas, así que hay que ver todo.
@@ -184,7 +187,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.10.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.11.0", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

@@ -255,7 +255,10 @@ ns.UI.RegisterPage("requests", function(page)
         W.Confirm("¿Seguro que ya no lo vas a hacer?", function() ns.Sync.Release(r.id) end)
       end)
       local myActive = mine and Data.CommitActive(mine, now)
-      if myActive and ns.Mail.CanPrepare() then
+      if r.demo and myActive and mine.n > Data.DeliveredOf(mine) then
+        -- Petición de ejemplo: no se puede mandar correo a alguien que no existe; se simula.
+        setButton(detail.b3, "Enviar (ejemplo)", true, function() ns.Demo.SimulateMail(r) end)
+      elseif myActive and ns.Mail.CanPrepare() then
         setButton(detail.b3, "Preparar correo", true, function()
           ns.Mail.Prepare(r, mine.n - Data.DeliveredOf(mine))
         end)
@@ -297,6 +300,9 @@ ns.UI.RegisterPage("requests", function(page)
     if needed then lines[#lines + 1] = "|cffbbbbbbHace falta: " .. needed .. "|r" end
     lines[#lines + 1] = "Paga: " .. (payText(r) or "|cffbbbbbbnada indicado|r")
     lines[#lines + 1] = "Para: " .. (r.to and ns.ShortName(r.to) or "cualquiera")
+    if r.demo then
+      lines[#lines + 1] = "|cffff8040Petición de ejemplo: acéptala y pulsa \"Enviar (ejemplo)\" para simular el correo.|r"
+    end
     local mine = r.c and r.c[ns.Me()]
     if mine and Data.CommitActive(mine, now) then
       lines[#lines + 1] = string.format("|cff40ff40Envíale %d por correo a %s: la petición se completará sola.|r",

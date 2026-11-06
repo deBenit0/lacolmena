@@ -46,6 +46,28 @@ local keys = {}
 for _, item in ipairs(mats.list.items) do if not item.header then keys[item.key] = true end end
 H.ok(keys.i4234 and keys.i2840, "materiales de mi coraza: cuero (Peletería) y barra de cobre (Minería)")
 H.ok(penv.HDFProfPanel.title:GetText():find("DEMOSTRACIÓN", 1, true), "el título avisa del modo demostración")
+-- Peticiones de ejemplo para mí: aceptar, "enviar" y ver subir el karma.
+local mineReq = ns.G().requests["Bruno-Demo:tuya1"]
+H.ok(mineReq and mineReq.k == "i12405" and mineReq.to == ns.Me(), "petición de ejemplo para mí con algo que sé hacer")
+H.ok(ns.Data.CanServe(mineReq, ns.Now()), "puedo atenderla")
+local alert = penv.HDFProfAlert -- ya salió (y se cerró solo) al activar el modo
+H.ok(alert and alert.alert and alert.alert.id == mineReq.id and alert.text:GetText():find("(a ti)", 1, true),
+  "salta el aviso de la petición de ejemplo")
+alert.commit:Click()
+pepe.popups[#pepe.popups].data.callback(mineReq.q)
+H.ok(mineReq.c and mineReq.c[ns.Me()] and mineReq.c[ns.Me()].n == mineReq.q, "aceptada")
+ns.UI.Open("requests", mineReq.id)
+local reqPage = penv.HDFProfPanel.pageFrames.requests
+H.eq(reqPage.detail.b3:GetText(), "Enviar (ejemplo)", "botón para simular el envío")
+local karmaBefore = ns.Data.KarmaFor(ns.Me())
+reqPage.detail.b3:Click()
+H.eq(ns.Data.RequestInfo(mineReq, ns.Now()).state, "done", "enviada: la petición se completa")
+H.Advance(5)
+H.ok(ns.Data.KarmaFor(ns.Me()) > karmaBefore, "sube mi karma al recibirlo el de ejemplo")
+H.Advance(30)
+local anaLeak = false
+for id in pairs(ana.ns.G().requests) do if id:find("Demo", 1, true) then anaLeak = true end end
+H.ok(not anaLeak, "las peticiones de ejemplo no salen de mi ordenador")
 ns.Demo.Set(false)
 local left = 0
 for _, e in pairs(ns.G().entries) do if e.demo then left = left + 1 end end

@@ -6,6 +6,15 @@ ns.UI = UI
 
 local panel
 local hosts = {}
+-- Secciones del addon. De momento solo "Pedidos"; las demás se verán pero aún no se pueden abrir.
+local SECTIONS = {
+  { id = "orders", label = "Pedidos" },
+  { id = "dungeons", label = "Mazmorras", soon = true },
+  { id = "events", label = "Eventos", soon = true },
+}
+ns.MOTTO = "Mi vida por el fundillo"
+
+-- Pestañas de la sección "Pedidos".
 local PAGES = {
   { id = "materials", label = "Pedir materiales" },
   -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
@@ -19,7 +28,7 @@ function UI.RegisterPage(id, create)
 end
 
 local function createPanel()
-  panel = W.Panel("HDFProfPanel", UIParent, 640, 480)
+  panel = W.Panel("HDFProfPanel", UIParent, 640, 512)
   panel:SetFrameStrata("HIGH")
   panel:SetToplevel(true)
   panel:SetClampedToScreen(true)
@@ -34,18 +43,51 @@ local function createPanel()
 
   panel.title = W.Text(panel, "GameFontNormal")
   panel.title:SetPoint("TOPLEFT", 22, -18)
+  -- El lema de la hermandad, siempre a la vista.
+  panel.motto = W.Text(panel, "GameFontNormalLarge", "RIGHT")
+  panel.motto:SetPoint("TOPRIGHT", -38, -15)
+  panel.motto:SetTextColor(1, 0.45, 0.1)
+  panel.motto:SetText("\194\171" .. ns.MOTTO .. "\194\187")
   local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
+
+  -- Secciones (Pedidos, Mazmorras, Eventos).
+  panel.sections = {}
+  for i, s in ipairs(SECTIONS) do
+    local b = W.Button(panel, s.label, 130, 24)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 134, -40)
+    if s.soon then
+      b:Disable()
+      if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
+      b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(s.label)
+        GameTooltip:AddLine("Próximamente", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+      end)
+      b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    else
+      b:LockHighlight()
+      local fs = b.GetFontString and b:GetFontString()
+      if fs then fs:SetTextColor(1, 1, 1) end
+    end
+    panel.sections[s.id] = b
+  end
+  local line = panel:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(1, 0.82, 0, 0.35)
+  line:SetHeight(1)
+  line:SetPoint("TOPLEFT", 20, -68)
+  line:SetPoint("TOPRIGHT", -20, -68)
 
   panel.tabs = {}
   for i, p in ipairs(PAGES) do
     local b = W.Button(panel, p.label, 140, 22, function() UI.ShowPage(p.id) end)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 146, -40)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 146, -74)
     panel.tabs[p.id] = b
   end
 
   panel.content = CreateFrame("Frame", nil, panel)
-  panel.content:SetPoint("TOPLEFT", 16, -68)
+  panel.content:SetPoint("TOPLEFT", 16, -100)
   panel.content:SetPoint("BOTTOMRIGHT", -16, 16)
 
   panel.noGuild = W.Text(panel, "GameFontNormalLarge", "CENTER")
@@ -70,7 +112,7 @@ end
 
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
-  panel.title:SetText(ns.TITLE .. " - Profesiones"
+  panel.title:SetText(ns.TITLE
     .. (ns.db and ns.db.settings.demo and "  |cffff8040(MODO DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
   panel.noGuild:SetShown(not inGuild)
@@ -259,7 +301,8 @@ function UI.AttachHost(host)
   tab:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(ns.TITLE)
-    GameTooltip:AddLine("Profesiones y peticiones de la hermandad", 1, 1, 1)
+    GameTooltip:AddLine(ns.MOTTO, 1, 0.45, 0.1)
+    GameTooltip:AddLine("Pedidos de la hermandad (pronto: mazmorras y eventos)", 1, 1, 1)
     GameTooltip:Show()
   end)
   tab:SetScript("OnLeave", function() GameTooltip:Hide() end)

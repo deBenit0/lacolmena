@@ -69,6 +69,98 @@ local REQUESTS = {
 
 local function full(name) return name .. "-" .. REALM end
 
+-- Peticiones de ejemplo hechas a tu medida: piden cosas que tú sabes fabricar o recolectar,
+-- para que puedas probar todo el proceso (aceptar, enviar y ver cómo sube tu karma).
+local ASKERS = { "Bruno", "Nimra", "Chispa", "Ivette", "Tula", "Pepa" }
+local GATHER_ITEMS = { [393] = 4234, [182] = 3820, [186] = 2772 } -- cuero pesado, hierba, mineral de hierro
+local FALLBACK_ITEM = 2318 -- cuero ligero: si no sabes hacer nada, una dirigida a ti
+
+local function myKeys()
+  local c = ns.MyChar()
+  local mats, others = {}, {}
+  if c then
+    for _, prof in pairs(c.profs or {}) do
+      for key in pairs(prof.recipes or {}) do
+        local kind, id = ns.ParseKey(key)
+        if kind == "i" then
+          local _, class = ns.ItemInstant(id)
+          if class == 7 or class == 5 then mats[#mats + 1] = key else others[#others + 1] = key end
+        end
+      end
+    end
+  end
+  table.sort(mats)
+  table.sort(others)
+  local keys = {}
+  for i = 1, math.min(2, #mats) do keys[#keys + 1] = mats[i] end
+  for i = 1, math.min(2 - #keys, #others) do keys[#keys + 1] = others[i] end
+  for skill, id in pairs(GATHER_ITEMS) do
+    if c and c.gather and c.gather[skill] then keys[#keys + 1] = "i" .. id end
+  end
+  return keys
+end
+
+local function addMyRequests(g, now)
+  local keys = myKeys()
+  local list = {}
+  -- Una siempre va dirigida a ti, así puedes probarlo aunque aún no tengas profesiones.
+  table.insert(list, { k = keys[1] or ("i" .. FALLBACK_ITEM), to = ns.Me() })
+  for i = 2, #keys do list[#list + 1] = { k = keys[i] } end
+  local made = {}
+  for i, item in ipairs(list) do
+    local author = full(ASKERS[(i - 1) % #ASKERS + 1])
+    local r = Data.SanitizeRequest({
+      id = author .. ":tuya" .. i, a = author, t = now - i * 240, k = item.k,
+      q = 5 * i, av = now, g = 10000 * i, m = (i % 2 == 0) or nil, to = item.to,
+    })
+    if r then
+      r.demo = true
+      g.requests[r.id] = r
+      made[#made + 1] = r
+    end
+  end
+  return made
+end
+
+-- Lo que dicen los jugadores de ejemplo (en tu chat; nadie más lo ve).
+local function say(author, text)
+  ns.Print("|cffff8040[ejemplo]|r " .. ns.ShortName(author) .. ": " .. text)
+end
+
+-- Has aceptado una petición de ejemplo.
+function Demo.OnCommit(r)
+  if not r or not r.demo then return end
+  ns.After(2, function() say(r.a, "¡Genial, muchas gracias! Mándamelo por correo cuando lo tengas.") end)
+end
+
+-- "Enviar (ejemplo)": hace como si mandaras el correo; el autor lo recibe a los pocos segundos.
+function Demo.SimulateMail(r)
+  local g, me, now = ns.G(), ns.Me(), ns.Now()
+  local cm = r and r.demo and r.c and r.c[me]
+  if not cm or not Data.CommitActive(cm, now) then return false end
+  local units = cm.n - Data.DeliveredOf(cm)
+  if units <= 0 then return false end
+  cm.s = Data.DeliveredOf(cm) + units
+  cm.sv = now
+  ns.Print(string.format("correo de ejemplo enviado a %s: %dx %s (de verdad no se envía nada).",
+    ns.ShortName(r.a), units, ns.KeyLabel(r.k)))
+  ns.Fire("DATA_CHANGED", "request", r.id)
+  ns.After(3, function()
+    local e = g.entries[r.a]
+    if not ns.db.settings.demo or not e or g.requests[r.id] ~= r then return end
+    -- El autor apunta el karma y el encargo, igual que haría un jugador de verdad.
+    local value = units * (r.vu or Data.DEFAULT_UNIT_VALUE)
+    e.kc = e.kc or {}
+    e.kc[me] = (e.kc[me] or 0) + value
+    e.kd = (e.kd or 0) + value
+    e.th = e.th or {}
+    e.th[me] = (e.th[me] or 0) + 1
+    say(r.a, string.format("¡Recibido! Gracias, crack. (+%d de karma para ti)", math.floor(value / 10000)))
+    ns.Fire("DATA_CHANGED", "entry", r.a)
+  end)
+  return true
+end
+
 function Demo.IsDemo(name)
   return type(name) == "string" and name:sub(-#REALM - 1) == "-" .. REALM
 end
@@ -153,6 +245,7 @@ function Demo.Enable()
     r.demo = true
     g.requests[r.id] = r
   end
+  Demo.mine = addMyRequests(g, now)
   Data.indexDirty = true
   ns.Fire("DATA_CHANGED", "demo")
 end
@@ -175,7 +268,20 @@ end
 
 function Demo.Set(on)
   ns.db.settings.demo = on and true or nil
-  if on then Demo.Enable() else Demo.Disable() end
+  if on then
+    Demo.Enable()
+    -- Enseña el aviso que te saltaría con una petición para ti.
+    local r = Demo.mine and Demo.mine[1]
+    if r and ns.Alerts then
+      ns.After(1.5, function()
+        local _, icon = ns.KeyInfo(r.k)
+        ns.Alerts.Push({ id = r.id, icon = icon, canCommit = true,
+          text = string.format("%s pide %dx %s (a ti)", ns.ShortName(r.a), r.q, ns.KeyLabel(r.k)) })
+      end)
+    end
+  else
+    Demo.Disable()
+  end
 end
 
 -- Al entrar: quitar los restos de una sesión anterior y volver a crearlos si sigue activo.

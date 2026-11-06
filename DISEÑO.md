@@ -64,6 +64,9 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - **Prioridad**: marcan peticiones "de hermandad" que salen destacadas.
 
 ## Interfaz
+- **Addon integral de la hermandad**: secciones arriba (**Pedidos**, **Mazmorras**, **Eventos**).
+  Solo Pedidos está hecha; las otras dos se ven desactivadas ("Próximamente").
+- El lema **«Mi vida por el fundillo»** se ve siempre en la cabecera de la ventana.
 - **Integrada en la ventana de hermandad** como pestaña lateral (sin tocar las pestañas de
   Blizzard, para que los parches no la rompan con facilidad).
 - **Sin** comando de barra ni botón de minimapa.
