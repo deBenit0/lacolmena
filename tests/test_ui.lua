@@ -253,7 +253,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.16.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.16.1", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

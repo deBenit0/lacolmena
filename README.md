@@ -11,7 +11,7 @@ cada sección:
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.16.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.16.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
