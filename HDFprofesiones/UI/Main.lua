@@ -6,26 +6,42 @@ ns.UI = UI
 
 local panel
 local hosts = {}
--- Secciones del addon. De momento solo "Pedidos"; las demás se verán pero aún no se pueden abrir.
+-- Secciones del addon (fila de arriba). Mazmorras y Eventos se ven pero aún no se pueden abrir.
 local SECTIONS = {
+  { id = "home", label = "Inicio" },
   { id = "orders", label = "Pedidos" },
   { id = "dungeons", label = "Mazmorras", soon = true },
   { id = "events", label = "Eventos", soon = true },
 }
 ns.MOTTO = "Mi vida por el fundillo"
 
--- Pestañas de la sección "Pedidos".
+-- Todas las páginas. "tab" = pestaña de la sección Pedidos que se enciende con ella.
 local PAGES = {
-  { id = "board", label = "Tablón" },
-  { id = "materials", label = "Pedir materiales" },
+  { id = "home", section = "home" },
+  { id = "board", section = "orders", label = "Tablón", tab = "board" },
+  { id = "materials", section = "orders", label = "Pedir materiales", tab = "materials" },
   -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
-  { id = "requests", label = "Peticiones" },
-  { id = "mine", label = "Mis cosas" },
+  { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
+  { id = "mine", section = "orders", label = "Mis cosas", tab = "mine" },
 }
+local PAGE_BY_ID = {}
+for _, p in ipairs(PAGES) do PAGE_BY_ID[p.id] = p end
 
 -- Cada página se registra con una función que construye su contenido.
 function UI.RegisterPage(id, create)
   UI.pages[id] = create
+end
+
+local function setActive(b, active)
+  local fs = b.GetFontString and b:GetFontString()
+  -- La activa se queda con el brillo encendido (no gris, que parece bloqueada).
+  if active then
+    b:LockHighlight()
+    if fs then fs:SetTextColor(1, 1, 1) end
+  else
+    b:UnlockHighlight()
+    if fs then fs:SetTextColor(1, 0.82, 0) end
+  end
 end
 
 local function createPanel()
@@ -52,7 +68,7 @@ local function createPanel()
   local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
-  -- Secciones (Pedidos, Mazmorras, Eventos).
+  -- Secciones (Inicio, Pedidos, Mazmorras, Eventos).
   panel.sections = {}
   for i, s in ipairs(SECTIONS) do
     local b = W.Button(panel, s.label, 130, 24)
@@ -67,10 +83,10 @@ local function createPanel()
         GameTooltip:Show()
       end)
       b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    elseif s.id == "home" then
+      b:SetScript("OnClick", function() UI.ShowPage("home") end)
     else
-      b:LockHighlight()
-      local fs = b.GetFontString and b:GetFontString()
-      if fs then fs:SetTextColor(1, 1, 1) end
+      b:SetScript("OnClick", function() UI.ShowPage(UI.lastOrders or "board") end)
     end
     panel.sections[s.id] = b
   end
@@ -80,11 +96,16 @@ local function createPanel()
   line:SetPoint("TOPLEFT", 20, -68)
   line:SetPoint("TOPRIGHT", -20, -68)
 
+  -- Pestañas de la sección Pedidos.
   panel.tabs = {}
-  for i, p in ipairs(PAGES) do
-    local b = W.Button(panel, p.label, 136, 22, function() UI.ShowPage(p.id) end)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 140, -74)
-    panel.tabs[p.id] = b
+  local i = 0
+  for _, p in ipairs(PAGES) do
+    if p.label then
+      i = i + 1
+      local b = W.Button(panel, p.label, 136, 22, function() UI.ShowPage(p.id) end)
+      b:SetPoint("TOPLEFT", 20 + (i - 1) * 140, -74)
+      panel.tabs[p.id] = b
+    end
   end
 
   panel.content = CreateFrame("Frame", nil, panel)
@@ -102,7 +123,12 @@ local function createPanel()
     local create = UI.pages[p.id]
     if create then
       local f = CreateFrame("Frame", nil, panel.content)
-      f:SetAllPoints()
+      if p.section == "home" then
+        f:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -76) -- sin pestañas debajo: más sitio
+        f:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 16)
+      else
+        f:SetAllPoints()
+      end
       f:Hide()
       create(f)
       panel.pageFrames[p.id] = f
@@ -116,27 +142,26 @@ function UI.Refresh()
   panel.title:SetText(ns.TITLE
     .. (ns.db and ns.db.settings.demo and "  |cffff8040(MODO DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
-  panel.noGuild:SetShown(not inGuild)
+  local home = UI.current == "home"
+  panel.noGuild:SetShown(not inGuild and not home)
   for id, f in pairs(panel.pageFrames) do
-    f:SetShown(inGuild and id == UI.current)
+    f:SetShown((inGuild or id == "home") and id == UI.current)
   end
   local f = panel.pageFrames[UI.current]
-  if inGuild and f and f.Refresh then ns.SafeCall(f.Refresh, f) end
+  if (inGuild or home) and f and f.Refresh then ns.SafeCall(f.Refresh, f) end
 end
 
 function UI.ShowPage(id)
   if not panel then createPanel() end
   UI.current = id
-  -- La pestaña activa se queda con el brillo del botón encendido (no gris, que parece bloqueada).
+  local page = PAGE_BY_ID[id] or PAGE_BY_ID.board
+  if page.section == "orders" then UI.lastOrders = (id == "requests") and "board" or id end
+  for sid, b in pairs(panel.sections) do
+    if b:IsEnabled() then setActive(b, sid == page.section) end
+  end
   for pid, b in pairs(panel.tabs) do
-    local fs = b.GetFontString and b:GetFontString()
-    if pid == id then
-      b:LockHighlight()
-      if fs then fs:SetTextColor(1, 1, 1) end
-    else
-      b:UnlockHighlight()
-      if fs then fs:SetTextColor(1, 0.82, 0) end
-    end
+    b:SetShown(page.section == "orders")
+    setActive(b, pid == page.tab)
   end
   UI.Refresh()
 end
@@ -166,7 +191,7 @@ function UI.Open(pageId, selectId, host)
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
   end
   panel:Show()
-  UI.ShowPage(pageId or UI.current or "board")
+  UI.ShowPage(pageId or "home")
   if selectId then
     local f = panel.pageFrames[UI.current]
     if f and f.SelectById then f:SelectById(selectId) end

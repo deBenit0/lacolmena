@@ -54,6 +54,16 @@ ns.UI.Open("board")
 local board = penv.HDFProfPanel.pageFrames.board
 H.eq(board.list.items[1].r.id, mineReq.id, "en el tablón, arriba la que es para mí")
 H.ok(#board.list.items >= 10, "el tablón muestra los pedidos de ejemplo: " .. #board.list.items)
+local anyNew = false
+for _, it in ipairs(board.list.items) do if it.new then anyNew = true end end
+H.ok(anyNew, "la primera vez, los pedidos salen como nuevos")
+ns.UI.ShowPage("materials")
+H.ok(ns.G().boardSeen ~= nil, "al salir del tablón se apunta la visita")
+H.Advance(1)
+ns.UI.ShowPage("board")
+anyNew = false
+for _, it in ipairs(board.list.items) do if it.new then anyNew = true end end
+H.ok(not anyNew, "al volver ya no son nuevos")
 board.onlyMine:SetChecked(true)
 board.onlyMine:GetScript("OnClick")(board.onlyMine)
 for _, it in ipairs(board.list.items) do H.ok(it.canServe, "filtro: solo las que puedo hacer") end
@@ -65,6 +75,12 @@ H.ok(alert and alert.alert and alert.alert.id == mineReq.id and alert.text:GetTe
 alert.commit:Click()
 pepe.popups[#pepe.popups].data.callback(mineReq.q)
 H.ok(mineReq.c and mineReq.c[ns.Me()] and mineReq.c[ns.Me()].n == mineReq.q, "aceptada")
+-- En el tablón sale arriba como "Tu encargo" con el botón de enviar y si tengo los materiales.
+board:Refresh()
+H.eq(board.list.items[1].r.id, mineReq.id, "mi encargo arriba del tablón")
+H.ok(board.list.rows[1].title:GetText():find("[Tu encargo]", 1, true), "marcado como tu encargo")
+H.eq(board.list.rows[1].accept:GetText(), "Enviar (ejemplo)", "botón de enviar en el tablón")
+H.ok(board.list.rows[1].mats:GetText():find("Te faltan", 1, true), "dice qué materiales me faltan: " .. board.list.rows[1].mats:GetText())
 ns.UI.Open("requests", mineReq.id)
 local reqPage = penv.HDFProfPanel.pageFrames.requests
 H.eq(reqPage.detail.b3:GetText(), "Enviar (ejemplo)", "botón para simular el envío")

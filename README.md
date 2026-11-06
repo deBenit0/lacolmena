@@ -1,13 +1,15 @@
 # Los hijos del Fundillo: profesiones
 
 Addon de WoW Forever para **Los hijos del Fundillo** (*«Mi vida por el fundillo»*): un addon
-para todo lo que necesita la hermandad. Arriba tiene tres secciones:
+para todo lo que necesita la hermandad. Al abrirlo sale el **Inicio**, que explica cómo
+funciona, con el lema y un resumen (pedidos abiertos, nuevos, los que puedes hacer y tus encargos
+por enviar). Desde ahí vas a cada sección:
 
 - **Pedidos** (la que está hecha): cada miembro pide lo que necesita a quien sabe fabricarlo o
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.12.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.13.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -26,16 +28,20 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
   Encantamiento), sin filtros puestos. Cada vez que la abras se actualizan tus recetas y
   cooldowns. Para que se cuente lo que tienes en el banco, ábrelo una vez.
 
-### Tablón (lo primero que ves)
-Al abrir el addon, en **Pedidos**, sale el **Tablón** con los pedidos abiertos de la gente en ese
-momento. Arriba van los que son **para ti**, luego los que **puedes hacer** (en verde) y luego el
-resto, por karma. Cada pedido dice quién lo pide, hace cuánto, cuántos faltan y qué paga, con dos
-botones:
-- **Ver pedido**: abre todos los detalles (materiales, quién se encarga...).
-- **Aceptar encargo**: dices cuántos haces y listo (si ya tenías parte, pone **Aceptar más**).
+### Tablón (al entrar en Pedidos)
+Los pedidos de la gente en este momento, en este orden:
+1. **[Tu encargo]**: lo que aceptaste y aún no has enviado, con **Preparar correo** (con el
+   buzón abierto) o **Enviar (ejemplo)** si es de demostración.
+2. **[A ti]**: los que te piden a ti.
+3. **Puedes hacerlo** (en verde): debajo dice si **tienes los materiales** o qué te falta
+   (contando bolsas y banco); si lo recolectas, cuántos tienes.
+4. **¡Nuevo!**: lo que ha llegado desde la última vez que miraste el tablón.
+5. El resto (por karma) y al final los tuyos (*[Tuyo]*).
 
-Con **Solo los que puedo hacer** ves únicamente los tuyos. Tus propios pedidos salen al final
-marcados como *[Tuyo]*.
+Cada pedido tiene **Ver pedido** (todos los detalles) y **Aceptar encargo** (dices cuántos haces
+y listo; si ya tenías parte, **Aceptar más**). Con **Solo lo que puedo hacer** filtras, y los
+botones **Mis pedidos** e **Historial** abren la lista completa (con **< Tablón** para volver).
+La antigua pestaña "Peticiones" está ahora dentro del tablón.
 
 ### Pedir materiales
 **Solo materiales de verdad** (cueros, telas, barras, piezas, elementales, esencias...; sin pociones,
@@ -70,7 +76,7 @@ los materiales que te faltan (contando bolsas y banco):
 
 ### Peticiones
 - Solo se pide desde **tu ventana de profesión** (botón "Pedir" en cada material o "Pedir en la
-  hermandad") o desde la pestaña **Pedir materiales**.
+  hermandad") o desde la pestaña **Pedir materiales**. Se aceptan desde el **Tablón**.
 - Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
   Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
   se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.

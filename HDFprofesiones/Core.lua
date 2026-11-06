@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.12.0"
+ns.VERSION = "0.13.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"

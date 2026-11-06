@@ -64,7 +64,9 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - **Prioridad**: marcan peticiones "de hermandad" que salen destacadas.
 
 ## Interfaz
-- **Addon integral de la hermandad**: secciones arriba (**Pedidos**, **Mazmorras**, **Eventos**).
+- Al abrirlo, página de **Inicio** que explica cómo funciona; desde ahí a cada sección.
+- Pedidos: **Tablón** (pestaña principal, incluye las antiguas "Peticiones"), Pedir materiales y Mis cosas.
+- **Addon integral de la hermandad**: secciones arriba (**Inicio**, **Pedidos**, **Mazmorras**, **Eventos**).
   Solo Pedidos está hecha; las otras dos se ven desactivadas ("Próximamente").
 - El lema **«Mi vida por el fundillo»** se ve siempre en la cabecera de la ventana.
 - **Integrada en la ventana de hermandad** como pestaña lateral (sin tocar las pestañas de

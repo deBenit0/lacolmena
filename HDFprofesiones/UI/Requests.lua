@@ -79,10 +79,14 @@ local function neededMaterials(r)
 end
 
 ns.UI.RegisterPage("requests", function(page)
+  ns.UI.FilterRequests = function(fid) page:SetFilter(fid) end
   local state = { filter = 1, id = nil }
 
+  -- Esta página se abre desde el tablón ("Ver pedido"): botón para volver.
+  page.back = W.Button(page, "< Tablón", 84, 22, function() ns.UI.ShowPage("board") end)
+  page.back:SetPoint("TOPLEFT", 4, -2)
   local filterButton = W.Button(page, FILTERS[1].label, 190, 22)
-  filterButton:SetPoint("TOPLEFT", 4, -2)
+  filterButton:SetPoint("LEFT", page.back, "RIGHT", 6, 0)
   filterButton:SetScript("OnClick", function()
     state.filter = state.filter % #FILTERS + 1
     page:Refresh()
@@ -368,6 +372,14 @@ ns.UI.RegisterPage("requests", function(page)
     end)
     list:SetItems(items)
     page:RefreshDetail()
+  end
+
+  function page:SetFilter(fid)
+    for i, f in ipairs(FILTERS) do
+      if f.id == fid then state.filter = i end
+    end
+    state.id = nil
+    page:Refresh()
   end
 
   -- Abre la página con una petición concreta elegida (desde un aviso, por ejemplo).
