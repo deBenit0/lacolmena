@@ -6,15 +6,16 @@ local W = ns.W
 local HELP = table.concat({
   "|cffffd100Pedidos|r: pide lo que necesitas a quien sabe fabricarlo o recolectarlo, y acepta los "
     .. "encargos de los demás.",
-  "   |cffffffff· Tablón|r: los pedidos de la gente en este momento. Arriba, tus encargos por enviar "
-    .. "y lo que puedes hacer (te dice si tienes los materiales). Pulsa |cffffffffAceptar encargo|r, "
-    .. "mándalo por correo y el pedido |cff40ff40se completa solo|r al enviarlo.",
-  "   |cffffffff· Pedir materiales|r: busca el material, elige cuántos y pídelo. También puedes pedir "
-    .. "desde tu ventana de profesión: pasa el ratón por un material y pulsa |cffffffffPedir|r.",
+  "   |cffffffff· Tablón|r: los pedidos de la gente en este momento. Los pedidos van a toda la "
+    .. "hermandad y |cffffffffse lo queda el primero que lo acepta|r, diciendo cuándo lo tendrá (ya, antes "
+    .. "de 2 horas u hoy). Si no lo entrega a tiempo, vuelve al tablón. Mándalo por correo y el pedido "
+    .. "|cff40ff40se completa solo|r al enviarlo.",
+  "   |cffffffff· Pedir materiales|r: busca el material, elige cuántos, qué prisa tienes y si das "
+    .. "propina. También desde tu ventana de profesión: pasa el ratón por un material y pulsa |cffffffffPedir|r.",
   "   |cffffffff· Mis cosas|r: tus profesiones, los avisos y el |cffff8040modo demostración|r "
     .. "(pedidos de ejemplo para probar).",
-  "|cffffd100Karma|r: sube cuando entregas y baja cuando recibes (1 punto por cada oro que vale en "
-    .. "subasta). A quien más ayuda le atienden antes.",
+  "|cffffd100Karma|r: +1 por cada pedido que entregas y -1 por cada uno que recibes. "
+    .. "A quien más ayuda le atienden antes.",
   "|cffffd100Mazmorras|r y |cffffd100Eventos|r: próximamente.",
   "|cff999999Para que tus recetas salgan a los demás, abre una vez la ventana de cada profesión.|r",
 }, "\n\n")

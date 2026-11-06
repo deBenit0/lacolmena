@@ -56,10 +56,7 @@ local function createFrame()
     local g = ns.G()
     local r = alert and g and g.requests[alert.id]
     if not r or not Data.CanServe(r, ns.Now()) then return end
-    local remaining = Data.RequestInfo(r, ns.Now()).remaining
-    ns.W.AskAmount(string.format("¿Cuántos vas a hacer? (faltan %d)", remaining), remaining, function(n)
-      ns.Sync.Commit(r.id, n)
-    end)
+    ns.W.AcceptRequest(r)
   end)
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", 0, 0)
@@ -133,10 +130,10 @@ function Alerts.OnRequestUpdated(old, new, retry)
       -- el juego aún no sabe qué objeto es: volver a mirarlo en un momento
       ns.After(3, function() Alerts.OnRequestUpdated(nil, g.requests[new.id], true) end)
     end
-    if new.to == me or (not new.to and (Data.ICanCraft(new.k) or canGather)) then
+    if Data.ICanCraft(new.k) or canGather then
       g.alerted[new.id] = true
       local text = string.format("%s pide %dx %s", ns.ShortName(new.a), new.q, ns.KeyLabel(new.k))
-      if new.to == me then text = text .. " (a ti)" end
+      if new.pr then text = text .. " (" .. Data.WHEN[new.pr].ask:lower() .. ")" end
       Alerts.Push({ id = new.id, icon = icon, text = text, canCommit = true })
     end
   end
@@ -155,16 +152,27 @@ function Alerts.OnRequestUpdated(old, new, retry)
     end
   end
 
-  -- Alguien se compromete en una de mis peticiones.
+  -- Alguien acepta una de mis peticiones.
   if new.a == me and old then
-    for name, cm in pairs(new.c or {}) do
-      local before = old.c and old.c[name]
-      if Data.CommitActive(cm, now) and (not before or before.rl or (before.n or 0) < cm.n) then
-        Alerts.Push({
-          id = new.id, icon = icon,
-          text = string.format("%s hará %dx %s", ns.ShortName(name), cm.n - (cm.d or 0), ns.KeyLabel(new.k)),
-        })
-      end
+    local owner, cm = Data.OwnerOf(new, now)
+    local before = Data.OwnerOf(old, now)
+    if owner and owner ~= before then
+      local w = cm.w and Data.WHEN[cm.w]
+      Alerts.Push({
+        id = new.id, icon = icon,
+        text = string.format("%s te hace %dx %s%s", ns.ShortName(owner), new.q, ns.KeyLabel(new.k),
+          w and (" (" .. w.label:gsub("^Lo hago ", ""):lower() .. ")") or ""),
+      })
+    end
+  end
+
+  -- Lo acepté a la vez que otro y él lo hizo antes: me quedo sin él.
+  if new.a ~= me and old and new.c and new.c[me] then
+    local mineBefore = old.c and old.c[me] and Data.CommitActive(old.c[me], now, old)
+    local owner = Data.OwnerOf(new, now)
+    if mineBefore and owner and owner ~= me then
+      Alerts.Push({ id = new.id, icon = icon,
+        text = string.format("%s aceptó antes que tú: %s", ns.ShortName(owner), ns.KeyLabel(new.k)) })
     end
   end
 end

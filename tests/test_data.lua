@@ -24,40 +24,50 @@ H.ok(r ~= nil, "crear petición")
 H.eq(Data.RequestInfo(r, now()).state, "open", "nueva: abierta")
 H.eq(Data.RequestInfo(r, now()).remaining, 5, "faltan 5")
 
-as("Bea", function() return Data.Commit(r.id, 3, now()) end)
+-- Bea acepta "antes de 2 horas": se queda el pedido entero.
+as("Bea", function() return Data.Commit(r.id, 2, now()) end)
 local info = Data.RequestInfo(r, now())
-H.eq(info.state, "open", "con 3 de 5: abierta")
-H.eq(info.remaining, 2, "faltan 2")
+H.eq(info.state, "accepted", "Bea lo acepta: aceptada")
+H.eq(info.owner, "Bea-Reino", "es de Bea")
+H.eq(r.c["Bea-Reino"].n, 5, "se queda las 5")
+H.eq(r.c["Bea-Reino"].w, 2, "dijo antes de 2 horas")
+H.eq(r.c["Bea-Reino"].by, now() + 7200, "plazo: 2 horas")
 
-as("Cris", function() return Data.Commit(r.id, 5, now()) end)
-info = Data.RequestInfo(r, now())
-H.eq(r.c["Cris-Reino"].n, 2, "Cris solo puede comprometer lo que falta")
-H.eq(info.state, "accepted", "todo comprometido: aceptada")
+-- Cris llega tarde: no puede.
+local okCris, errCris = as("Cris", function() return Data.Commit(r.id, 1, now()) end)
+H.ok(okCris == nil and errCris and errCris:find("Bea", 1, true), "Cris no puede: ya lo aceptó Bea")
 
 local okSelf, errSelf = Data.Commit(r.id, 1, now())
 H.ok(okSelf == nil and errSelf, "el autor no puede aceptar su propia petición")
 
+-- Si no lo entrega a tiempo (plazo + 15 min de margen), vuelve al tablón.
+H.eq(Data.RequestInfo(r, now() + 7200 + 10 * 60).state, "accepted", "dentro del margen sigue aceptada")
+H.eq(Data.RequestInfo(r, now() + 7200 + 16 * 60).state, "open", "pasado el plazo vuelve a abierta")
+
 as("Bea", function() return Data.Release(r.id, now()) end)
 info = Data.RequestInfo(r, now())
 H.eq(info.state, "open", "Bea suelta: vuelve a abierta")
-H.eq(info.remaining, 3, "faltan 3")
+H.eq(info.owner, nil, "sin encargado")
 
-local _, thanks = Data.ConfirmDelivery(r.id, "Cris-Reino", 2, now())
+-- Ahora la coge Cris "ya" y se la entregan en mano.
+as("Cris", function() return Data.Commit(r.id, 1, now()) end)
+H.eq(r.c["Cris-Reino"].by, now() + 3600, "lo hago ya: 1 hora")
+local _, thanks = Data.ConfirmDelivery(r.id, "Cris-Reino", 5, now())
 H.ok(thanks == true, "confirmar a Cris suma un encargo")
 H.eq(ns.G().thanks["Ana-Reino"]["Cris-Reino"], 1, "contador de Cris")
 info = Data.RequestInfo(r, now())
-H.eq(info.delivered, 2, "2 entregadas")
-
--- Un compromiso sin entregar caduca a las 48 h.
-as("Bea", function() return Data.Commit(r.id, 3, now()) end)
-H.eq(Data.RequestInfo(r, now()).state, "accepted", "Bea vuelve: aceptada")
-H.eq(Data.RequestInfo(r, now() + 47 * 3600).state, "accepted", "a las 47 h sigue aceptada")
-H.eq(Data.RequestInfo(r, now() + 49 * 3600).state, "open", "a las 49 h vuelve a abierta")
-
-Data.ConfirmDelivery(r.id, "Bea-Reino", 3, now())
-info = Data.RequestInfo(r, now())
 H.eq(info.state, "done", "todo entregado: hecha")
-H.eq(ns.G().thanks["Ana-Reino"]["Bea-Reino"], 1, "contador de Bea")
+H.eq(Data.KarmaFor("Ana-Reino"), 0, "el karma propio se publica con la ficha (aún no)")
+H.eq(ns.G().karma["Ana-Reino"].kc["Cris-Reino"], Data.KARMA_POINT, "Cris gana 1 punto por el pedido")
+
+-- "Hoy": hasta medianoche y como mínimo 3 horas.
+H.ok(Data.Deadline(3, 1000) >= 1000 + 3 * 3600, "hoy: al menos 3 horas")
+
+-- Prisa del que pide.
+local rp = Data.CreateRequest({ k = "i101", q = 1, pr = 1 }, now())
+H.eq(rp.pr, 1, "prisa guardada")
+H.eq(Data.SanitizeRequest(rp).pr, 1, "la prisa sobrevive al saneado")
+rp.x = now() -- cerrada: no cuenta para el límite
 
 -- Límite de 10 peticiones abiertas.
 local created = 0

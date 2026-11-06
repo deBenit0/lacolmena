@@ -120,12 +120,14 @@ converged({ ana, bea, cris }, "tras la entrega")
 -- 7) Dos personas aceptan a la vez la misma petición: todos acaban viendo lo mismo.
 local req2 = cris.ns.Sync.CreateRequest({ k = "i13443", q = 10 })
 H.Advance(10)
-ana.ns.Sync.Commit(req2.id, 6)
-bea.ns.Sync.Commit(req2.id, 6)
+ana.ns.Sync.Commit(req2.id, 1)
+bea.ns.Sync.Commit(req2.id, 1)
 H.Advance(30)
 converged({ ana, bea, cris }, "dos compromisos simultáneos")
 local info2 = cris.ns.Data.RequestInfo(cris.ns.G().requests[req2.id], cris.ns.Now())
-H.eq(info2.delivered + info2.pending, 12, "se ven los dos compromisos (6 + 6)")
+H.eq(info2.pending, 10, "solo cuenta uno: el pedido entero")
+H.ok(info2.owner == "Ana-Reino" or info2.owner == "Bea-Reino", "se lo queda uno de los dos")
+H.eq(ana.ns.Data.RequestInfo(ana.ns.G().requests[req2.id], ana.ns.Now()).owner, info2.owner, "todos ven al mismo")
 
 -- 8) Bea sale; mientras, Cris confirma y cierra. Bea vuelve y se pone al día.
 local beaDB = H.Logout(bea)

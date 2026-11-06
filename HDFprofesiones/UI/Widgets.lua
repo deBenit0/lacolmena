@@ -260,3 +260,62 @@ function W.Confirm(text, callback)
   local popup = StaticPopup_Show("HDFPROF_CONFIRM", text, nil, data)
   if popup then popup.data = data end
 end
+
+-- Ventana pequeña con varios botones para elegir una opción (cuándo lo harás, por ejemplo).
+local choice
+function W.Choose(title, sub, labels, callback)
+  if not choice then
+    choice = W.Panel("HDFProfChoice", UIParent, 430, 118)
+    choice:SetFrameStrata("DIALOG")
+    choice:SetToplevel(true)
+    choice:SetPoint("CENTER", 0, 120)
+    choice:Hide()
+    tinsert(UISpecialFrames, "HDFProfChoice")
+    choice.title = W.Text(choice, "GameFontNormal", "CENTER")
+    choice.title:SetPoint("TOP", 0, -16)
+    choice.title:SetWidth(400)
+    choice.sub = W.Text(choice, "GameFontHighlightSmall", "CENTER")
+    choice.sub:SetPoint("TOP", choice.title, "BOTTOM", 0, -6)
+    choice.sub:SetWidth(400)
+    choice.buttons = {}
+    for i = 1, 4 do
+      local b = W.Button(choice, "", 124, 24)
+      b:SetPoint("BOTTOMLEFT", 18 + (i - 1) * 132, 40)
+      b:SetScript("OnClick", function()
+        local cb = choice.callback
+        choice:Hide()
+        if cb then cb(i) end
+      end)
+      choice.buttons[i] = b
+    end
+    choice.cancel = W.Button(choice, "Cancelar", 96, 22, function() choice:Hide() end)
+    choice.cancel:SetPoint("BOTTOM", 0, 12)
+  end
+  choice.title:SetText(title)
+  choice.sub:SetText(sub or "")
+  choice.callback = callback
+  for i, b in ipairs(choice.buttons) do
+    b:SetShown(labels[i] ~= nil)
+    if labels[i] then b:SetText(labels[i]) end
+  end
+  local n = #labels
+  local width = n * 132 - 8
+  for i, b in ipairs(choice.buttons) do
+    b:ClearAllPoints()
+    b:SetPoint("BOTTOMLEFT", choice, "BOTTOM", -width / 2 + (i - 1) * 132, 40)
+  end
+  choice:Show()
+  return choice
+end
+
+-- "Aceptar encargo": elegir cuándo lo tendrás (y ver qué prisa tiene quien lo pide).
+function W.AcceptRequest(r)
+  local Data = ns.Data
+  local info = Data.RequestInfo(r, ns.Now())
+  local labels = {}
+  for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
+  local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
+  sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al tablón.", info.remaining)
+  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.ShortName(r.a)),
+    sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
+end

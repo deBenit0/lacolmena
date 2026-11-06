@@ -72,7 +72,12 @@ H.Advance(2)
 local tab = ana.env.HDFProfGuildTabGuildFrame
 H.ok(tab.badge:IsShown() and tab.badge.text:GetText() == "1", "pestaña con 1 pendiente: " .. tostring(tab.badge.text:GetText()))
 alert.commit:Click()
-ana.popups[#ana.popups].data.callback(15)
+local choice = ana.env.HDFProfChoice
+H.ok(choice and choice:IsShown(), "pregunta cuándo lo tendrá")
+H.eq(choice.buttons[1]:GetText(), "Lo hago ya", "botón Lo hago ya")
+H.eq(choice.buttons[2]:GetText(), "Antes de 2 horas", "botón Antes de 2 horas")
+H.eq(choice.buttons[3]:GetText(), "Lo hago hoy", "botón Lo hago hoy")
+choice.buttons[2]:Click()
 H.Advance(10)
 H.eq(pepe.ns.Data.RequestInfo(pepe.ns.G().requests[leatherReq.id], pepe.ns.Now()).state, "accepted", "aceptada desde el aviso")
 H.Advance(2)
@@ -83,7 +88,7 @@ H.AddMember("Bea")
 local bea = H.Login("Bea")
 H.Advance(15)
 H.OpenTradeSkill(bea, LEATHERWORKING)
-local req3 = pepe.ns.Sync.CreateRequest({ k = "i4234", q = 2, to = "Bea-Reino" })
+local req3 = pepe.ns.Sync.CreateRequest({ k = "i4234", q = 2 })
 H.Advance(60)
 local summary = false
 for _, line in ipairs(bea.chat) do
@@ -92,13 +97,24 @@ end
 H.ok(summary, "resumen en el chat al entrar")
 H.ok(req3 ~= nil, "petición para Bea")
 
--- Formulario corto: sin destinatario, las opciones extra están ocultas.
+-- Formulario: prisa y propina con botones; sin precio de subasta ni destinatario.
 pepe.ns.UI.OpenRequestDialog({ k = "i4234" })
 local dialog = pepe.env.HDFProfRequestDialog
-H.ok(not dialog.more:IsShown(), "formulario corto por defecto")
-dialog.moreButton:Click()
-H.ok(dialog.more:IsShown(), "Más opciones las muestra")
-pepe.ns.UI.OpenRequestDialog({ k = "i4234", to = "Ana-Reino" })
-H.ok(dialog.more:IsShown(), "con destinatario se abren solas")
-dialog:Hide()
+H.eq(dialog.rush[2]:GetText(), "Ya", "prisa: Ya")
+H.eq(dialog.rush[3]:GetText(), "Antes de 2 horas", "prisa: Antes de 2 horas")
+H.eq(dialog.rush[4]:GetText(), "Hoy", "prisa: Hoy")
+dialog.rush[4]:Click()
+H.eq(dialog.pr, 3, "prisa elegida: hoy")
+dialog.tips[3]:Click()
+H.eq(dialog.gold:GetText(), "1", "propina sugerida: 1 oro")
+dialog.tips[2]:Click()
+H.eq(dialog.gold:GetText() .. "/" .. dialog.silver:GetText(), "/50", "propina sugerida: 50 plata")
+dialog.gold:SetText("3")
+dialog.silver:SetText("")
+dialog:Publish()
+local last
+for _, r in pairs(pepe.ns.G().requests) do
+  if not last or r.t > last.t or (r.t == last.t and r.id > last.id) then last = r end
+end
+H.ok(last and last.g == 30000 and last.pr == 3 and last.to == nil, "pedido con propina 3 oro y prisa hoy, para toda la hermandad")
 H.eq(#H.errors, 0, "sin errores de Lua")

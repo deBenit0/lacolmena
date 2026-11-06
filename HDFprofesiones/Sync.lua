@@ -403,16 +403,11 @@ local function afterRequestAction(r, err)
 end
 
 function Sync.CreateRequest(opts)
-  -- Valor por unidad para el karma: el precio de subasta al crearla (igual para todos).
-  if not opts.vu and ns.Prices then
-    local kind, id = ns.ParseKey(opts.k)
-    if kind == "i" then opts.vu = ns.Prices.Get(id) end
-  end
   return afterRequestAction(Data.CreateRequest(opts, ns.Now()))
 end
 
-function Sync.Commit(id, amount)
-  local r, err = afterRequestAction(Data.Commit(id, amount, ns.Now()))
+function Sync.Commit(id, when)
+  local r, err = afterRequestAction(Data.Commit(id, when, ns.Now()))
   if r and r.demo and ns.Demo then ns.Demo.OnCommit(r) end
   return r, err
 end

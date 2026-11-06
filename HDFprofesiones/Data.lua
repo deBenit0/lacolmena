@@ -9,9 +9,11 @@
 -- Petición:
 --   { id, a = autor, t = creada, k = "i<objeto>"/"e<encantamiento>", pk = profesión,
 --     q = cantidad, av = versión del bloque del autor, m = aporta materiales,
---     g = pago en cobre, pi = { [objeto] = n } pago en objetos, to = para quién,
+--     g = propina en cobre, pr = prisa (1 ya, 2 antes de 2 h, 3 hoy),
 --     x = cerrada, rn = renovada,
+--     (pi, to y vu son de versiones anteriores: se conservan pero ya no se usan)
 --     c = { [fabricante] = { n = prometidas, cv = versión, rl = soltada,
+--                            by = plazo para entregarlo, w = cuándo dijo (1/2/3),
 --                            d = entregadas (lo confirma el autor), dv = versión,
 --                            s = enviadas por correo (lo apunta el fabricante), sv = versión } } }
 -- Cada parte tiene un único dueño y su propia versión, así que dos copias se
@@ -22,7 +24,26 @@ local Data = {}
 ns.Data = Data
 
 Data.REQUEST_TTL = 7 * 86400 -- las peticiones caducan a los 7 días
-Data.COMMIT_TTL = 48 * 3600  -- un "lo hago yo" sin entregar caduca a las 48 h
+Data.COMMIT_TTL = 48 * 3600  -- encargos de versiones antiguas (sin plazo): caducan a las 48 h
+Data.COMMIT_GRACE = 15 * 60  -- margen tras el plazo antes de que el pedido vuelva al tablón
+
+-- Cuándo lo hará el que acepta (y la prisa del que pide): mismos botones.
+Data.WHEN = {
+  { id = 1, label = "Lo hago ya", need = "Lo necesita ya", ask = "Ya", secs = 3600 },
+  { id = 2, label = "Antes de 2 horas", need = "Lo necesita antes de 2 h", ask = "Antes de 2 horas", secs = 7200 },
+  { id = 3, label = "Lo hago hoy", need = "Lo necesita hoy", ask = "Hoy", today = true },
+}
+
+-- Plazo (en el reloj del addon) para la opción elegida.
+function Data.Deadline(when, now)
+  local w = Data.WHEN[when] or Data.WHEN[3]
+  if not w.today then return now + w.secs end
+  -- "Hoy": hasta la medianoche (hora del ordenador), y como mínimo 3 horas.
+  local left = 12 * 3600
+  local t = date and date("*t")
+  if type(t) == "table" and t.hour then left = (24 - t.hour) * 3600 - (t.min or 0) * 60 - (t.sec or 0) end
+  return now + math.max(3 * 3600, left)
+end
 Data.MAX_OPEN = 10           -- peticiones abiertas por jugador
 Data.KEEP_AFTER = 2 * 86400  -- las terminadas se siguen viendo 2 días
 Data.MAX_QTY = 1000
@@ -285,9 +306,9 @@ end
 -- ¿Puedo atender esta petición? (sé fabricarlo o conseguirlo, no es mía y está abierta para mí)
 function Data.CanServe(r, now)
   local me = ns.Me()
-  if not r or r.a == me or (r.to and r.to ~= me) then return false end
+  if not r or r.a == me then return false end
   if Data.RequestInfo(r, now).state ~= "open" then return false end
-  return r.to == me or Data.ICanCraft(r.k) or Data.ICanGather(r.k) or false
+  return Data.ICanCraft(r.k) or Data.ICanGather(r.k) or false
 end
 
 -- Peticiones que puedo atender ahora mismo.
@@ -310,8 +331,8 @@ function Data.MyActiveRequestFor(key, now)
   end
 end
 
--- Karma de un personaje, en puntos (1 punto = 1 oro de valor en subasta):
--- lo que le reconocen los demás por entregar, menos lo que ha recibido él.
+-- Karma de un personaje, en puntos (1 punto por pedido): los pedidos que le reconocen los
+-- demás por entregar, menos los que ha recibido él.
 function Data.KarmaFor(name)
   local g = ns.G()
   if not g then return 0 end
@@ -439,7 +460,7 @@ end
 ---------------------------------------------------------------------------
 -- Peticiones
 ---------------------------------------------------------------------------
-local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu" }
+local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu", "pr" }
 
 function Data.SanitizeRequest(r)
   if type(r) ~= "table" then return nil end
@@ -475,6 +496,8 @@ function Data.SanitizeRequest(r)
   if tonumber(r.rn) then out.rn = tonumber(r.rn) end
   local vu = tonumber(r.vu)
   if vu and vu >= 1 then out.vu = floor(vu) end
+  local pr = tonumber(r.pr)
+  if pr and Data.WHEN[pr] then out.pr = pr end
   if type(r.c) == "table" then
     local c, any = {}, false
     for name, cm in pairs(r.c) do
@@ -484,6 +507,9 @@ function Data.SanitizeRequest(r)
         if n and n >= 1 then o.n = floor(n) end
         if tonumber(cm.cv) then o.cv = tonumber(cm.cv) end
         if cm.rl == true then o.rl = true end
+        if tonumber(cm.by) then o.by = tonumber(cm.by) end
+        local w = tonumber(cm.w)
+        if w and Data.WHEN[w] then o.w = w end
         local d = tonumber(cm.d)
         if d and d >= 1 then o.d = floor(d) end
         if tonumber(cm.dv) then o.dv = tonumber(cm.dv) end
@@ -531,11 +557,12 @@ function Data.MergeRequests(a, b)
   for name in pairs(names) do
     local ca = (a.c and a.c[name]) or {}
     local cb = (b.c and b.c[name]) or {}
-    local crafter = pickBlock({ n = ca.n, cv = ca.cv, rl = ca.rl }, { n = cb.n, cv = cb.cv, rl = cb.rl }, "cv")
+    local crafter = pickBlock({ n = ca.n, cv = ca.cv, rl = ca.rl, by = ca.by, w = ca.w },
+      { n = cb.n, cv = cb.cv, rl = cb.rl, by = cb.by, w = cb.w }, "cv")
     local delivered = pickBlock({ d = ca.d, dv = ca.dv }, { d = cb.d, dv = cb.dv }, "dv")
     local sent = pickBlock({ s = ca.s, sv = ca.sv }, { s = cb.s, sv = cb.sv }, "sv")
     local o = {
-      n = crafter.n, cv = crafter.cv, rl = crafter.rl,
+      n = crafter.n, cv = crafter.cv, rl = crafter.rl, by = crafter.by, w = crafter.w,
       d = delivered.d, dv = delivered.dv, s = sent.s, sv = sent.sv,
     }
     if next(o) then
@@ -561,19 +588,50 @@ local function lastActivity(cm)
   return max(cm.cv or 0, cm.dv or 0, cm.sv or 0)
 end
 
-function Data.CommitActive(cm, now)
+-- Plazo de un encargo: el que dijo al aceptar (o 48 h en versiones antiguas).
+local function commitDeadline(cm)
+  if cm.by then return cm.by + Data.COMMIT_GRACE end
+  return lastActivity(cm) + Data.COMMIT_TTL
+end
+
+-- ¿Sigue en pie este encargo? (sin soltar, sin entregar del todo y dentro de plazo)
+local function commitAlive(cm, now)
   if not cm or cm.rl or not cm.n then return false end
   if deliveredOf(cm) >= cm.n then return false end
-  return now <= lastActivity(cm) + Data.COMMIT_TTL
+  return now <= commitDeadline(cm)
+end
+
+-- El pedido es de uno solo: el primero que lo aceptó (si dos lo aceptan a la vez sin verse,
+-- gana el que lo hizo antes; todos llegan a la misma conclusión).
+function Data.OwnerOf(r, now)
+  local owner, ocm
+  for name, cm in pairs(r and r.c or {}) do
+    if commitAlive(cm, now) then
+      local cv, ocv = cm.cv or 0, ocm and (ocm.cv or 0)
+      if not owner or cv < ocv or (cv == ocv and name < owner) then owner, ocm = name, cm end
+    end
+  end
+  return owner, ocm
+end
+
+-- ¿Está activo este encargo? Con la petición, además tiene que ser el que se queda el pedido.
+function Data.CommitActive(cm, now, r)
+  if not commitAlive(cm, now) then return false end
+  if r then
+    local _, ocm = Data.OwnerOf(r, now)
+    return ocm == cm
+  end
+  return true
 end
 
 -- Estado calculado de una petición (no se guarda: todos llegan al mismo resultado).
 function Data.RequestInfo(r, now)
   local info = { delivered = 0, pending = 0, commits = {} }
+  info.owner = Data.OwnerOf(r, now)
   for name, cm in pairs(r.c or {}) do
     local d = deliveredOf(cm)
     info.delivered = info.delivered + d
-    local active = Data.CommitActive(cm, now)
+    local active = name == info.owner
     local pending = active and (cm.n - d) or 0
     info.pending = info.pending + pending
     if active or d > 0 then
@@ -584,7 +642,8 @@ function Data.RequestInfo(r, now)
         mailed = cm.s or 0,
         pending = pending,
         active = active,
-        deadline = active and (lastActivity(cm) + Data.COMMIT_TTL) or nil,
+        deadline = active and (cm.by or commitDeadline(cm)) or nil,
+        when = cm.w,
       }
     end
   end
@@ -654,7 +713,7 @@ function Data.CountOpenBy(author, now)
   return n
 end
 
--- opts = { k, pk, q, m, g, pi, to }
+-- opts = { k, pk, q, m, g = propina, pr = prisa }
 function Data.CreateRequest(opts, now)
   local g, me = ns.G(), ns.Me()
   if not g or not me then return nil, "No estás en una hermandad." end
@@ -666,7 +725,7 @@ function Data.CreateRequest(opts, now)
   local id = me .. ":" .. Codec.EncodeUInt(now) .. Codec.EncodeUInt(g.reqSeq % 1024)
   local r = Data.SanitizeRequest({
     id = id, a = me, t = now, k = opts.k, pk = opts.pk, q = opts.q or 1, av = now,
-    m = opts.m and true or nil, g = opts.g, pi = opts.pi, to = opts.to, vu = opts.vu,
+    m = opts.m and true or nil, g = opts.g, pr = opts.pr,
   })
   g.requests[id] = r
   return r
@@ -677,20 +736,23 @@ local function getRequest(id)
   return g and g.requests[id]
 end
 
--- "Lo hago yo": me comprometo a hacer "amount" más.
-function Data.Commit(id, amount, now)
+-- "Lo hago yo": me quedo el pedido entero y digo cuándo lo tendré (when = 1, 2 o 3).
+-- Solo puede tenerlo uno: si ya lo ha aceptado otro, no se puede.
+function Data.Commit(id, when, now)
   local r, me = getRequest(id), ns.Me()
   if not r then return nil, "La petición ya no existe." end
   if r.a == me then return nil, "No puedes aceptar tu propia petición." end
-  if r.to and r.to ~= me then return nil, "Esta petición es para otra persona." end
   local info = Data.RequestInfo(r, now)
+  if info.owner and info.owner ~= me then
+    return nil, "Ya lo ha aceptado " .. ns.ShortName(info.owner) .. "."
+  end
   if info.state ~= "open" then return nil, "La petición ya no está abierta." end
-  amount = min(info.remaining, max(1, floor(tonumber(amount) or 1)))
+  when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}
-  local delivered = deliveredOf(cm)
-  local myPending = Data.CommitActive(cm, now) and (cm.n - delivered) or 0
-  cm.n = delivered + myPending + amount
+  cm.n = r.q - (info.delivered - deliveredOf(cm))
+  cm.w = when
+  cm.by = Data.Deadline(when, now)
   cm.cv = bump(cm.cv, now)
   cm.rl = nil
   r.c[me] = cm
@@ -731,30 +793,18 @@ end
 
 -- Contador de encargos: lo lleva el autor. Suma uno a cada fabricante que entrega todo
 -- lo que prometió (o que completa la petición), confirmado a mano o enviado por correo.
-Data.DEFAULT_UNIT_VALUE = 10000 -- si no se sabe el precio: 1 oro por unidad
+Data.KARMA_POINT = 10000 -- el karma se guarda en "cobre" por compatibilidad: 1 punto = 10000
 
+-- Karma por pedido: cuando el encargado entrega todo, él gana 1 punto y yo (autor) pierdo 1.
 function Data.CheckThanks(r, now)
   local g, me = ns.G(), ns.Me()
   if not g or not r or r.a ~= me or not r.c then return false end
   local info = Data.RequestInfo(r, now)
-  local changed = false
-  -- Karma: por cada unidad entregada, el fabricante gana y yo (autor) pierdo su valor en subasta.
   g.karma = g.karma or {}
   g.karma[me] = g.karma[me] or { kc = {}, kd = 0 }
   local karma = g.karma[me]
   karma.kc = karma.kc or {}
-  g.karmaSeen = g.karmaSeen or {}
-  g.karmaSeen[r.id] = g.karmaSeen[r.id] or {}
-  local unitValue = r.vu or Data.DEFAULT_UNIT_VALUE
-  for crafter, cm in pairs(r.c) do
-    local units = deliveredOf(cm) - (g.karmaSeen[r.id][crafter] or 0)
-    if units > 0 then
-      g.karmaSeen[r.id][crafter] = deliveredOf(cm)
-      karma.kc[crafter] = (karma.kc[crafter] or 0) + units * unitValue
-      karma.kd = (karma.kd or 0) + units * unitValue
-      changed = true
-    end
-  end
+  local changed = false
   for crafter, cm in pairs(r.c) do
     local d = deliveredOf(cm)
     if d > 0 and (d >= (cm.n or 0) or info.delivered >= r.q) then
@@ -763,6 +813,8 @@ function Data.CheckThanks(r, now)
         g.thanked[r.id][crafter] = true
         g.thanks[me] = g.thanks[me] or {}
         g.thanks[me][crafter] = (g.thanks[me][crafter] or 0) + 1
+        karma.kc[crafter] = (karma.kc[crafter] or 0) + Data.KARMA_POINT
+        karma.kd = (karma.kd or 0) + Data.KARMA_POINT
         changed = true
       end
     end
@@ -787,7 +839,7 @@ function Data.RegisterMail(recipient, items, now)
     local kind, id = ns.ParseKey(r.k)
     local cm = r.c[me]
     local left = items[id] or 0
-    if kind == "i" and left > 0 and Data.CommitActive(cm, now) then
+    if kind == "i" and left > 0 and Data.CommitActive(cm, now, r) then
       local credit = min(left, cm.n - deliveredOf(cm))
       if credit > 0 then
         cm.s = deliveredOf(cm) + credit

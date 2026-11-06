@@ -29,10 +29,17 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 
 ## Peticiones
 - Se pide un **objeto enlazado** o un **encantamiento** (los encantamientos no son objetos).
-- **Cantidad** con entregas parciales (p. ej. 12/20 pociones); varios fabricantes pueden aportar.
+- **Cantidad** con entregas parciales (p. ej. 12/20 pociones). **Un solo encargado**: se lo queda
+  entero el primero que lo acepta (si dos a la vez, gana el que lo hizo antes).
+- Al aceptar, el encargado dice **cuándo**: ya (1 h), antes de 2 horas u hoy (medianoche, mín. 3 h).
+  Pasado ese plazo (+15 min) el pedido vuelve al tablón.
+- El que pide indica su **prisa** con los mismos botones (o sin prisa).
 - Indicador de **si el autor aporta los materiales**.
-- **Pago opcional**: oro y/u objetos.
-- Botón **"Pedir"** en cada receta: a un fabricante concreto o a todos.
+- **Propina opcional** con botones sugeridos (50 plata, 1, 2 y 5 oro) o la que se escriba; se
+  cobra contra reembolso. Sin precios de subasta (se quitó Auctionator: consume y solo se
+  actualiza al abrir la subasta).
+- Los pedidos van **siempre a toda la hermandad** (no se puede pedir a una persona concreta).
+- **Karma por pedido**: +1 al que entrega, −1 al que recibe.
 - **Caducan a los 7 días** (renovables).
 - Estados: **Abierta → Aceptada → Hecha**.
   - **Entrega por correo:** cuando quien aceptó envía el correo con los objetos al autor, se
@@ -40,7 +47,6 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
     pide cuero y la peletera se lo manda). Solo cuentan los objetos pedidos y hasta lo prometido.
   - El autor también puede confirmar a mano las entregas en persona ("Recibido").
   - Al **comerciar** el objeto pedido con el autor, el addon propone cerrarla.
-  - Una aceptada que pasa **48 h** sin hacerse vuelve a abierta.
   - El fabricante puede **soltarla**.
 - **Máximo 10** peticiones abiertas por jugador.
 - **Aviso emergente + sonido** solo a quien conoce la receta; clic en el aviso abre la petición.

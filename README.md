@@ -9,7 +9,7 @@ por enviar). Desde ahí vas a cada sección:
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.13.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.14.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -32,14 +32,14 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
 Los pedidos de la gente en este momento, en este orden:
 1. **[Tu encargo]**: lo que aceptaste y aún no has enviado, con **Preparar correo** (con el
    buzón abierto) o **Enviar (ejemplo)** si es de demostración.
-2. **[A ti]**: los que te piden a ti.
-3. **Puedes hacerlo** (en verde): debajo dice si **tienes los materiales** o qué te falta
+2. **Puedes hacerlo** (en verde): debajo dice si **tienes los materiales** o qué te falta
    (contando bolsas y banco); si lo recolectas, cuántos tienes.
-4. **¡Nuevo!**: lo que ha llegado desde la última vez que miraste el tablón.
-5. El resto (por karma) y al final los tuyos (*[Tuyo]*).
+3. **¡Nuevo!**: lo que ha llegado desde la última vez que miraste el tablón.
+4. El resto y al final los tuyos (*[Tuyo]*, con quién lo hace y su plazo). Dentro de cada grupo,
+   primero los que **corren prisa** y luego por karma.
 
-Cada pedido tiene **Ver pedido** (todos los detalles) y **Aceptar encargo** (dices cuántos haces
-y listo; si ya tenías parte, **Aceptar más**). Con **Solo lo que puedo hacer** filtras, y los
+Cada pedido dice quién lo pide, su **prisa**, la **propina** y si pone los materiales, con
+**Ver pedido** (todos los detalles) y **Aceptar encargo**. Con **Solo lo que puedo hacer** filtras, y los
 botones **Mis pedidos** e **Historial** abren la lista completa (con **< Tablón** para volver).
 La antigua pestaña "Peticiones" está ahora dentro del tablón.
 
@@ -53,16 +53,20 @@ nombres de todos los objetos para que el buscador los encuentre.
 
 Los grupos salen **plegados**, salvo los que tienen materiales que usan tus recetas, y el addon
 recuerda cuáles dejas abiertos. Con **+ Favorito** marcas lo que pides a menudo: sale arriba del
-todo. Al elegir un material ves para qué recetas tuyas sirve, el **precio en la subasta**, quién lo
-da, la cantidad con − y +, y los botones **Pedir a todos**, **Pedir a [nombre]** y **Susurrar**.
+todo. Al elegir un material ves para qué recetas tuyas sirve, quién lo da, la cantidad con − y +,
+y los botones **Pedir a la hermandad** y **Susurrar**.
 
 *(La pestaña "Pedir equipo" está retirada de momento: se rehará más adelante.)*
 
-### Precio y pago
-- El precio de la subasta sale de **Auctionator** (recomendado); si no lo tienes, de TSM o de lo
-  que el addon apunta al mirar la subasta. La petición propone pagar **un 10% menos**.
-- Si la petición ofrece oro, al **Preparar correo** el envío va **contra reembolso**: el juego
-  le cobra al que pidió cuando recoge el objeto.
+### Al pedir: prisa y propina
+- **¿Qué prisa tienes?**: *Sin prisa*, *Ya*, *Antes de 2 horas* u *Hoy*. Se ve en el tablón y
+  en el aviso; los que corren prisa salen antes.
+- **Ofrecer propina (opcional)**: botones *Nada*, *50 plata*, *1 oro*, *2 oro*, *5 oro*, o la que
+  escribas.
+- Si hay propina, al **Preparar correo** el envío va **contra reembolso**: el juego le cobra la
+  propina al que pidió cuando recoge el objeto.
+- El pedido va **siempre a toda la hermandad**: no se puede pedir a una persona concreta.
+- Ya no se usan precios de subasta (ni Auctionator).
 
 ### Pedir en la hermandad (desde tu ventana de profesión)
 Al pasar el ratón por un material de la receta aparece un botón **Pedir** para pedir solo ese.
@@ -79,23 +83,25 @@ los materiales que te faltan (contando bolsas y banco):
   hermandad") o desde la pestaña **Pedir materiales**. Se aceptan desde el **Tablón**.
 - Quien pueda fabricarlo **o conseguirlo recolectando** (cuero → Desuello, hierbas →
   Herboristería, mineral y piedra → Minería) recibe un **aviso con sonido** (salvo en combate, mazmorras y bandas:
-  se guarda para después). Si la petición es para alguien concreto, solo le avisa a él.
+  se guarda para después).
 - El aviso trae el botón **Lo hago yo** para aceptar sin abrir nada. Al entrar, un resumen en
   el chat te dice cuántas puedes hacer, y la pestaña del addon muestra ese número.
-- **Lo hago yo:** te comprometes a hacer una cantidad. Varios pueden repartirse una petición.
-- **Soltar:** si al final no puedes. Un compromiso sin entregar caduca solo a las **48 h**.
+- **Aceptar encargo:** el pedido **se lo queda entero el primero que lo acepta** (no se reparte).
+  Al aceptar eliges cuándo lo tendrás: **Lo hago ya** (1 hora), **Antes de 2 horas** o
+  **Lo hago hoy** (hasta medianoche, mínimo 3 horas).
+- **Plazo:** si no lo envía a tiempo (con 15 minutos de margen), el pedido **vuelve al tablón**
+  para que lo coja otro.
+- Si dos lo aceptan a la vez, se lo queda el que pulsó antes y al otro le avisa.
+- **Soltar:** si al final no puedes, el pedido vuelve al tablón.
 - **Entrega por correo:** quien ha aceptado envía los objetos por correo al autor y la
-  petición **se completa sola** al enviarse el correo (solo cuentan los objetos pedidos y hasta
-  lo prometido). Con el buzón abierto, el botón **Preparar correo** pone el destinatario y el asunto.
+  petición **se completa sola** al enviarse el correo (solo cuentan los objetos pedidos). Con el buzón abierto, el botón **Preparar correo** pone el destinatario y el asunto.
 - **Recibido** (solo el autor): para entregas en mano. Las entregas suman al contador de
   encargos del fabricante.
 - **Renovar** y **Cerrar** (solo el autor). Las peticiones caducan a los **7 días**; las
   terminadas se siguen viendo 2 días. Máximo **10 abiertas** por jugador.
 
 ### Karma
-- **Sube** cuando entregas lo que aceptaste y **baja** cuando recibes lo que pediste, según su
-  valor en subasta: **1 punto por cada oro**. El precio se fija al crear la petición (con
-  Auctionator si lo tiene quien pide; si no, 1 oro por unidad).
+- **+1** por cada pedido que entregas y **−1** por cada pedido que recibes.
 - Si una petición caduca o se cierra sin recibir nada, no se pierde karma.
 - Se ve junto a cada nombre, hay una clasificación en Mis cosas y las peticiones de quien tiene
   **más karma salen antes** en las listas.
@@ -103,10 +109,10 @@ los materiales que te faltan (contando bolsas y banco):
 ### Modo demostración (para probar)
 En **Mis cosas**, marca **Modo demostración**: aparecen jugadores de ejemplo con sus recetas y
 peticiones. Solo los ves tú; nunca se envían a la hermandad. Algunas peticiones están hechas a tu
-medida: piden cosas que tú sabes fabricar o recolectar, y una va **dirigida a ti** (te salta el
+medida: piden cosas que tú sabes fabricar o recolectar, y una **corre prisa** (te salta el
 aviso con **Lo hago yo**). Para probar todo el proceso:
-1. Pulsa **Lo hago yo** en el aviso o en Peticiones y di cuántos haces. El de ejemplo te
-   contesta en el chat.
+1. Pulsa **Lo hago yo** en el aviso o **Aceptar encargo** en el tablón y elige cuándo lo
+   tendrás. El de ejemplo te contesta en el chat.
 2. Pulsa **Enviar (ejemplo)**: hace como si mandaras el correo (no se envía nada) y la petición
    se completa.
 3. A los pocos segundos el de ejemplo lo "recibe", te da las gracias y **sube tu karma**.
@@ -116,7 +122,7 @@ Al desmarcarlo desaparece todo lo de ejemplo.
 ### Mis cosas
 Tus profesiones publicadas, el **modo demostración**, el modo **No disponible** (sin avisos y apareces el último),
 los avisos y el sonido, un **diagnóstico** (dónde puso la pestaña, si lee tus profesiones, si
-encuentra Auctionator y el correo, versión del juego) y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
+encuentra el correo, versión del juego) y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
 
 ## Primera prueba en la hermandad: qué mirar
 
@@ -125,7 +131,7 @@ Activa los errores de Lua para verlos si salen: escribe `/console scriptErrors 1
 1. ¿Aparece la pestaña del engranaje en la ventana de hermandad? ¿Está bien colocada?
 2. Abre tus profesiones: ¿salen en **Mis cosas** con su número de recetas?
 3. Con dos o más conectados: ¿veis las recetas de los demás en **Recetas**?
-4. Haz una petición: ¿le llega el aviso a quien sabe hacerlo? ¿Funcionan *Lo hago yo* y *Recibido*?
+4. Haz una petición: ¿le llega el aviso a quien sabe hacerlo? ¿Funcionan *Aceptar encargo* y *Recibido*?
 5. Sal y vuelve a entrar: ¿se mantiene todo? ¿Le llegan los datos a quien entra más tarde?
 
 Si algo falla, haz una captura del error (o de la ventana) y dile qué estabas haciendo.

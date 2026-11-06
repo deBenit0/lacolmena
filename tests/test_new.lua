@@ -1,5 +1,5 @@
 local H = ...
--- Modo demostración, "Pedir" sobre un material, contra reembolso y precios de subasta.
+-- Modo demostración, "Pedir" sobre un material y contra reembolso.
 H.AddMember("Pepe")
 H.AddMember("Ana")
 local BLACKSMITHING = {
@@ -48,7 +48,7 @@ H.ok(keys.i4234 and keys.i2840, "materiales de mi coraza: cuero (Peletería) y b
 H.ok(penv.HDFProfPanel.title:GetText():find("DEMOSTRACIÓN", 1, true), "el título avisa del modo demostración")
 -- Peticiones de ejemplo para mí: aceptar, "enviar" y ver subir el karma.
 local mineReq = ns.G().requests["Bruno-Demo:tuya1"]
-H.ok(mineReq and mineReq.k == "i12405" and mineReq.to == ns.Me(), "petición de ejemplo para mí con algo que sé hacer")
+H.ok(mineReq and mineReq.k == "i12405" and mineReq.pr == 1, "petición de ejemplo con algo que sé hacer (y prisa)")
 H.ok(ns.Data.CanServe(mineReq, ns.Now()), "puedo atenderla")
 ns.UI.Open("board")
 local board = penv.HDFProfPanel.pageFrames.board
@@ -70,10 +70,10 @@ for _, it in ipairs(board.list.items) do H.ok(it.canServe, "filtro: solo las que
 board.onlyMine:SetChecked(false)
 board.onlyMine:GetScript("OnClick")(board.onlyMine)
 local alert = penv.HDFProfAlert -- ya salió (y se cerró solo) al activar el modo
-H.ok(alert and alert.alert and alert.alert.id == mineReq.id and alert.text:GetText():find("(a ti)", 1, true),
+H.ok(alert and alert.alert and alert.alert.id == mineReq.id and alert.text:GetText():find("(ya)", 1, true),
   "salta el aviso de la petición de ejemplo")
 alert.commit:Click()
-pepe.popups[#pepe.popups].data.callback(mineReq.q)
+penv.HDFProfChoice.buttons[1]:Click()
 H.ok(mineReq.c and mineReq.c[ns.Me()] and mineReq.c[ns.Me()].n == mineReq.q, "aceptada")
 -- En el tablón sale arriba como "Tu encargo" con el botón de enviar y si tengo los materiales.
 board:Refresh()
@@ -108,26 +108,10 @@ H.ok(dialog:IsShown() and dialog.key == "i4234", "abre la petición de cuero")
 H.eq(dialog.qty:GetText(), "7", "lo que falta: 4x2 - 1")
 dialog:Hide()
 
--- 3) Precios: los apunta al mirar la subasta y Auctionator manda si está.
-penv.GetNumAuctionItems = function() return 2 end
-penv.GetAuctionItemInfo = function(_, i)
-  if i == 1 then return "Cuero", "", 5, 1, true, 1, nil, 0, 0, 5000, 0, nil, nil, "X", nil, 0, 4234 end
-  return "Cuero", "", 2, 1, true, 1, nil, 0, 0, 1800, 0, nil, nil, "Y", nil, 0, 4234
-end
-H.FireEvent(pepe, "AUCTION_ITEM_LIST_UPDATE")
-H.Advance(1)
-local unit, source = ns.Prices.Get(4234)
-H.eq(unit, 900, "la venta más barata por unidad: 1800/2")
-H.eq(source, "subasta", "fuente: subasta")
-H.eq((ns.Prices.Suggest(4234, 10)), 8100, "oferta por 10: 9000 menos un 10%")
-penv.Auctionator = { API = { v1 = { GetAuctionPriceByItemID = function() return 1200 end } } }
-unit, source = ns.Prices.Get(4234)
-H.ok(unit == 1200 and source == "Auctionator", "con Auctionator usa su precio")
-
--- 4) Contra reembolso al preparar el correo.
+-- 3) Contra reembolso al preparar el correo.
 local req = ns.Sync.CreateRequest({ k = "i4234", q = 10, g = 9000 })
 H.Advance(10)
-ana.ns.Sync.Commit(req.id, 10)
+ana.ns.Sync.Commit(req.id, 1)
 H.Advance(10)
 local aenv, cod = ana.env, nil
 aenv.MailFrame = aenv.CreateFrame("Frame", "MailFrame")

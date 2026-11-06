@@ -4,22 +4,21 @@
 local _, ns = ...
 local W, Data = ns.W, ns.Data
 
--- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y no es para otra persona)
+-- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y nadie lo ha cogido)
 local function canAccept(r, info, me)
-  return r.a ~= me and info.state == "open" and info.remaining > 0 and (not r.to or r.to == me)
+  return r.a ~= me and info.state == "open" and not info.owner and info.remaining > 0
 end
 
-local function accept(r)
-  local info = Data.RequestInfo(r, ns.Now())
-  W.AskAmount(string.format("¿Cuántos vas a hacer? (faltan %d)", info.remaining), info.remaining, function(n)
-    ns.Sync.Commit(r.id, n)
-  end)
+local function urgencyText(r)
+  if not r.pr then return nil end
+  local color = r.pr == 1 and "|cffff4040" or "|cffff9933"
+  return color .. Data.WHEN[r.pr].need .. "|r"
 end
 
 -- Lo que me queda por enviar de un pedido que acepté (0 si nada).
 local function toSend(r, me, now)
   local cm = r.a ~= me and r.c and r.c[me]
-  if not cm or not Data.CommitActive(cm, now) then return 0 end
+  if not cm or not Data.CommitActive(cm, now, r) then return 0 end
   return math.max(0, (cm.n or 0) - Data.DeliveredOf(cm))
 end
 
@@ -62,7 +61,8 @@ local function collect(seenAt)
   for _, r in pairs(g.requests) do
     local info = Data.RequestInfo(r, now)
     local pending = toSend(r, me, now)
-    local visible = info.state == "open" and (not r.to or r.to == me or r.a == me)
+    local mine = r.a == me
+    local visible = info.state == "open" or (mine and Data.IsActiveState(info.state))
     if pending > 0 or visible then
       local item = {
         r = r, info = info, me = me, now = now, mine = r.a == me, pending = pending,
@@ -89,7 +89,6 @@ end
 local function rank(x)
   if x.pending > 0 then return 0 end -- mis encargos por enviar
   if x.mine then return 5 end
-  if x.r.to == x.me then return 1 end
   if x.canServe then return 2 end
   if x.new then return 3 end
   return 4
@@ -157,7 +156,6 @@ ns.UI.RegisterPage("board", function(page)
       local tags = ""
       if item.pending > 0 then tags = tags .. "|cff66ccff[Tu encargo]|r " end
       if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
-      if r.to == item.me and not item.mine then tags = tags .. "|cffff80ff[A ti]|r " end
       if item.mine then tags = tags .. "|cff999999[Tuyo]|r " end
       local title = tags .. string.format("%dx %s", r.q, ns.KeyLabel(r.k))
       if item.canServe and item.pending == 0 then title = title .. "  |cff40ff40(puedes hacerlo)|r" end
@@ -166,11 +164,19 @@ ns.UI.RegisterPage("board", function(page)
       local parts = { "Pide " .. ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ")" }
       parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (r.t or item.now))
       if item.pending > 0 then
-        parts[#parts + 1] = string.format("te comprometiste a %d, te quedan %d por enviar", r.c[item.me].n, item.pending)
+        local by = r.c[item.me].by
+        parts[#parts + 1] = by and ("plazo: " .. (by > item.now and ("quedan " .. ns.FormatDuration(by - item.now))
+          or "|cffff4040se acaba|r")) or "por enviar"
+      elseif item.mine and info.owner then
+        local cm = r.c[info.owner]
+        parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
+          .. (cm.by and (" (plazo " .. ns.FormatDuration(math.max(0, cm.by - item.now)) .. ")") or "")
       else
-        parts[#parts + 1] = string.format("faltan %d de %d", info.remaining, r.q)
+        parts[#parts + 1] = "nadie lo ha cogido"
       end
-      if r.g then parts[#parts + 1] = "paga " .. ns.FormatMoney(r.g) end
+      local urgency = urgencyText(r)
+      if urgency then parts[#parts + 1] = urgency end
+      if r.g then parts[#parts + 1] = "propina " .. ns.FormatMoney(r.g) end
       row.sub:SetText(table.concat(parts, "  |cff666666·|r  "))
 
       local mats
@@ -196,10 +202,9 @@ ns.UI.RegisterPage("board", function(page)
           row.accept:SetScript("OnClick", function() ns.Mail.Prepare(r, item.pending) end)
         end
       else
-        local cm = r.c and r.c[item.me]
-        row.accept:SetText(cm and Data.CommitActive(cm, item.now) and "Aceptar más" or "Aceptar encargo")
+        row.accept:SetText("Aceptar encargo")
         row.accept:SetEnabled(item.acceptable)
-        row.accept:SetScript("OnClick", function() accept(r) end)
+        row.accept:SetScript("OnClick", function() W.AcceptRequest(r) end)
       end
     end,
     onSelect = function(item) ns.UI.Open("requests", item.r.id) end,
@@ -224,7 +229,9 @@ ns.UI.RegisterPage("board", function(page)
     table.sort(items, function(a, b)
       local ra, rb = rank(a), rank(b)
       if ra ~= rb then return ra < rb end
-      if a.karma ~= b.karma then return a.karma > b.karma end -- prioridad por karma
+      local pa, pb = a.r.pr or 9, b.r.pr or 9
+      if pa ~= pb then return pa < pb end -- primero los que corren prisa
+      if a.karma ~= b.karma then return a.karma > b.karma end -- luego por karma
       if (a.r.t or 0) ~= (b.r.t or 0) then return (a.r.t or 0) > (b.r.t or 0) end
       return a.r.id < b.r.id
     end)

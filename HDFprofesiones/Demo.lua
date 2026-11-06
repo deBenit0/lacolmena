@@ -73,7 +73,7 @@ local function full(name) return name .. "-" .. REALM end
 -- para que puedas probar todo el proceso (aceptar, enviar y ver cómo sube tu karma).
 local ASKERS = { "Bruno", "Nimra", "Chispa", "Ivette", "Tula", "Pepa" }
 local GATHER_ITEMS = { [393] = 4234, [182] = 3820, [186] = 2772 } -- cuero pesado, hierba, mineral de hierro
-local FALLBACK_ITEM = 2318 -- cuero ligero: si no sabes hacer nada, una dirigida a ti
+local FALLBACK_ITEM = 2318 -- cuero ligero: si aún no sabes hacer nada, para que puedas probar igual
 
 local function myKeys()
   local c = ns.MyChar()
@@ -103,15 +103,15 @@ end
 local function addMyRequests(g, now)
   local keys = myKeys()
   local list = {}
-  -- Una siempre va dirigida a ti, así puedes probarlo aunque aún no tengas profesiones.
-  table.insert(list, { k = keys[1] or ("i" .. FALLBACK_ITEM), to = ns.Me() })
-  for i = 2, #keys do list[#list + 1] = { k = keys[i] } end
+  -- Siempre hay al menos una, así puedes probarlo aunque aún no tengas profesiones.
+  table.insert(list, { k = keys[1] or ("i" .. FALLBACK_ITEM), pr = 1 })
+  for i = 2, #keys do list[#list + 1] = { k = keys[i], pr = (i % 3 == 0) and 3 or nil } end
   local made = {}
   for i, item in ipairs(list) do
     local author = full(ASKERS[(i - 1) % #ASKERS + 1])
     local r = Data.SanitizeRequest({
       id = author .. ":tuya" .. i, a = author, t = now - i * 240, k = item.k,
-      q = 5 * i, av = now, g = 10000 * i, m = (i % 2 == 0) or nil, to = item.to,
+      q = 5 * i, av = now, g = 10000 * i, m = (i % 2 == 0) or nil, pr = item.pr,
     })
     if r then
       r.demo = true
@@ -130,14 +130,14 @@ end
 -- Has aceptado una petición de ejemplo.
 function Demo.OnCommit(r)
   if not r or not r.demo then return end
-  ns.After(2, function() say(r.a, "¡Genial, muchas gracias! Mándamelo por correo cuando lo tengas.") end)
+  ns.After(2, function() say(r.a, "¡Genial, es tuyo! Mándamelo por correo cuando lo tengas.") end)
 end
 
 -- "Enviar (ejemplo)": hace como si mandaras el correo; el autor lo recibe a los pocos segundos.
 function Demo.SimulateMail(r)
   local g, me, now = ns.G(), ns.Me(), ns.Now()
   local cm = r and r.demo and r.c and r.c[me]
-  if not cm or not Data.CommitActive(cm, now) then return false end
+  if not cm or not Data.CommitActive(cm, now, r) then return false end
   local units = cm.n - Data.DeliveredOf(cm)
   if units <= 0 then return false end
   cm.s = Data.DeliveredOf(cm) + units
@@ -149,13 +149,13 @@ function Demo.SimulateMail(r)
     local e = g.entries[r.a]
     if not ns.db.settings.demo or not e or g.requests[r.id] ~= r then return end
     -- El autor apunta el karma y el encargo, igual que haría un jugador de verdad.
-    local value = units * (r.vu or Data.DEFAULT_UNIT_VALUE)
+    local value = Data.KARMA_POINT -- 1 punto por pedido
     e.kc = e.kc or {}
     e.kc[me] = (e.kc[me] or 0) + value
     e.kd = (e.kd or 0) + value
     e.th = e.th or {}
     e.th[me] = (e.th[me] or 0) + 1
-    say(r.a, string.format("¡Recibido! Gracias, crack. (+%d de karma para ti)", math.floor(value / 10000)))
+    say(r.a, "¡Recibido! Gracias, crack. (+1 de karma para ti)")
     ns.Fire("DATA_CHANGED", "entry", r.a)
   end)
   return true
@@ -240,8 +240,9 @@ function Demo.Enable()
     })
     -- algunas ya tienen a alguien encargado
     if i % 4 == 0 then
-      r.c = { [full("Roca")] = { n = math.ceil(req[3] / 2), cv = now - 600 } }
+      r.c = { [full("Roca")] = { n = req[3], cv = now - 600, w = 2, by = now + 5400 } }
     end
+    if i % 5 == 0 then r.pr = 1 elseif i % 3 == 0 then r.pr = 3 end
     r.demo = true
     g.requests[r.id] = r
   end
@@ -276,7 +277,7 @@ function Demo.Set(on)
       ns.After(1.5, function()
         local _, icon = ns.KeyInfo(r.k)
         ns.Alerts.Push({ id = r.id, icon = icon, canCommit = true,
-          text = string.format("%s pide %dx %s (a ti)", ns.ShortName(r.a), r.q, ns.KeyLabel(r.k)) })
+          text = string.format("%s pide %dx %s (ya)", ns.ShortName(r.a), r.q, ns.KeyLabel(r.k)) })
       end)
     end
   else

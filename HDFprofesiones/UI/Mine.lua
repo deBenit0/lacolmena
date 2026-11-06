@@ -94,7 +94,7 @@ ns.UI.RegisterPage("mine", function(page)
       string.format("Peticiones activas: %d", active),
       string.format("Tus peticiones abiertas: %d/%d", Data.CountOpenBy(me, now), Data.MAX_OPEN),
       string.format("Encargos que te han confirmado: %d", Data.ThanksFor(me)),
-      "Tu karma: " .. Data.KarmaText(me) .. " |cff999999(1 punto = 1 oro entregado; baja al recibir)|r",
+      "Tu karma: " .. Data.KarmaText(me) .. " |cff999999(+1 por pedido entregado, -1 por pedido recibido)|r",
       " ",
       "|cffffd100Addon|r",
       "Tu versión: " .. ns.VERSION,
@@ -131,14 +131,12 @@ ns.UI.RegisterPage("mine", function(page)
     local hostNames = ns.UI.HostNames()
     local profCount = 0
     for _ in pairs(c.profs) do profCount = profCount + 1 end
-    local priceSource = (Auctionator and Auctionator.API and "Auctionator") or (TSM_API and "TSM") or nil
     local build = GetBuildInfo and select(4, GetBuildInfo())
     stats[#stats + 1] = " "
     stats[#stats + 1] = "|cffffd100Diagnóstico|r"
     stats[#stats + 1] = "Pestaña en: " .. yes(#hostNames > 0, table.concat(hostNames, ", "), "no encontrada")
     stats[#stats + 1] = "Ventana de profesión: " .. yes(GetNumTradeSkills ~= nil, "compatible", "no compatible")
       .. "  (" .. profCount .. " leídas)"
-    stats[#stats + 1] = "Precios: " .. yes(priceSource ~= nil, priceSource or "", "sin Auctionator (usa lo que apunte)")
     stats[#stats + 1] = "Correo: " .. yes(SendMail ~= nil, "compatible", "no compatible")
     stats[#stats + 1] = "Interfaz del juego: " .. tostring(build or "?")
     page.stats:SetText(table.concat(stats, "\n"))

@@ -307,10 +307,6 @@ local function buildCatalog(page, mode)
   detail.sub:SetPoint("TOPLEFT", detail.name, "BOTTOMLEFT", 0, -4)
   detail.sub:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
 
-  detail.price = W.Text(detail, "GameFontHighlightSmall")
-  detail.price:SetPoint("TOPLEFT", detail.sub, "BOTTOMLEFT", 0, -2)
-  detail.price:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
-  detail.price:SetWordWrap(false)
 
   detail.matsLabel = W.Text(detail, "GameFontNormalSmall")
   detail.matsLabel:SetPoint("TOPLEFT", 12, -62)
@@ -410,24 +406,20 @@ local function buildCatalog(page, mode)
   detail.minus:SetScript("OnClick", function() setQuantity(quantity() - (state.step or 1)) end)
   detail.plus:SetScript("OnClick", function() setQuantity(quantity() + (state.step or 1)) end)
 
-  local function requestOptions(to)
-    return { k = state.key, pk = state.pk or Data.SingleProfession(state.key), q = quantity(), to = to }
+  local function requestOptions()
+    return { k = state.key, pk = state.pk or Data.SingleProfession(state.key), q = quantity() }
   end
 
-  detail.askAll = W.Button(detail, "Pedir a todos", 104, 22, function()
-    if state.key then ns.UI.OpenRequestDialog(requestOptions(nil)) end
+  -- El pedido va siempre a toda la hermandad (se lo queda el primero que lo acepte).
+  detail.askAll = W.Button(detail, "Pedir a la hermandad", 150, 22, function()
+    if state.key then ns.UI.OpenRequestDialog(requestOptions()) end
   end)
   detail.askAll:SetPoint("BOTTOMLEFT", 8, 8)
-  detail.askOne = W.Button(detail, "Pedir a...", 124, 22, function()
-    local c = crafters:Selected()
-    if state.key and c then ns.UI.OpenRequestDialog(requestOptions(c.name)) end
-  end)
-  detail.askOne:SetPoint("LEFT", detail.askAll, "RIGHT", 4, 0)
   detail.whisper = W.Button(detail, "Susurrar", 96, 22, function()
     local c = crafters:Selected()
     if c and ChatFrame_SendTell then ChatFrame_SendTell(c.name) end
   end)
-  detail.whisper:SetPoint("LEFT", detail.askOne, "RIGHT", 4, 0)
+  detail.whisper:SetPoint("LEFT", detail.askAll, "RIGHT", 4, 0)
 
   detail.empty = W.Text(detail, "GameFontNormal", "CENTER")
   detail.empty:SetTextColor(0.6, 0.6, 0.6)
@@ -451,8 +443,6 @@ local function buildCatalog(page, mode)
     local me = ns.Me()
     local other = c and c.name ~= me
     detail.askAll:SetEnabled(state.key ~= nil)
-    detail.askOne:SetEnabled(state.key ~= nil and other or false)
-    detail.askOne:SetText(other and ("Pedir a " .. ns.ShortName(c.name)) or "Pedir a...")
     detail.whisper:SetEnabled(other or false)
   end
 
@@ -497,10 +487,10 @@ local function buildCatalog(page, mode)
     local rec = key and Data.GetIndex()[key]
     local hasKey = key ~= nil and (rec ~= nil or state.gatherOnly[key] ~= nil)
     local regions = {
-      detail.price, detail.fav,
+      detail.fav,
       detail.icon, detail.name, detail.sub, detail.matsLabel, detail.craftersLabel, crafters,
       detail.qtyLabel, detail.minus, detail.qty, detail.plus, detail.made,
-      detail.askAll, detail.askOne, detail.whisper,
+      detail.askAll, detail.whisper,
     }
     for _, region in ipairs(regions) do region:SetShown(hasKey) end
     detail.empty:SetShown(not hasKey)
@@ -529,16 +519,7 @@ local function buildCatalog(page, mode)
     if materials and skill and #(Data.GatherersOf(key)) > 0 then profNames[#profNames + 1] = ns.ProfessionName(skill) end
     table.sort(profNames)
     detail.sub:SetText(table.concat(profNames, ", "))
-    -- Precio en la subasta (Auctionator si está instalado).
-    local kind, itemID = ns.ParseKey(key)
-    local unit, source
-    if kind == "i" then unit, source = ns.Prices.Get(itemID) end
-    if unit then
-      detail.price:SetText("En subasta: " .. ns.FormatMoney(unit) .. " cada uno |cff999999(" .. source .. ")|r")
-    else
-      detail.price:SetText("|cff999999Sin precio de subasta (abre la subasta o usa Auctionator)|r")
-      if kind == "i" then ns.Prices.Query(itemID) end
-    end
+    local _, itemID = ns.ParseKey(key)
     local made = 1
     if materials then
       -- En materiales: para qué recetas tuyas sirve.

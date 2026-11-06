@@ -6,7 +6,7 @@ local FILTERS = {
   { id = "active", label = "Ver: activas" },
   { id = "craft", label = "Ver: puedo hacerlas" },
   { id = "mine", label = "Ver: mías" },
-  { id = "involved", label = "Ver: para mí / aceptadas" },
+  { id = "involved", label = "Ver: aceptadas por mí" },
   { id = "ended", label = "Ver: terminadas" },
 }
 
@@ -46,7 +46,7 @@ local function matchesFilter(filter, r, info, me)
   end
   if filter == "mine" then return r.a == me end
   if filter == "involved" then
-    return active and (r.to == me or (myCommit and Data.CommitActive(myCommit, ns.Now())) or false)
+    return active and (myCommit and Data.CommitActive(myCommit, ns.Now(), r)) or false
   end
   if filter == "ended" then return not active end
   return true
@@ -118,7 +118,6 @@ ns.UI.RegisterPage("requests", function(page)
       local _, icon = ns.KeyInfo(r.k)
       row.icon:SetTexture(icon)
       local title = string.format("%dx %s", r.q, ns.KeyLabel(r.k))
-      if r.to == ns.Me() then title = "|cffff80ff[A ti]|r " .. title end
       row.title:SetText(title)
       local sub = ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ") - " .. stateText(r, info)
       local pay = r.g and ns.FormatMoney(r.g)
@@ -249,16 +248,12 @@ ns.UI.RegisterPage("requests", function(page)
       end)
     else
       local mine = r.c and r.c[me]
-      local canCommit = info.state == "open" and (not r.to or r.to == me)
-      setButton(detail.b1, "Lo hago yo", canCommit, function()
-        W.AskAmount(string.format("¿Cuántos vas a hacer? (faltan %d)", info.remaining), info.remaining, function(n)
-          ns.Sync.Commit(r.id, n)
-        end)
-      end)
-      setButton(detail.b2, "Soltar", mine and Data.CommitActive(mine, now), function()
+      local canCommit = info.state == "open" and not info.owner
+      setButton(detail.b1, "Aceptar encargo", canCommit, function() W.AcceptRequest(r) end)
+      setButton(detail.b2, "Soltar", mine and Data.CommitActive(mine, now, r), function()
         W.Confirm("¿Seguro que ya no lo vas a hacer?", function() ns.Sync.Release(r.id) end)
       end)
-      local myActive = mine and Data.CommitActive(mine, now)
+      local myActive = mine and Data.CommitActive(mine, now, r)
       if r.demo and myActive and mine.n > Data.DeliveredOf(mine) then
         -- Petición de ejemplo: no se puede mandar correo a alguien que no existe; se simula.
         setButton(detail.b3, "Enviar (ejemplo)", true, function() ns.Demo.SimulateMail(r) end)
@@ -296,19 +291,26 @@ ns.UI.RegisterPage("requests", function(page)
     local lines = {}
     lines[#lines + 1] = "Estado: " .. stateText(r, info)
     if Data.IsActiveState(info.state) then
-      lines[#lines + 1] = string.format("Entregadas: %d de %d   Faltan por cubrir: %d", info.delivered, r.q, info.remaining)
+      lines[#lines + 1] = string.format("Entregadas: %d de %d", info.delivered, r.q)
       lines[#lines + 1] = "Caduca en " .. ns.FormatDuration(info.expires - now)
     end
     lines[#lines + 1] = r.m and "Materiales: |cff40ff40los pone quien pide|r" or "Materiales: |cffffd100los pone quien fabrica|r"
     local needed = neededMaterials(r)
     if needed then lines[#lines + 1] = "|cffbbbbbbHace falta: " .. needed .. "|r" end
-    lines[#lines + 1] = "Paga: " .. (payText(r) or "|cffbbbbbbnada indicado|r")
-    lines[#lines + 1] = "Para: " .. (r.to and ns.ShortName(r.to) or "cualquiera")
+    lines[#lines + 1] = "Propina: " .. (payText(r) or "|cffbbbbbbninguna|r")
+    lines[#lines + 1] = "Prisa: " .. (r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. "|r") or "sin prisa")
+    if info.owner then
+      local cm = r.c[info.owner]
+      local w = cm.w and Data.WHEN[cm.w]
+      lines[#lines + 1] = "Lo hace: |cffffffff" .. ns.ShortName(info.owner) .. "|r"
+        .. (w and (" (" .. w.label:lower() .. ")") or "")
+        .. (cm.by and (", plazo " .. ns.FormatDuration(math.max(0, cm.by - now))) or "")
+    end
     if r.demo then
       lines[#lines + 1] = "|cffff8040Petición de ejemplo: acéptala y pulsa \"Enviar (ejemplo)\" para simular el correo.|r"
     end
     local mine = r.c and r.c[ns.Me()]
-    if mine and Data.CommitActive(mine, now) then
+    if mine and Data.CommitActive(mine, now, r) then
       lines[#lines + 1] = string.format("|cff40ff40Envíale %d por correo a %s: la petición se completará sola.|r",
         mine.n - Data.DeliveredOf(mine), ns.ShortName(r.a))
     end
@@ -361,8 +363,6 @@ ns.UI.RegisterPage("requests", function(page)
       end
     end
     table.sort(items, function(a, b)
-      local aMe, bMe = a.r.to == me, b.r.to == me
-      if aMe ~= bMe then return aMe end
       local aActive, bActive = Data.IsActiveState(a.info.state), Data.IsActiveState(b.info.state)
       if aActive ~= bActive then return aActive end
       -- Prioridad: primero las de quien tiene más karma.

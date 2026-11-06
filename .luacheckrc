@@ -9,7 +9,7 @@ globals = { "HDFProfesiones", "HDFProfesionesDB", "StaticPopupDialogs", "UISpeci
 
 read_globals = {
   -- Lua de WoW
-  "wipe", "tinsert", "hooksecurefunc", "geterrorhandler", "time",
+  "wipe", "tinsert", "hooksecurefunc", "geterrorhandler", "time", "date",
   -- Marcos e interfaz
   "CreateFrame", "UIParent", "GameTooltip", "DEFAULT_CHAT_FRAME", "BackdropTemplateMixin",
   "FauxScrollFrame_Update", "FauxScrollFrame_GetOffset", "FauxScrollFrame_SetOffset", "FauxScrollFrame_OnVerticalScroll",
