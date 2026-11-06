@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+<!-- Pañal chulo: Con gafas de sol: el pañal más guay del subathon -->
+<rect x="2" y="2" width="68" height="68" rx="16" fill="#121216" stroke="#facc15" stroke-width="4"/><g transform="translate(36 41) scale(1) translate(-36 -39)">
+  <path d="M13 20 H59 V29 C59 47 47 58 36 58 C25 58 13 47 13 29 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M13 28 H59" stroke="#d4d4d8" stroke-width="2.5"/>
+  <rect x="9" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <rect x="54" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <path d="M22 36 H50" stroke="#0a0a0c" stroke-width="2.5"/>
+   <path d="M22 35 H34 V39 C34 43 31 45 28 45 C25 45 22 43 22 39 Z M38 35 H50 V39 C50 43 47 45 44 45 C41 45 38 43 38 39 Z" fill="#0a0a0c"/>
+   <path d="M25 38 L28 37" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/><path d="M41 38 L44 37" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+   <path d="M31 50 Q36 53 41 50" fill="none" stroke="#0a0a0c" stroke-width="2" stroke-linecap="round"/>
+</g>
+</svg>

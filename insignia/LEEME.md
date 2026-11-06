@@ -19,3 +19,19 @@ y el fondo oscuro del overlay del subathon.
 ```
 🎁 EVENTO ESPECIAL: regala 5 subs durante el subathon y te llevas para siempre la insignia de Regalador del Subathon del Fundillo 💩 Además, cada sub regalada te mete en los sorteos del subathon 🎟️
 ```
+
+## Más versiones (`variantes/`)
+
+En `variantes/hoja-variantes.png` están todas juntas, en grande y a tamaño real en el chat. Cada una tiene su
+`.svg` y su `-1024.png` para subir a Twitch:
+
+| Archivo | Nombre | Idea |
+|---|---|---|
+| `corona` | Rey del Pañal | Corona dorada: ideal para el top de regaladores |
+| `regalo` | Pañal de regalo | Envuelto con lazo: encaja con «regala 5 subs» |
+| `cacota` | Pañal con sorpresa | Caquita sonriente asomando: el humor del Fundillo |
+| `alas` | Pañal con alas | Angelito con aureola: «gracias por tu apoyo» |
+| `gafas` | Pañal chulo | Con gafas de sol |
+| `x5` | Pañal x5 | Dice claramente cómo se gana |
+| `reventando` | Pañal a reventar | Lleno, con chispas, como la meta del overlay |
+| `medalla` | Medalla del Pañal | Medalla redonda con cinta |

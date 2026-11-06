@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+<!-- Pañal de regalo: El pañal envuelto con lazo: encaja con «regala 5 subs» -->
+<rect x="2" y="2" width="68" height="68" rx="16" fill="#121216" stroke="#facc15" stroke-width="4"/><g transform="translate(36 43) scale(0.9) translate(-36 -39)">
+  <path d="M13 20 H59 V29 C59 47 47 58 36 58 C25 58 13 47 13 29 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M13 28 H59" stroke="#d4d4d8" stroke-width="2.5"/>
+  <rect x="9" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <rect x="54" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <path d="M36 21 V57" stroke="#ff4d6d" stroke-width="5"/><path d="M36 21 V57" stroke="#0a0a0c" stroke-width="5" stroke-opacity="0" />
+</g><path d="M36 18 C30 10 22 11 24 16 C25 19 31 19 36 18 Z M36 18 C42 10 50 11 48 16 C47 19 41 19 36 18 Z" fill="#ff4d6d" stroke="#0a0a0c" stroke-width="2" stroke-linejoin="round"/>
+   <circle cx="36" cy="18" r="3" fill="#ff4d6d" stroke="#0a0a0c" stroke-width="2"/>
+</svg>

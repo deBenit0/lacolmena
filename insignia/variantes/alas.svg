@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+<!-- Pañal con alas: pañal angelito con alas, «gracias por tu apoyo» -->
+<rect x="2" y="2" width="68" height="68" rx="16" fill="#121216" stroke="#facc15" stroke-width="4"/><path d="M22 33 C14 27 7 29 6 34 C9 34 10 36 8 38 C11 39 13 40 11 43 C15 44 19 42 22 39 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2" stroke-linejoin="round"/><path d="M50 33 C58 27 65 29 66 34 C63 34 62 36 64 38 C61 39 59 40 61 43 C57 44 53 42 50 39 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2" stroke-linejoin="round"/><g transform="translate(36 43) scale(0.7) translate(-36 -39)">
+  <path d="M13 20 H59 V29 C59 47 47 58 36 58 C25 58 13 47 13 29 Z" fill="#ffffff" stroke="#0a0a0c" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M13 28 H59" stroke="#d4d4d8" stroke-width="2.5"/>
+  <rect x="9" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <rect x="54" y="21" width="9" height="8" rx="2.5" fill="#facc15" stroke="#0a0a0c" stroke-width="2"/>
+  <path d="M36 50 C29 45 26 41 26 37.5 C26 34.5 28.3 32.5 31 32.5 C33 32.5 34.7 33.6 36 35.4 C37.3 33.6 39 32.5 41 32.5 C43.7 32.5 46 34.5 46 37.5 C46 41 43 45 36 50 Z" fill="#facc15" stroke="#0a0a0c" stroke-width="1.8" stroke-linejoin="round"/>
+</g><ellipse cx="36" cy="16" rx="9" ry="2.8" fill="none" stroke="#facc15" stroke-width="2.6"/>
+</svg>
