@@ -12,6 +12,8 @@ Sorteos para directos de **Twitch** que funcionan **en el navegador**, sin insta
 
 ![Panel en modo Subathon](docs/panel-subathon.png)
 
+![Sorteo de opciones](docs/panel-opciones.png)
+
 ![Nombres cayendo en OBS](docs/escena-nombres.png)
 
 ![Ganador en OBS](docs/escena-ganador.png)
@@ -27,16 +29,34 @@ se recalculan al instante y nadie desaparece de la lista.
 | **Subs más papeletas** | Todo el que escriba `!sorteo` | No sub 1 · Tier 1/Prime 2 · Tier 2 3 · Tier 3 4 |
 | **Solo subs** | Solo suscriptores que escriban `!sorteo` | 1 cada uno |
 | **Más gasto, más papeletas** | Todo el que escriba `!sorteo` | 1 + 1 por cada euro gastado (mínimo 1 si gasta algo) |
-| **Subathon** | Solo quien regala subs o dona (bits, Hype Chat, StreamElements, a mano). Escribir `!sorteo` o suscribirse uno mismo **no** cuenta | 1 por cada euro donado (hay que donar al menos 1 € en total) |
+| **Subathon** | Solo quien regala subs o dona (bits, Hype Chat, StreamElements, `!donacion`, a mano). Escribir `!sorteo` o suscribirse uno mismo **no** cuenta | 1 por cada euro neto donado (hay que llegar al menos a 1 €) |
 
 En todos los modos, quien gasta (bits, subs, regalos, Hype Chat) entra aunque no escriba la palabra (se puede desactivar).
 Las papeletas de cada tier, el máximo por persona y el resto se cambian en **Ajustes**.
 
+### Sortear opciones (hitos del subathon)
+
+Arriba del panel eliges **👥 Sortear personas** o **📝 Sortear opciones**. Con opciones no se sortea gente, sino
+propuestas: el póster, el nombre del alter, el disfraz…
+
+- **A mano:** escribe opciones en el cuadro, una por línea, y pulsa *Añadir*.
+- **Sugerencias del chat:** marca *💬 Recoger sugerencias del chat* y el chat propone con `!sugerencia texto`.
+  Una por persona (si vuelve a escribir, cambia la suya) y sin repetidas. Quita las que no valgan con ✕.
+- Las dos fuentes se juntan en la misma lista; *Vaciar lista* la deja limpia para el siguiente hito.
+- Todas las opciones tienen la misma probabilidad. En OBS sale «¡Ha salido!» con la opción y quién la propuso.
+
+**¿Qué se sortea?** es un texto (por ejemplo «Fondo de pantalla» o «Póster nuevo») que sale en OBS debajo de
+«SORTEO DEL FUNDILLO» y queda apuntado en la lista de ganadores. Vale para los dos tipos de sorteo.
+
 ### Subathon y donaciones de StreamElements
 
 En el modo **Subathon** entra en el sorteo quien regala subs o dona, y cuanto más dona, más papeletas tiene.
-Cada sub regalada vale su precio (Tier 1 = 3,99 € → 3 papeletas), cada 100 bits = 1 €, y los Hype Chats
-y las donaciones cuentan su importe. Suscribirse uno mismo no cuenta. El mínimo para entrar (1 € por defecto)
+Por defecto se cuenta en **€ netos, igual que la barra del overlay del subathon**: sub regalada Tier 1 1,98 €,
+Tier 2 3,96 €, Tier 3 9,91 €; de las donaciones cuenta el 90 %, de los bits el 70 % (100 bits = 0,70 €) y del
+Hype Chat el 70 %. Lo añadido a mano en el panel cuenta tal cual. Todo se cambia en Ajustes, o se pasa a € brutos.
+
+**Bizum y efectivo:** tú o un mod escribís en el chat `!donacion Nombre 5` (el mismo comando del overlay) y cuenta
+como donación. Si lo escribe alguien que no es mod, no hace nada. Suscribirse uno mismo no cuenta. El mínimo para entrar (1 € por defecto)
 y los euros por papeleta se cambian en Ajustes.
 
 **Donaciones de StreamElements:** el programa lee el aviso que pone el bot de StreamElements en el chat cuando alguien

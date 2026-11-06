@@ -214,7 +214,7 @@ test('bonus para el top 3 de regaladores de subs y de bits', () => {
 });
 
 test('modo subathon: solo regalos y donaciones, más papeletas a quien más dona', () => {
-  const sub = { ...aj, modo: 'subathon' };
+  const sub = { ...aj, modo: 'subathon', subathonNeto: false };
   const e = N.estadoVacio();
   const meter = (linea) => acc(linea, sub).forEach((a) => N.registrar(e, a, sub));
   meter(priv('id=a1', 'mirona', '!sorteo'));                                                         // escribir no mete
@@ -256,4 +256,60 @@ test('top 3 con más de 3 personas y empates', () => {
   assert.deepEqual(N.top3(ps, 'bits').map((t) => [t.login, t.puesto]), [['a', 1], ['b', 2], ['c', 2]]);
   const ps2 = [['a', 9], ['b', 7], ['c', 5], ['d', 5], ['e', 1]].map(([login, bits]) => ({ login, nombre: login, detalle: { bits } }));
   assert.deepEqual(N.top3(ps2, 'bits').map((t) => [t.login, t.puesto]), [['a', 1], ['b', 2], ['c', 3], ['d', 3]]);
+});
+
+test('subathon en € netos, como el overlay', () => {
+  const sub = { ...aj, modo: 'subathon', subathonNeto: true };
+  const e = N.estadoVacio();
+  const meter = (linea) => acc(linea, sub).forEach((a) => N.registrar(e, a, sub));
+  for (let i = 0; i < 5; i++) meter(`@login=t1;id=g1${i};msg-id=subgift;msg-param-sub-plan=1000;msg-param-recipient-user-name=r${i} :tmi.twitch.tv USERNOTICE #prueba`);
+  meter('@login=t3;id=g3;msg-id=subgift;msg-param-sub-plan=3000;msg-param-recipient-user-name=z :tmi.twitch.tv USERNOTICE #prueba');
+  meter(priv('bits=1000;id=b1', 'bitera', 'Cheer1000'));
+  meter(priv('id=d1', 'streamelements', 'Donante just tipped €10.00'));
+  const l = N.lista(e, sub);
+  const v = Object.fromEntries(l.participantes.map((p) => [p.login, [p.valor, p.papeletas]]));
+  assert.deepEqual(v, { t1: [9.9, 9], t3: [9.91, 9], bitera: [7, 7], donante: [9, 9] });
+  // en bruto, los mismos datos dan otras cifras
+  const b = Object.fromEntries(N.lista(e, { ...sub, subathonNeto: false }).participantes.map((p) => [p.login, p.papeletas]));
+  assert.deepEqual(b, { t1: 19, t3: 19, bitera: 10, donante: 10 });
+});
+
+test('!donacion solo la pueden usar mods y el dueño del canal', () => {
+  const sub = { ...aj, modo: 'subathon' };
+  const e = N.estadoVacio();
+  const meter = (linea) => acc(linea, sub).forEach((a) => N.registrar(e, a, sub));
+  meter(priv('badges=moderator/1;mod=1;id=c1', 'unmod', '!donacion @Abuela 20'));
+  meter(priv('badges=broadcaster/1;id=c2', 'prueba', '!donación Primo 5,50€'));
+  meter(priv('id=c3', 'listillo', '!donacion listillo 1000'));
+  assert.deepEqual(Object.keys(e.participantes).sort(), ['abuela', 'primo']);
+  assert.equal(e.participantes.abuela.detalle.donaciones, 20);
+  assert.equal(e.participantes.primo.detalle.donaciones, 5.5);
+  assert.equal(N.lista(e, sub).participantes.find((p) => p.login === 'abuela').papeletas, 18); // 20 € al 90 %
+});
+
+test('sugerencias del chat y lista a mano para sortear opciones', () => {
+  const e = N.estadoVacio();
+  const meter = (linea) => acc(linea).forEach((a) => N.registrar(e, a, aj));
+  meter(priv('id=s0', 'ana', '!sugerencia Gandalf'));                      // cerrado: no entra
+  assert.equal(e.opciones.length, 0);
+  e.recogiendo = true;
+  meter(priv('display-name=Ana;id=s1', 'ana', '!sugerencia   Gandalf   el Gris  '));
+  meter(priv('id=s2', 'luis', '!Sugerencia gandalf el gris'));             // repetida (sin importar mayúsculas)
+  meter(priv('id=s3', 'luis', '!sugerencia Legolas'));
+  meter(priv('id=s4', 'luis', '!sugerencia Aragorn'));                     // cambia la suya
+  meter(priv('id=s5', 'pepe', '!sugerencia'));                             // vacía
+  assert.deepEqual(e.opciones.map((o) => [o.texto, o.autor]), [['Gandalf el Gris', 'Ana'], ['Aragorn', 'luis']]);
+  assert.equal(N.anadirOpciones(e, ['Póster Zelda', '  ', 'aragorn', 'Póster Elden Ring']), 2);
+  assert.equal(e.opciones.length, 4);
+  e.queSorteo = 'Nombre del alter';
+  const vistos = new Set();
+  for (let i = 0; i < 200; i++) {
+    const copia = JSON.parse(JSON.stringify(e));
+    const t = N.sortearOpcion(copia, aj);
+    assert.equal(t.tira[t.indiceGanador], t.ganador.nombre);
+    assert.equal(t.titulo, 'Nombre del alter');
+    vistos.add(t.ganador.nombre);
+  }
+  assert.equal(vistos.size, 4, 'todas las opciones pueden salir');
+  assert.equal(N.sortearOpcion(N.estadoVacio(), aj), null);
 });

@@ -15,6 +15,8 @@
     //  'subathon' solo quien regala subs o dona (bits, Hype Chat, StreamElements…);
     //             suscribirse uno mismo o escribir la palabra no cuenta
     modo: 'igual',
+    // 'personas' (sortea gente del chat) u 'opciones' (lista a mano + sugerencias del chat)
+    tipoSorteo: 'personas',
     papeletasNoSub: 1,
     papeletasTier1: 2,
     papeletasTier2: 3,
@@ -32,6 +34,12 @@
     maximo: 0,
     // Subathon: donado mínimo (en €) para entrar. 0 = cualquier cantidad.
     subathonMinimo: 1,
+    // Contar en € netos, igual que la barra del overlay del subathon
+    subathonNeto: true,
+    netos: { subTier1: 1.98, subTier2: 3.96, subTier3: 9.91, porcentajeDonaciones: 90, porcentajeBits: 70, porcentajeHypeChat: 70 },
+    // Comandos del chat
+    comandoDonacion: '!donacion',     // solo mods y el dueño del canal: !donacion Nombre 5
+    comandoSugerencia: '!sugerencia', // cualquiera, mientras se recogen sugerencias
     // Donaciones de StreamElements/Streamlabs leídas del aviso que pone su bot en el chat.
     // Plantillas separadas por ";" con {usuario} y {cantidad}.
     botsDonaciones: ['streamelements', 'streamlabs'],
@@ -203,6 +211,26 @@
         }
         return res; // los mensajes del bot no cuentan para nada más
       }
+      const txt = texto(msg).trim();
+      const primera = (txt.split(/\s+/)[0] || '').toLowerCase();
+      const sinTilde = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // !donacion Nombre 5 → donación por Bizum o en efectivo apuntada por un mod (como en el overlay)
+      if (aj.comandoDonacion && sinTilde(primera) === sinTilde(aj.comandoDonacion)) {
+        const esMod = t.mod === '1' || /(^|,)(broadcaster|moderator)\//.test(t.badges || '');
+        const m = /^\S+\s+@?([\p{L}\p{N}_]{2,25})\s+(\d[\d.,]*)/u.exec(txt);
+        if (esMod && m) {
+          const importe = numeroDe(m[2]);
+          if (importe > 0) res.push({ tipo: 'donacion', id: id && id + ':cmd', login: m[1].toLowerCase(), nombre: m[1], cantidad: importe,
+            euros: importe, texto: `dona ${importe} € (Bizum/efectivo, lo apunta ${nombre})` });
+        }
+        return res;
+      }
+      // !sugerencia texto → opción para un sorteo de opciones
+      if (aj.comandoSugerencia && sinTilde(primera) === sinTilde(aj.comandoSugerencia)) {
+        const propuesta = txt.slice(primera.length).trim().replace(/\s+/g, ' ').slice(0, 60);
+        if (propuesta) res.push({ tipo: 'sugerencia', login, nombre, texto: propuesta });
+        return res;
+      }
       const bits = parseInt(t.bits, 10);
       if (bits > 0) {
         res.push({ tipo: 'bits', id: id && id + ':bits', login, nombre, cantidad: bits,
@@ -242,7 +270,7 @@
         // contamos estos para no duplicar.
         if (aj.subsRegaladasCuentanParaQuienRegala || aj.modo === 'subathon') {
           const para = t['msg-param-recipient-display-name'] || t['msg-param-recipient-user-name'] || '?';
-          res.push({ tipo: 'regalo', id, login, nombre, cantidad: 1, euros: valorSub(plan, aj),
+          res.push({ tipo: 'regalo', id, login, nombre, cantidad: 1, tier: tierDePlan(plan), euros: valorSub(plan, aj),
             texto: `regala sub ${NOMBRE_PLAN[plan] || ''} a ${para}`.replace(/\s+/g, ' ') });
         }
       } else if (aviso === 'giftpaidupgrade' || aviso === 'primepaidupgrade') {
@@ -257,13 +285,27 @@
   // --- Papeletas --------------------------------------------------------------
   // ¿Está apuntado? Escribió la palabra, o gastó y quien gasta entra sin escribir.
   // Lo donado sin contar la sub propia: regalos, bits, Hype Chat, donaciones y ajustes a mano.
-  const donadoDe = (p) => Math.max(0, Number(p.donado) || 0);
+  function valorDonado(p, aj) {
+    const d = p.detalle || {};
+    if (!aj.subathonNeto) return Math.max(0, Number(p.donado) || 0);
+    const N = aj.netos || {};
+    const pct = (v) => (Number(v) || 0) / 100;
+    const regT = d.regalosT || { 1: d.regalos || 0 }; // registros antiguos sin tier: Tier 1
+    const v = (regT[1] || 0) * (Number(N.subTier1) || 0) + (regT[2] || 0) * (Number(N.subTier2) || 0) + (regT[3] || 0) * (Number(N.subTier3) || 0)
+      + (d.bits || 0) * (Number(aj.valores.bit) || 0) * pct(N.porcentajeBits)
+      + (d.hypechat || 0) * pct(N.porcentajeHypeChat)
+      + (d.donaciones || 0) * pct(N.porcentajeDonaciones)
+      + (d.manual || 0); // lo añadido a mano ya va en € tal cual
+    return Math.max(0, Math.round(v * 100) / 100);
+  }
+  const donadoDe = (p, aj) => valorDonado(p, aj);
 
   function participa(p, aj) {
     if (!p || p.excluido) return false;
     if (aj.modo === 'subathon') {
       const minimo = Math.max(0, Number(aj.subathonMinimo) || 0);
-      return donadoDe(p) > 0 && donadoDe(p) + 1e-9 >= minimo;
+      const v = donadoDe(p, aj);
+      return v > 0 && v + 1e-9 >= minimo;
     }
     return p.escribio || (p.euros > 0 && !!aj.gastanEntranSinEscribir);
   }
@@ -280,7 +322,7 @@
       case 'soloSubs': n = tier > 0 ? 1 : 0; break;
       case 'subathon': {
         const epp = Number(aj.eurosPorPapeleta) || 1;
-        n = Math.max(1, Math.floor(donadoDe(p) / epp + 1e-9));
+        n = Math.max(1, Math.floor(donadoDe(p, aj) / epp + 1e-9));
         break;
       }
       case 'gasto': {
@@ -323,7 +365,8 @@
 
   // --- Estado del sorteo ------------------------------------------------------
   function estadoVacio() {
-    return { abierto: true, participantes: {}, eventos: [], ganadores: [], idsVistos: [], mensajesGanador: [], tiers: {} };
+    return { abierto: true, participantes: {}, eventos: [], ganadores: [], idsVistos: [], mensajesGanador: [], tiers: {},
+      opciones: [], recogiendo: false, queSorteo: '' };
   }
 
   const redondear = (n) => Math.round(n * 100) / 100;
@@ -341,6 +384,7 @@
       }
       return null;
     }
+    if (ac.tipo === 'sugerencia') return registrarSugerencia(estado, ac, aj, login, ahora);
     if (ac.id) {
       if (estado.idsVistos.includes(ac.id)) return null;
       estado.idsVistos.push(ac.id);
@@ -358,7 +402,7 @@
     else if (ac.tipo !== 'entrada' && ac.tipo !== 'manual' && !(ac.euros > 0)) ev.motivo = 'sin valor en euros';
     else {
       const p = existente || { login, nombre: ev.nombre, euros: 0, donado: 0, escribio: false, excluido: false,
-        detalle: { bits: 0, subs: 0, regalos: 0, hypechat: 0, manual: 0, donaciones: 0 } };
+        detalle: { bits: 0, subs: 0, regalos: 0, regalosT: { 1: 0, 2: 0, 3: 0 }, hypechat: 0, manual: 0, donaciones: 0 } };
       p.nombre = ev.nombre;
       if (p.donado == null) p.donado = 0;
       if (p.detalle.donaciones == null) p.detalle.donaciones = 0;
@@ -368,7 +412,12 @@
         if (ac.tipo !== 'sub') p.donado = Math.max(0, redondear(p.donado + ac.euros));
         if (ac.tipo === 'bits') p.detalle.bits += ac.cantidad;
         else if (ac.tipo === 'sub') p.detalle.subs += 1;
-        else if (ac.tipo === 'regalo') p.detalle.regalos += 1;
+        else if (ac.tipo === 'regalo') {
+          p.detalle.regalos += 1;
+          if (!p.detalle.regalosT) p.detalle.regalosT = { 1: p.detalle.regalos - 1, 2: 0, 3: 0 };
+          const tr = ac.tier === 2 || ac.tier === 3 ? ac.tier : 1;
+          p.detalle.regalosT[tr] = (p.detalle.regalosT[tr] || 0) + 1;
+        }
         else if (ac.tipo === 'hypechat') p.detalle.hypechat = redondear(p.detalle.hypechat + ac.euros);
         else if (ac.tipo === 'manual') p.detalle.manual = redondear(p.detalle.manual + ac.euros);
         else if (ac.tipo === 'donacion') p.detalle.donaciones = redondear(p.detalle.donaciones + ac.euros);
@@ -381,6 +430,60 @@
     estado.eventos.unshift(ev);
     if (estado.eventos.length > 300) estado.eventos.length = 300;
     return ev;
+  }
+
+  // --- Sorteo de opciones (lista a mano + sugerencias del chat) ----------------
+  const MAX_OPCIONES = 300;
+  const clave = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+
+  function registrarSugerencia(estado, ac, aj, login, ahora) {
+    if (!estado.recogiendo) return null;
+    if ((aj.ignorar || []).some((s) => s.toLowerCase() === login)) return null;
+    if (!estado.opciones) estado.opciones = [];
+    const texto = String(ac.texto || '').trim();
+    if (!texto) return null;
+    // Una sugerencia por persona: si vuelve a escribir, cambia la suya.
+    const previa = estado.opciones.findIndex((o) => o.origen === 'chat' && o.login === login);
+    const repetida = estado.opciones.find((o) => clave(o.texto) === clave(texto));
+    if (repetida) return null; // ya está en la lista
+    if (previa === -1 && estado.opciones.length >= MAX_OPCIONES) return null;
+    const opcion = { id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, autor: ac.nombre || login, login, origen: 'chat' };
+    if (previa !== -1) estado.opciones[previa] = opcion; else estado.opciones.push(opcion);
+    const ev = { hora: ahora || new Date().toISOString(), login, nombre: ac.nombre || login, tipo: 'sugerencia',
+      texto: `sugiere «${texto}»${previa !== -1 ? ' (cambia la suya)' : ''}`, euros: null, contado: true };
+    estado.eventos.unshift(ev);
+    if (estado.eventos.length > 300) estado.eventos.length = 300;
+    return ev;
+  }
+
+  // Añade opciones escritas a mano (una por línea). Devuelve cuántas ha añadido.
+  function anadirOpciones(estado, textos) {
+    if (!estado.opciones) estado.opciones = [];
+    let n = 0;
+    for (const bruto of textos) {
+      const texto = String(bruto || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+      if (!texto || estado.opciones.some((o) => clave(o.texto) === clave(texto)) || estado.opciones.length >= MAX_OPCIONES) continue;
+      estado.opciones.push({ id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + n, texto, autor: null, login: null, origen: 'manual' });
+      n++;
+    }
+    return n;
+  }
+
+  function sortearOpcion(estado, aj, opciones) {
+    opciones = opciones || {};
+    const lista = (estado.opciones || []).filter((o) => !o.descartada);
+    if (!lista.length) return null;
+    const segmentos = lista.map((o) => ({ nombre: o.texto, papeletas: 1 }));
+    const i = elegirPonderado(segmentos.map(() => 1), opciones.aleatorio);
+    const o = lista[i];
+    const ganador = { hora: new Date().toISOString(), tipo: 'opcion', nombre: o.texto, autor: o.autor, login: null,
+      titulo: estado.queSorteo || '', participantes: lista.length, papeletas: 1, totalPapeletas: lista.length, probabilidad: 1 / lista.length };
+    estado.ganadores.unshift(ganador);
+    estado.mensajesGanador = [];
+    const duracionMs = Math.max(3, Number(aj.duracionSorteo) || 8) * 1000;
+    const largo = Math.round(30 + duracionMs / 1000 * 4);
+    const t = construirTira(segmentos, i, largo);
+    return { tira: t.tira, indiceGanador: t.indiceGanador, ganador, duracionMs, titulo: ganador.titulo };
   }
 
   // Top 3 por un campo del detalle (regalos o bits). Empates comparten puesto.
@@ -414,7 +517,7 @@
           if (t) { top[campo] = t.puesto; extra += premio(t.puesto); }
         }
       }
-      return Object.assign({}, p, { tier, top, extra, papeletas: papeletasDe(p, aj, tier, extra) });
+      return Object.assign({}, p, { tier, top, extra, valor: valorDonado(p, aj), papeletas: papeletasDe(p, aj, tier, extra) });
     });
     const total = ps.reduce((a, p) => a + p.papeletas, 0);
     ps.forEach((p) => { p.probabilidad = total ? p.papeletas / total : 0; });
@@ -458,18 +561,18 @@
     const i = elegirPonderado(segmentos.map((s) => s.papeletas), opciones.aleatorio);
     if (i < 0) return null;
     const g = segmentos[i];
-    const ganador = { hora: new Date().toISOString(), login: g.login, nombre: g.nombre, papeletas: g.papeletas,
-      totalPapeletas, probabilidad: g.papeletas / totalPapeletas, participantes: segmentos.length };
+    const ganador = { hora: new Date().toISOString(), tipo: 'persona', login: g.login, nombre: g.nombre, papeletas: g.papeletas,
+      totalPapeletas, probabilidad: g.papeletas / totalPapeletas, participantes: segmentos.length, titulo: estado.queSorteo || '' };
     estado.ganadores.unshift(ganador);
     estado.mensajesGanador = [];
     if (aj.quitarGanador) estado.participantes[g.login].excluido = true;
     const duracionMs = Math.max(3, Number(aj.duracionSorteo) || 8) * 1000;
     const largo = Math.round(30 + duracionMs / 1000 * 4); // nombres que pasan antes del ganador
     const { tira, indiceGanador } = construirTira(segmentos, i, largo);
-    return { tira, indiceGanador, ganador, duracionMs };
+    return { tira, indiceGanador, ganador, duracionMs, titulo: ganador.titulo };
   }
 
-  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, top3, leerDonacion, numeroDe, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
+  const Nucleo = { AJUSTES_DEFECTO, MODOS, tierDeEtiquetas, participa, top3, leerDonacion, numeroDe, valorDonado, anadirOpciones, sortearOpcion, mezclarAjustes, parseLine, autor, texto, accionesDesdeMensaje,
     papeletasDe, elegirPonderado, estadoVacio, registrar, lista, sortear, construirTira };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo;

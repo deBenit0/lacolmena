@@ -7,7 +7,7 @@
 <style>
   :root {
     --fondo: #0b0b0e; --panel: #16161b; --panel2: #202028; --borde: #2e2e38;
-    --texto: #f2f2f5; --suave: #a3a3b2; --acento: #a970ff; --acento2: #c4a0ff;
+    --texto: #f2f2f5; --suave: #a3a3b2; --acento: #facc15; --acento2: #fde047;
     --ok: #4fc36b; --mal: #e5534b;
   }
   * { box-sizing: border-box; }
@@ -25,7 +25,7 @@
   .card { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
   button { font: inherit; cursor: pointer; border: 1px solid var(--borde); background: var(--panel2); color: var(--texto); padding: 7px 12px; border-radius: 8px; }
   button:hover { border-color: var(--acento); }
-  button.acento { background: var(--acento); color: #fff; border-color: var(--acento); font-weight: 800; }
+  button.acento { background: var(--acento); color: #1a1405; border-color: var(--acento); font-weight: 800; }
   button.acento:hover { background: var(--acento2); }
   button.peligro:hover { border-color: var(--mal); color: var(--mal); }
   button:disabled { opacity: .5; cursor: not-allowed; }
@@ -56,7 +56,7 @@
   ul.lista li .h { color: var(--suave); flex: none; font-variant-numeric: tabular-nums; }
   ul.lista li.no { opacity: .5; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); color: var(--suave); white-space: nowrap; }
-  .tag.acento { background: #2a1f40; color: var(--acento2); }
+  .tag.acento { background: #2a2610; color: var(--acento2); }
   .error { color: var(--mal); font-size: 13px; min-height: 1em; margin-top: 6px; }
   details > summary { cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); list-style: none; }
   details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
@@ -67,19 +67,31 @@
   .probador label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--suave); }
   .probador .det { margin-top: 6px; font-size: 13px; }
   .ajustes h3 { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; color: var(--acento); }
-  .aviso { background: #2a1f40; border: 1px solid var(--acento); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .aviso { background: #2a2610; border: 1px solid var(--acento); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
   .modos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
   @media (max-width: 1200px) { .modos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 560px) { .modos { grid-template-columns: repeat(2, 1fr); } }
   .modos button { padding: 10px 8px; line-height: 1.2; text-align: center; }
   .modos button b { display: block; font-size: 14px; }
   .modos button span { display: block; font-size: 11px; color: var(--suave); margin-top: 3px; }
-  .modos button.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
-  .modos button.activo span { color: #efe6ff; }
+  .modos button.activo { background: var(--acento); border-color: var(--acento); color: #1a1405; }
+  .modos button.activo span { color: #4a3b00; }
   .bonus { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px; cursor: pointer; background: var(--panel2); }
-  .bonus:has(input:checked) { border-color: var(--acento); background: #2a1f40; }
+  .bonus:has(input:checked) { border-color: var(--acento); background: #2a2610; }
   .bonus input { width: 18px; height: 18px; accent-color: var(--acento); flex: none; margin: 0; }
   .bonus b { font-size: 14px; } .bonus span { display: block; font-size: 12px; color: var(--suave); }
+  .tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .tipos button { padding: 10px; font-weight: 700; }
+  .tipos button.activo { background: var(--acento); border-color: var(--acento); color: #1a1405; }
+  .que { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--suave); white-space: nowrap; }
+  .que input { flex: 1; }
+  .opciones-lista { list-style: none; margin: 10px 0 0; padding: 0; max-height: 260px; overflow: auto; border: 1px solid var(--borde); border-radius: 10px; }
+  .opciones-lista li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--borde); font-size: 14px; }
+  .opciones-lista li:last-child { border-bottom: 0; }
+  .opciones-lista li .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .opciones-lista li button { padding: 2px 8px; font-size: 12px; }
+  .opciones-lista li.vacio { color: var(--suave); justify-content: center; padding: 16px; }
+  textarea { font: inherit; background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; width: 100%; min-height: 64px; resize: vertical; }
   .tops { display: none; font-size: 12px; color: var(--suave); margin-top: 6px; line-height: 1.6; }
   .tops.visible { display: block; }
   .tops b { color: var(--texto); font-weight: 600; }
@@ -112,17 +124,40 @@
         <canvas id="lienzo"></canvas>
         <canvas id="confeti"></canvas>
       </div>
-      <div class="modos" id="modos" role="group" aria-label="Modo del sorteo"></div>
-      <label class="bonus">
-        <input type="checkbox" id="chkBonus">
-        <div><b>⭐ Más papeletas al top de regaladores</b><span id="bonusDesc"></span></div>
-      </label>
-      <div class="tops" id="tops"></div>
-      <div class="entrada-chat" id="comoEntrar"></div>
+      <div class="tipos" role="group" aria-label="Qué se sortea">
+        <button type="button" data-tipo="personas">👥 Sortear personas</button>
+        <button type="button" data-tipo="opciones">📝 Sortear opciones</button>
+      </div>
+      <label class="que">¿Qué se sortea? <input type="text" id="queSorteo" maxlength="60" placeholder="Ej.: Fondo de pantalla, Póster nuevo, Nombre del alter… (sale en OBS)"></label>
+      <div id="zonaPersonas">
+        <div class="modos" id="modos" role="group" aria-label="Modo del sorteo"></div>
+        <label class="bonus">
+          <input type="checkbox" id="chkBonus">
+          <div><b>⭐ Más papeletas al top de regaladores</b><span id="bonusDesc"></span></div>
+        </label>
+        <div class="tops" id="tops"></div>
+        <div class="entrada-chat" id="comoEntrar"></div>
+      </div>
+      <div id="zonaOpciones" hidden>
+        <label class="bonus">
+          <input type="checkbox" id="chkRecoger">
+          <div><b>💬 Recoger sugerencias del chat</b><span id="recogerDesc"></span></div>
+        </label>
+        <div class="fila" style="margin-top:10px; align-items:stretch">
+          <textarea id="nuevasOpciones" placeholder="Añade opciones a mano, una por línea (por ejemplo, los pósters)" style="flex:1"></textarea>
+          <button type="button" id="btnAnadirOpciones">Añadir</button>
+        </div>
+        <ul class="opciones-lista" id="listaOpciones"></ul>
+        <div class="fila" style="margin-top:8px">
+          <span class="det" id="nOpciones"></span>
+          <div class="grow"></div>
+          <button type="button" class="peligro" id="btnVaciarOpciones">🗑 Vaciar lista</button>
+        </div>
+      </div>
       <button class="acento btn-sortear" id="btnSortear">🎲 ¡SORTEAR!</button>
       <div class="error" id="errSortear"></div>
       <div class="ganador" id="ganador">
-        <div class="det">🏆 Ganador</div>
+        <div class="det" id="gEtiqueta">🏆 Ganador</div>
         <div class="nombre" id="gNombre"></div>
         <div class="det" id="gInfo"></div>
       </div>
@@ -212,6 +247,7 @@
           <button data-sim="regalo5">+5 regaladas de una persona</button>
           <button data-sim="hypechat">+Hype Chat 5 €</button>
           <button data-sim="donacion">+Donación StreamElements 10 €</button>
+          <button data-sim="sugerencias">+4 sugerencias del chat</button>
         </div>
         <p></p>
         <div class="fila">
@@ -300,9 +336,34 @@ function etiquetasTop(p) {
   return t;
 }
 
+const opcionesVivas = () => (estado.opciones || []);
+const deOpciones = () => aj.tipoSorteo === 'opciones';
+
 function resumenParaEscena(l) {
+  const participantes = deOpciones()
+    ? opcionesVivas().map((o) => ({ nombre: o.texto, papeletas: 1 }))
+    : l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ nombre: p.nombre, papeletas: p.papeletas }));
   return { tipo: 'estado', canal: aj.canal, abierto: estado.abierto, palabraClave: aj.palabraClave, modo: aj.modo, bonusTop: !!aj.bonusTop,
-    totalPapeletas: l.totalPapeletas, participantes: l.participantes.filter((p) => p.papeletas > 0).map((p) => ({ nombre: p.nombre, papeletas: p.papeletas })) };
+    tipoSorteo: aj.tipoSorteo, recogiendo: !!estado.recogiendo, comandoSugerencia: aj.comandoSugerencia, queSorteo: estado.queSorteo || '',
+    totalPapeletas: l.totalPapeletas, participantes };
+}
+
+function pintarOpciones() {
+  const ops = opcionesVivas();
+  $('chkRecoger').checked = !!estado.recogiendo;
+  $('recogerDesc').textContent = estado.recogiendo
+    ? `Abierto: cada persona escribe ${aj.comandoSugerencia} y su propuesta (una por persona; si repite, cambia la suya)`
+    : `Cerrado: márcalo para que el chat proponga con ${aj.comandoSugerencia} …`;
+  const ul = $('listaOpciones');
+  ul.replaceChildren();
+  if (!ops.length) ul.append(el('li', { className: 'vacio', textContent: 'Sin opciones todavía. Añádelas a mano o abre las sugerencias del chat.' }));
+  for (const o of ops) {
+    const quitar = el('button', { type: 'button', textContent: '✕', title: 'Quitar esta opción' });
+    quitar.onclick = () => { estado.opciones = estado.opciones.filter((x) => x.id !== o.id); guardar(); pintar(); };
+    ul.append(el('li', {}, el('span', { className: 't', textContent: o.texto }),
+      el('span', { className: 'det', textContent: o.origen === 'chat' ? '💬 ' + o.autor : '✍️ a mano' }), quitar));
+  }
+  $('nOpciones').textContent = ops.length === 1 ? '1 opción' : `${ops.length} opciones`;
 }
 
 function pintarYa() {
@@ -310,13 +371,18 @@ function pintarYa() {
   $('estadoChat').textContent = chatEstado.texto;
   $('avisoCanal').hidden = !!aj.canal;
   $('btnAbrir').textContent = estado.abierto ? '🟢 Abierto · pulsa para cerrar' : '🔴 Cerrado · pulsa para abrir';
+  document.querySelectorAll('[data-tipo]').forEach((b) => b.classList.toggle('activo', b.dataset.tipo === aj.tipoSorteo));
+  $('zonaPersonas').hidden = deOpciones();
+  $('zonaOpciones').hidden = !deOpciones();
+  if (document.activeElement !== $('queSorteo')) $('queSorteo').value = estado.queSorteo || '';
   if (girando) return; // no desvelar al ganador antes de que pare la animación
+  pintarOpciones();
 
   const l = Nucleo.lista(estado, aj);
   $('nPart').textContent = l.participantes.filter((p) => p.papeletas > 0).length;
   $('nPap').textContent = l.totalPapeletas;
   const subathon = aj.modo === 'subathon';
-  const dinero = (p) => (subathon ? p.donado || 0 : p.euros);
+  const dinero = (p) => (subathon ? p.valor || 0 : p.euros);
   $('lblEur').textContent = $('thEur').textContent = subathon ? 'Donado' : 'Gastado';
   $('nEur').textContent = eur(l.participantes.reduce((a, p) => a + dinero(p), 0));
   const palabra = (aj.palabraClave || '').trim();
@@ -355,7 +421,7 @@ function pintarYa() {
   if (palabra && aj.modo !== 'subathon') partes.push(aj.gastanEntranSinEscribir ? 'quien gasta entra sin escribir' : 'quien gasta también tiene que escribir');
   $('reglas').textContent = 'Papeletas: ' + partes.join(' · ');
 
-  rodillo.mostrar(l.participantes.filter((p) => p.papeletas > 0).map((p) => p.nombre));
+  rodillo.mostrar(deOpciones() ? opcionesVivas().map((o) => o.texto) : l.participantes.filter((p) => p.papeletas > 0).map((p) => p.nombre));
   Enlace.enviar(resumenParaEscena(l));
 
   const tabla = $('tabla');
@@ -381,13 +447,18 @@ function pintarYa() {
   gan.replaceChildren();
   if (!estado.ganadores.length) gan.append(el('li', { className: 'no', textContent: 'Aún no hay ganadores.' }));
   for (const g of estado.ganadores) {
-    gan.append(el('li', {}, el('span', { className: 'h', textContent: hora(g.hora) }), el('b', { textContent: '🏆 ' + g.nombre }),
-      el('span', { className: 'det', textContent: `${g.papeletas} de ${g.totalPapeletas} papeletas (${(g.probabilidad * 100).toFixed(1)} %)` })));
+    const titulo = g.titulo ? g.titulo + ' · ' : '';
+    const info = g.tipo === 'opcion'
+      ? `${titulo}entre ${g.participantes} opciones${g.autor ? ' · propuesta por ' + g.autor : ''}`
+      : `${titulo}${g.papeletas} de ${g.totalPapeletas} papeletas (${(g.probabilidad * 100).toFixed(1)} %)`;
+    gan.append(el('li', {}, el('span', { className: 'h', textContent: hora(g.hora) }), el('b', { textContent: (g.tipo === 'opcion' ? '🎯 ' : '🏆 ') + g.nombre }),
+      el('span', { className: 'det', textContent: info })));
   }
 
   const mg = $('mensajesGanador');
   mg.replaceChildren();
   if (!estado.ganadores.length) mg.append(el('li', { className: 'no', textContent: 'Cuando haya ganador, aquí verás sus mensajes.' }));
+  else if (estado.ganadores[0].tipo === 'opcion') mg.append(el('li', { className: 'no', textContent: 'El último sorteo fue de opciones, no de una persona.' }));
   else if (!estado.mensajesGanador.length) mg.append(el('li', { className: 'no', textContent: `${estado.ganadores[0].nombre} aún no ha escrito desde que ganó…` }));
   for (const m of estado.mensajesGanador) mg.append(el('li', {}, el('span', { className: 'h', textContent: hora(m.hora) }), el('span', { textContent: m.texto })));
 
@@ -447,8 +518,8 @@ function pintarModos() {
 $('btnSortear').onclick = async () => {
   if (girando) return;
   $('errSortear').textContent = '';
-  const tirada = Nucleo.sortear(estado, aj);
-  if (!tirada) { $('errSortear').textContent = 'No hay nadie con papeletas.'; return; }
+  const tirada = deOpciones() ? Nucleo.sortearOpcion(estado, aj) : Nucleo.sortear(estado, aj);
+  if (!tirada) { $('errSortear').textContent = deOpciones() ? 'No hay opciones para sortear.' : 'No hay nadie con papeletas.'; return; }
   guardar();
   Animacion.Sonido.preparar();
   girando = true;
@@ -459,7 +530,14 @@ $('btnSortear').onclick = async () => {
   await rodillo.girar(tirada, inicio);
   const g = tirada.ganador;
   $('gNombre').textContent = g.nombre;
-  $('gInfo').textContent = `${g.papeletas} de ${g.totalPapeletas} papeletas · ${(g.probabilidad * 100).toFixed(1)} % de probabilidad · ${g.participantes} participantes`;
+  const titulo = g.titulo ? g.titulo + ' · ' : '';
+  if (g.tipo === 'opcion') {
+    $('gEtiqueta').textContent = '🎯 Ha salido';
+    $('gInfo').textContent = `${titulo}entre ${g.participantes} opciones · ${g.autor ? 'propuesta por ' + g.autor : 'añadida a mano'}`;
+  } else {
+    $('gEtiqueta').textContent = '🏆 Ganador';
+    $('gInfo').textContent = `${titulo}${g.papeletas} de ${g.totalPapeletas} papeletas · ${(g.probabilidad * 100).toFixed(1)} % de probabilidad · ${g.participantes} participantes`;
+  }
   $('ganador').classList.add('visible');
   Animacion.confeti($('confeti'));
   setTimeout(() => { girando = false; $('btnSortear').disabled = false; pintar(); }, 2500);
@@ -469,6 +547,24 @@ $('btnSortear').onclick = async () => {
 Enlace.escuchar((m) => { if (m && m.tipo === 'hola' && !girando) Enlace.enviar(resumenParaEscena(Nucleo.lista(estado, aj))); });
 
 // --- Controles ----------------------------------------------------------------
+document.querySelectorAll('[data-tipo]').forEach((b) => b.onclick = () => {
+  if (girando || aj.tipoSorteo === b.dataset.tipo) return;
+  aj.tipoSorteo = b.dataset.tipo;
+  escribir('fundillo-ajustes', aj);
+  pintar();
+});
+$('queSorteo').oninput = (e) => { estado.queSorteo = e.target.value.trim(); guardar(); Enlace.enviar(resumenParaEscena(Nucleo.lista(estado, aj))); };
+$('chkRecoger').onchange = (e) => { estado.recogiendo = e.target.checked; guardar(); pintar(); };
+$('btnAnadirOpciones').onclick = () => {
+  const n = Nucleo.anadirOpciones(estado, $('nuevasOpciones').value.split('\n'));
+  $('nuevasOpciones').value = '';
+  if (n) { guardar(); pintar(); }
+};
+$('btnVaciarOpciones').onclick = () => {
+  if (!opcionesVivas().length || !confirm('¿Vaciar la lista de opciones? Se borran también las sugerencias del chat.')) return;
+  estado.opciones = [];
+  guardar(); pintar();
+};
 $('btnAbrir').onclick = () => { estado.abierto = !estado.abierto; guardar(); pintar(); };
 $('btnEscena').onclick = () => window.open('escena.html', 'escena-fundillo', 'width=1280,height=720');
 $('btnReiniciar').onclick = () => {
@@ -505,6 +601,14 @@ document.querySelectorAll('[data-sim]').forEach((b) => b.onclick = () => {
     regalo5: () => ({ tipo: 'regalo', cantidad: 1, euros: v.subTier1, texto: 'regala sub Tier 1 (prueba)' }),
     hypechat: () => ({ tipo: 'hypechat', cantidad: 5, euros: 5, texto: 'Hype Chat 5 EUR (prueba)' }),
   }[tipo];
+  if (tipo === 'sugerencias') {
+    const ideas = ['Gandalf', 'Mago Pocho', 'El Fundillo', 'Merlín de Hacendado', 'Pañalcito', 'Brujo Brujito', 'Archimago Pepe'];
+    for (let i = 0; i < 4; i++) {
+      const n = nombre();
+      Nucleo.registrar(estado, { tipo: 'sugerencia', login: n.toLowerCase(), nombre: n, texto: ideas[Math.floor(Math.random() * ideas.length)] }, aj);
+    }
+    guardar(); pintar(); return;
+  }
   if (tipo === 'donacion') {
     const n = nombre();
     const linea = `@id=prueba-don-${Date.now()}-${nSim++} :streamelements!streamelements@streamelements.tmi.twitch.tv PRIVMSG #${aj.canal || 'canal'} :${n} just tipped €10.00 PogChamp`;
@@ -562,6 +666,16 @@ const CAMPOS = [
   ['bonusTop3', 'Papeletas extra al 3º', 'number'],
   ['h', 'Modo «Subathon»'],
   ['subathonMinimo', 'Donado mínimo en total para entrar (€, 0 = cualquiera)', 'number'],
+  ['subathonNeto', 'Contar en € netos, como la barra del overlay', 'check'],
+  ['netos.subTier1', 'Neto sub regalada Tier 1 (€)', 'number'],
+  ['netos.subTier2', 'Neto sub regalada Tier 2 (€)', 'number'],
+  ['netos.subTier3', 'Neto sub regalada Tier 3 (€)', 'number'],
+  ['netos.porcentajeDonaciones', '% que cuenta de las donaciones', 'number'],
+  ['netos.porcentajeBits', '% que cuenta de los bits', 'number'],
+  ['netos.porcentajeHypeChat', '% que cuenta del Hype Chat', 'number'],
+  ['h', 'Comandos del chat'],
+  ['comandoDonacion', 'Apuntar Bizum/efectivo (solo mods): comando Nombre importe', 'text'],
+  ['comandoSugerencia', 'Proponer una opción en los sorteos de opciones', 'text'],
   ['eurosPorPapeleta', '€ por cada papeleta (también en «Más gasto»)', 'number'],
   ['h', 'Donaciones de StreamElements / Streamlabs (aviso del bot en el chat)'],
   ['botsDonaciones', 'Cuentas del bot que anuncia las donaciones (separadas por comas)', 'lista'],

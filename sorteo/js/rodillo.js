@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const ACENTO = '#a970ff';
+  const ACENTO = '#facc15';
 
   // --- Sonido -------------------------------------------------------------
   let ctxAudio = null;
@@ -97,7 +97,7 @@
       const cy = H / 2;
 
       // Franja central
-      ctx.fillStyle = 'rgba(169, 112, 255, .14)';
+      ctx.fillStyle = 'rgba(250, 204, 21, .12)';
       ctx.fillRect(0, cy - h / 2, W, h);
       ctx.fillStyle = ACENTO;
       ctx.fillRect(0, cy - h / 2, W, Math.max(2, h * 0.03));
