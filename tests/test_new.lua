@@ -50,6 +50,15 @@ H.ok(penv.HDFProfPanel.title:GetText():find("DEMOSTRACIÓN", 1, true), "el títu
 local mineReq = ns.G().requests["Bruno-Demo:tuya1"]
 H.ok(mineReq and mineReq.k == "i12405" and mineReq.to == ns.Me(), "petición de ejemplo para mí con algo que sé hacer")
 H.ok(ns.Data.CanServe(mineReq, ns.Now()), "puedo atenderla")
+ns.UI.Open("board")
+local board = penv.HDFProfPanel.pageFrames.board
+H.eq(board.list.items[1].r.id, mineReq.id, "en el tablón, arriba la que es para mí")
+H.ok(#board.list.items >= 10, "el tablón muestra los pedidos de ejemplo: " .. #board.list.items)
+board.onlyMine:SetChecked(true)
+board.onlyMine:GetScript("OnClick")(board.onlyMine)
+for _, it in ipairs(board.list.items) do H.ok(it.canServe, "filtro: solo las que puedo hacer") end
+board.onlyMine:SetChecked(false)
+board.onlyMine:GetScript("OnClick")(board.onlyMine)
 local alert = penv.HDFProfAlert -- ya salió (y se cerró solo) al activar el modo
 H.ok(alert and alert.alert and alert.alert.id == mineReq.id and alert.text:GetText():find("(a ti)", 1, true),
   "salta el aviso de la petición de ejemplo")

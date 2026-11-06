@@ -7,7 +7,7 @@ para todo lo que necesita la hermandad. Arriba tiene tres secciones:
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.11.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.12.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -25,6 +25,17 @@ Todos los miembros deben tenerlo: la información viaja entre los que están con
 - **Publicar tus recetas:** abre **una vez la ventana de cada profesión** (también
   Encantamiento), sin filtros puestos. Cada vez que la abras se actualizan tus recetas y
   cooldowns. Para que se cuente lo que tienes en el banco, ábrelo una vez.
+
+### Tablón (lo primero que ves)
+Al abrir el addon, en **Pedidos**, sale el **Tablón** con los pedidos abiertos de la gente en ese
+momento. Arriba van los que son **para ti**, luego los que **puedes hacer** (en verde) y luego el
+resto, por karma. Cada pedido dice quién lo pide, hace cuánto, cuántos faltan y qué paga, con dos
+botones:
+- **Ver pedido**: abre todos los detalles (materiales, quién se encarga...).
+- **Aceptar encargo**: dices cuántos haces y listo (si ya tenías parte, pone **Aceptar más**).
+
+Con **Solo los que puedo hacer** ves únicamente los tuyos. Tus propios pedidos salen al final
+marcados como *[Tuyo]*.
 
 ### Pedir materiales
 **Solo materiales de verdad** (cueros, telas, barras, piezas, elementales, esencias...; sin pociones,

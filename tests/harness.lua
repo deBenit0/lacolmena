@@ -240,7 +240,7 @@ end
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
   "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Missing.lua", "Demo.lua", "Prices.lua", "Preload.lua", "Alerts.lua",
-  "UI/Widgets.lua", "UI/Main.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
+  "UI/Widgets.lua", "UI/Main.lua", "UI/Board.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua",
 }
 
 local function itemLink(id) return "|cff1eff00|Hitem:" .. id .. ":0:0:0|h[Objeto " .. id .. "]|h|r" end

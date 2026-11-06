@@ -35,9 +35,11 @@ tab:Click()
 local panel = env.HDFProfPanel
 H.ok(panel and panel:IsShown(), "la pestaña abre la ventana")
 H.ok(panel.host == guildFrame, "pegada a la ventana de hermandad")
+H.ok(panel.pageFrames.board:IsShown(), "al entrar en Pedidos se ve el tablón")
 guildFrame:Hide()
 H.ok(not panel:IsShown(), "al cerrar la hermandad se cierra")
 guildFrame:Show()
+tab:Click()
 
 local function countItems(page)
   local n, headers = 0, 0
@@ -150,6 +152,20 @@ H.ok(req and req.q == 4 and req.g == 20000 and req.pi[12360] == 1 and req.to == 
 H.ok(requests.detail.info:GetText():find("Paga:", 1, true) ~= nil, "detalle con el pago")
 H.ok(not requests.detail.b1:IsEnabled(), "Recibido desactivado sin compromisos")
 
+-- Tablón de Ana: el pedido de Bea, para ella, con Ver pedido y Aceptar encargo.
+ana.ns.UI.Open("board")
+local board = ana.env.HDFProfPanel.pageFrames.board
+H.Advance(1)
+board:Refresh()
+H.eq(board.list.items[1] and board.list.items[1].r.id, id, "el pedido sale en el tablón de Ana")
+H.ok(board.list.rows[1].accept:IsEnabled(), "Aceptar encargo activo")
+H.ok(board.list.rows[1].title:GetText():find("[A ti]", 1, true), "marcado como para ella")
+board.list.rows[1].view:Click()
+H.ok(ana.env.HDFProfPanel.pageFrames.requests:IsShown(), "Ver pedido abre el detalle")
+board:Refresh()
+ana.ns.UI.Open("board")
+H.ok(not board.empty:IsShown(), "sin el texto de vacío")
+
 -- Ana la ve, le salta el aviso, hace clic y acepta.
 H.Advance(10)
 local alert = ana.env.HDFProfAlert
@@ -187,7 +203,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.11.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.12.0", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine

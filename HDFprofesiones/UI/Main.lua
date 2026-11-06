@@ -16,6 +16,7 @@ ns.MOTTO = "Mi vida por el fundillo"
 
 -- Pestañas de la sección "Pedidos".
 local PAGES = {
+  { id = "board", label = "Tablón" },
   { id = "materials", label = "Pedir materiales" },
   -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
   { id = "requests", label = "Peticiones" },
@@ -81,8 +82,8 @@ local function createPanel()
 
   panel.tabs = {}
   for i, p in ipairs(PAGES) do
-    local b = W.Button(panel, p.label, 140, 22, function() UI.ShowPage(p.id) end)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 146, -74)
+    local b = W.Button(panel, p.label, 136, 22, function() UI.ShowPage(p.id) end)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 140, -74)
     panel.tabs[p.id] = b
   end
 
@@ -165,7 +166,7 @@ function UI.Open(pageId, selectId, host)
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
   end
   panel:Show()
-  UI.ShowPage(pageId or UI.current or "materials")
+  UI.ShowPage(pageId or UI.current or "board")
   if selectId then
     local f = panel.pageFrames[UI.current]
     if f and f.SelectById then f:SelectById(selectId) end
