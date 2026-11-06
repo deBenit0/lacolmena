@@ -14,6 +14,7 @@
 --     (pi, to y vu son de versiones anteriores: se conservan pero ya no se usan)
 --     c = { [fabricante] = { n = prometidas, cv = versión, rl = soltada,
 --                            by = plazo para entregarlo, w = cuándo dijo (1/2/3),
+--                            at = cuándo lo aceptó, ex = ya pidió más tiempo,
 --                            d = entregadas (lo confirma el autor), dv = versión,
 --                            s = enviadas por correo (lo apunta el fabricante), sv = versión } } }
 -- Cada parte tiene un único dueño y su propia versión, así que dos copias se
@@ -508,6 +509,8 @@ function Data.SanitizeRequest(r)
         if tonumber(cm.cv) then o.cv = tonumber(cm.cv) end
         if cm.rl == true then o.rl = true end
         if tonumber(cm.by) then o.by = tonumber(cm.by) end
+        if tonumber(cm.at) then o.at = tonumber(cm.at) end
+        if cm.ex == true then o.ex = true end
         local w = tonumber(cm.w)
         if w and Data.WHEN[w] then o.w = w end
         local d = tonumber(cm.d)
@@ -557,12 +560,13 @@ function Data.MergeRequests(a, b)
   for name in pairs(names) do
     local ca = (a.c and a.c[name]) or {}
     local cb = (b.c and b.c[name]) or {}
-    local crafter = pickBlock({ n = ca.n, cv = ca.cv, rl = ca.rl, by = ca.by, w = ca.w },
-      { n = cb.n, cv = cb.cv, rl = cb.rl, by = cb.by, w = cb.w }, "cv")
+    local crafter = pickBlock({ n = ca.n, cv = ca.cv, rl = ca.rl, by = ca.by, w = ca.w, at = ca.at, ex = ca.ex },
+      { n = cb.n, cv = cb.cv, rl = cb.rl, by = cb.by, w = cb.w, at = cb.at, ex = cb.ex }, "cv")
     local delivered = pickBlock({ d = ca.d, dv = ca.dv }, { d = cb.d, dv = cb.dv }, "dv")
     local sent = pickBlock({ s = ca.s, sv = ca.sv }, { s = cb.s, sv = cb.sv }, "sv")
     local o = {
       n = crafter.n, cv = crafter.cv, rl = crafter.rl, by = crafter.by, w = crafter.w,
+      at = crafter.at, ex = crafter.ex,
       d = delivered.d, dv = delivered.dv, s = sent.s, sv = sent.sv,
     }
     if next(o) then
@@ -607,7 +611,8 @@ function Data.OwnerOf(r, now)
   local owner, ocm
   for name, cm in pairs(r and r.c or {}) do
     if commitAlive(cm, now) then
-      local cv, ocv = cm.cv or 0, ocm and (ocm.cv or 0)
+      -- la hora en que lo aceptó (ampliar el plazo no cambia quién lo tiene)
+      local cv, ocv = cm.at or cm.cv or 0, ocm and (ocm.at or ocm.cv or 0)
       if not owner or cv < ocv or (cv == ocv and name < owner) then owner, ocm = name, cm end
     end
   end
@@ -750,12 +755,39 @@ function Data.Commit(id, when, now)
   when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}
+  if info.owner ~= me then cm.at, cm.ex = now, nil end -- lo acepto ahora (o de nuevo)
   cm.n = r.q - (info.delivered - deliveredOf(cm))
   cm.w = when
   cm.by = Data.Deadline(when, now)
   cm.cv = bump(cm.cv, now)
   cm.rl = nil
   r.c[me] = cm
+  return r
+end
+
+Data.MIN_EXTEND = 30 * 60 -- "más tiempo" tiene que ampliar al menos media hora
+
+-- Opciones para pedir más tiempo: las que dan un plazo más largo que el actual.
+function Data.ExtendOptions(r, now)
+  local cm = r and r.c and r.c[ns.Me()]
+  local list = {}
+  if not cm or cm.ex or not Data.CommitActive(cm, now, r) then return list end
+  for _, w in ipairs(Data.WHEN) do
+    if Data.Deadline(w.id, now) > (cm.by or 0) + Data.MIN_EXTEND then list[#list + 1] = w end
+  end
+  return list
+end
+
+-- Pedir más tiempo (una sola vez): nuevo plazo con la opción elegida.
+function Data.Extend(id, when, now)
+  local r, me = getRequest(id), ns.Me()
+  local cm = r and r.c and r.c[me]
+  if not cm or not Data.CommitActive(cm, now, r) then return nil, "Ese pedido no es tuyo." end
+  if cm.ex then return nil, "Ya pediste más tiempo una vez." end
+  local by = Data.Deadline(tonumber(when) or 3, now)
+  if by <= (cm.by or 0) + Data.MIN_EXTEND then return nil, "Elige un plazo más largo que el que tenías." end
+  cm.by, cm.w, cm.ex = by, tonumber(when) or 3, true
+  cm.cv = bump(cm.cv, now)
   return r
 end
 

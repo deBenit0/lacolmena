@@ -249,7 +249,12 @@ ns.UI.RegisterPage("requests", function(page)
     else
       local mine = r.c and r.c[me]
       local canCommit = info.state == "open" and not info.owner
-      setButton(detail.b1, "Aceptar encargo", canCommit, function() W.AcceptRequest(r) end)
+      if mine and Data.CommitActive(mine, now, r) then
+        -- Es mío: puedo pedir más tiempo (una vez).
+        setButton(detail.b1, "Más tiempo", #Data.ExtendOptions(r, now) > 0, function() W.ExtendRequest(r) end)
+      else
+        setButton(detail.b1, "Aceptar encargo", canCommit, function() W.AcceptRequest(r) end)
+      end
       setButton(detail.b2, "Soltar", mine and Data.CommitActive(mine, now, r), function()
         W.Confirm("¿Seguro que ya no lo vas a hacer?", function() ns.Sync.Release(r.id) end)
       end)

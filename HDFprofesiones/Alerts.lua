@@ -166,6 +166,18 @@ function Alerts.OnRequestUpdated(old, new, retry)
     end
   end
 
+  -- Mi encargado pide más tiempo.
+  if new.a == me and old then
+    local owner, cm = Data.OwnerOf(new, now)
+    local before = owner and old.c and old.c[owner]
+    if owner and cm.ex and before and not before.ex and before.n then
+      local w = cm.w and Data.WHEN[cm.w]
+      Alerts.Push({ id = new.id, icon = icon,
+        text = string.format("%s necesita más tiempo para %s%s", ns.ShortName(owner), ns.KeyLabel(new.k),
+          w and (": " .. w.label:gsub("^Lo hago ", ""):lower()) or "") })
+    end
+  end
+
   -- Lo acepté a la vez que otro y él lo hizo antes: me quedo sin él.
   if new.a ~= me and old and new.c and new.c[me] then
     local mineBefore = old.c and old.c[me] and Data.CommitActive(old.c[me], now, old)
@@ -178,6 +190,51 @@ function Alerts.OnRequestUpdated(old, new, retry)
 end
 
 ns.Listen("REQUEST_UPDATED", Alerts.OnRequestUpdated)
+
+-- Plazos: aviso al encargado poco antes de que se acabe, y a los dos si se pasa.
+Alerts.WARN_BEFORE = 15 * 60
+function Alerts.CheckDeadlines()
+  local g, me, now = ns.G(), ns.Me(), ns.Now()
+  if not g or not me then return end
+  g.warned = g.warned or {}
+  local function once(key, alert)
+    if g.warned[key] then return end
+    g.warned[key] = now
+    Alerts.Push(alert)
+  end
+  for id, r in pairs(g.requests) do
+    local _, icon = ns.KeyInfo(r.k)
+    for name, cm in pairs(r.c or {}) do
+      local key = id .. ":" .. name .. ":" .. (cm.by or 0)
+      local pendingUnits = cm.n and (cm.n - Data.DeliveredOf(cm)) or 0
+      local expired = cm.by and not cm.rl and pendingUnits > 0 and now > cm.by + Data.COMMIT_GRACE
+        and now < cm.by + Data.COMMIT_GRACE + 86400 and Data.IsActiveState(Data.RequestInfo(r, now).state)
+      if name == me and r.a ~= me then
+        if cm.by and Data.CommitActive(cm, now, r) and cm.by - now <= Alerts.WARN_BEFORE then
+          local left = cm.by - now
+          once(key .. ":soon", { id = id, icon = icon,
+            text = string.format("%s para enviar %dx %s a %s",
+              left > 60 and ("Te quedan " .. ns.FormatDuration(left)) or "Se acaba tu plazo", pendingUnits,
+              ns.KeyLabel(r.k), ns.ShortName(r.a)) })
+        elseif expired then
+          once(key .. ":late", { id = id, icon = icon,
+            text = string.format("Se pasó tu plazo: %s vuelve al tablón", ns.KeyLabel(r.k)) })
+        end
+      elseif r.a == me and expired then
+        once(key .. ":back", { id = id, icon = icon,
+          text = string.format("%s no lo entregó a tiempo: %s vuelve al tablón", ns.ShortName(name), ns.KeyLabel(r.k)) })
+      end
+    end
+  end
+  -- Olvidar avisos viejos.
+  for key, t in pairs(g.warned) do
+    if type(t) ~= "number" or now - t > 3 * 86400 then g.warned[key] = nil end
+  end
+end
+C_Timer.NewTicker(60, function()
+  ns.SafeCall(Alerts.CheckDeadlines)
+  if ns.UI and ns.UI.IsShown() then ns.UI.Refresh() end -- para que corran los plazos en pantalla
+end)
 ns.On("PLAYER_REGEN_ENABLED", function() ns.After(1, Alerts.Flush) end)
 ns.On("PLAYER_ENTERING_WORLD", function() ns.After(3, Alerts.Flush) end)
 ns.On("ZONE_CHANGED_NEW_AREA", function() ns.After(3, Alerts.Flush) end)

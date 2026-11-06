@@ -8,7 +8,8 @@ local HELP = table.concat({
     .. "encargos de los demás.",
   "   |cffffffff· Tablón|r: los pedidos de la gente en este momento. Los pedidos van a toda la "
     .. "hermandad y |cffffffffse lo queda el primero que lo acepta|r, diciendo cuándo lo tendrá (ya, antes "
-    .. "de 2 horas u hoy). Si no lo entrega a tiempo, vuelve al tablón. Mándalo por correo y el pedido "
+    .. "de 2 horas u hoy; puede pedir más tiempo una vez). Si no lo entrega a tiempo, vuelve al tablón. "
+    .. "Mándalo por correo y el pedido "
     .. "|cff40ff40se completa solo|r al enviarlo.",
   "   |cffffffff· Pedir materiales|r: busca el material, elige cuántos, qué prisa tienes y si das "
     .. "propina. También desde tu ventana de profesión: pasa el ratón por un material y pulsa |cffffffffPedir|r.",

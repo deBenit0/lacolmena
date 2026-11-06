@@ -32,7 +32,9 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - **Cantidad** con entregas parciales (p. ej. 12/20 pociones). **Un solo encargado**: se lo queda
   entero el primero que lo acepta (si dos a la vez, gana el que lo hizo antes).
 - Al aceptar, el encargado dice **cuándo**: ya (1 h), antes de 2 horas u hoy (medianoche, mín. 3 h).
-  Pasado ese plazo (+15 min) el pedido vuelve al tablón.
+  Pasado ese plazo (+15 min) el pedido vuelve al tablón. Aviso al encargado 15 min antes y a
+  los dos si se pasa. El encargado puede pedir **más tiempo una vez** (opción más larga; aviso al
+  que pidió). Quién lo tiene se decide por la hora en que aceptó, así que ampliar no lo cambia.
 - El que pide indica su **prisa** con los mismos botones (o sin prisa).
 - Indicador de **si el autor aporta los materiales**.
 - **Propina opcional** con botones sugeridos (50 plata, 1, 2 y 5 oro) o la que se escriba; se

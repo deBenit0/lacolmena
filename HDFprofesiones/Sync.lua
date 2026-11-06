@@ -412,6 +412,10 @@ function Sync.Commit(id, when)
   return r, err
 end
 
+function Sync.Extend(id, when)
+  return afterRequestAction(Data.Extend(id, when, ns.Now()))
+end
+
 function Sync.Release(id)
   return afterRequestAction(Data.Release(id, ns.Now()))
 end

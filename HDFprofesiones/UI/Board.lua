@@ -165,8 +165,10 @@ ns.UI.RegisterPage("board", function(page)
       parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (r.t or item.now))
       if item.pending > 0 then
         local by = r.c[item.me].by
-        parts[#parts + 1] = by and ("plazo: " .. (by > item.now and ("quedan " .. ns.FormatDuration(by - item.now))
-          or "|cffff4040se acaba|r")) or "por enviar"
+        local left = by and (by - item.now)
+        local color = (left and left <= 15 * 60) and "|cffff4040" or "|cffffffff"
+        parts[#parts + 1] = by and ("plazo: " .. color .. (left > 0 and ("quedan " .. ns.FormatDuration(left))
+          or "se acaba") .. "|r") or "por enviar"
       elseif item.mine and info.owner then
         local cm = r.c[info.owner]
         parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
@@ -186,7 +188,16 @@ ns.UI.RegisterPage("board", function(page)
       if not mats and r.m and not item.mine then mats = "|cffbbbbbbLos materiales los pone quien pide.|r" end
       row.mats:SetText(mats or "")
 
-      row.view:SetScript("OnClick", function() ns.UI.Open("requests", r.id) end)
+      if item.pending > 0 then
+        -- Mi encargo: pedir más tiempo (una vez). Para ver el pedido, clic en la fila.
+        row.view:SetText("Más tiempo")
+        row.view:SetEnabled(#Data.ExtendOptions(r, item.now) > 0)
+        row.view:SetScript("OnClick", function() W.ExtendRequest(r) end)
+      else
+        row.view:SetText("Ver pedido")
+        row.view:SetEnabled(true)
+        row.view:SetScript("OnClick", function() ns.UI.Open("requests", r.id) end)
+      end
       row.accept.tip = nil
       if item.pending > 0 then
         -- Mi encargo: enviarlo directamente.

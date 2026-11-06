@@ -9,7 +9,7 @@ por enviar). Desde ahí vas a cada sección:
   recolectarlo, pagando si quiere.
 - **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.14.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.15.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -89,8 +89,11 @@ los materiales que te faltan (contando bolsas y banco):
 - **Aceptar encargo:** el pedido **se lo queda entero el primero que lo acepta** (no se reparte).
   Al aceptar eliges cuándo lo tendrás: **Lo hago ya** (1 hora), **Antes de 2 horas** o
   **Lo hago hoy** (hasta medianoche, mínimo 3 horas).
-- **Plazo:** si no lo envía a tiempo (con 15 minutos de margen), el pedido **vuelve al tablón**
-  para que lo coja otro.
+- **Plazo:** 15 minutos antes de que se acabe, al encargado le salta un **aviso**. Si no lo envía
+  a tiempo (con 15 minutos de margen), el pedido **vuelve al tablón** para que lo coja otro, y a
+  los dos les llega un aviso.
+- **Más tiempo:** el encargado puede ampliar el plazo **una sola vez** (botón *Más tiempo* en el
+  tablón o en el pedido) eligiendo una opción más larga. Al que pidió le llega un aviso.
 - Si dos lo aceptan a la vez, se lo queda el que pulsó antes y al otro le avisa.
 - **Soltar:** si al final no puedes, el pedido vuelve al tablón.
 - **Entrega por correo:** quien ha aceptado envía los objetos por correo al autor y la

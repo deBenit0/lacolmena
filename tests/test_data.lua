@@ -60,6 +60,27 @@ H.eq(info.state, "done", "todo entregado: hecha")
 H.eq(Data.KarmaFor("Ana-Reino"), 0, "el karma propio se publica con la ficha (aún no)")
 H.eq(ns.G().karma["Ana-Reino"].kc["Cris-Reino"], Data.KARMA_POINT, "Cris gana 1 punto por el pedido")
 
+-- Más tiempo: no cambia quién lo tiene, solo una vez; y si se pasa el plazo, aviso al autor.
+local re = Data.CreateRequest({ k = "i102", q = 2 }, now())
+as("Bea", function() return Data.Commit(re.id, 1, now()) end)
+re.c["Cris-Reino"] = { n = 2, cv = now() + 5, at = now() + 5, w = 3, by = now() + 99999 } -- Cris, más tarde
+H.eq(Data.RequestInfo(re, now()).owner, "Bea-Reino", "Bea lo aceptó antes")
+local okExt = as("Bea", function() return Data.Extend(re.id, 3, now() + 60) end)
+H.ok(okExt ~= nil, "Bea pide más tiempo")
+H.eq(Data.RequestInfo(re, now() + 60).owner, "Bea-Reino", "sigue siendo de Bea aunque cambie su versión")
+local okTwice, errTwice = as("Bea", function() return Data.Extend(re.id, 3, now() + 120) end)
+H.ok(okTwice == nil and errTwice, "solo una vez")
+re.c["Cris-Reino"] = nil
+local pushes = {}
+local push = ns.Alerts.Push
+ns.Alerts.Push = function(a) pushes[#pushes + 1] = a.text end
+re.c["Bea-Reino"].by = now() - 20 * 60
+ns.Alerts.CheckDeadlines()
+ns.Alerts.Push = push
+H.ok(pushes[1] and pushes[1]:find("no lo entregó a tiempo", 1, true), "aviso al autor: vuelve al tablón")
+H.eq(Data.RequestInfo(re, now()).state, "open", "y vuelve a estar abierto")
+re.x = now()
+
 -- "Hoy": hasta medianoche y como mínimo 3 horas.
 H.ok(Data.Deadline(3, 1000) >= 1000 + 3 * 3600, "hoy: al menos 3 horas")
 

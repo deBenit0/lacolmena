@@ -319,3 +319,18 @@ function W.AcceptRequest(r)
   W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.ShortName(r.a)),
     sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
 end
+
+-- "Más tiempo": elegir un plazo más largo (solo una vez).
+function W.ExtendRequest(r)
+  local Data = ns.Data
+  local options = Data.ExtendOptions(r, ns.Now())
+  if #options == 0 then
+    ns.Print("ya no puedes pedir más tiempo para este pedido.")
+    return
+  end
+  local labels = {}
+  for i, w in ipairs(options) do labels[i] = w.label end
+  W.Choose(string.format("¿Para cuándo tendrás %s?", ns.KeyLabel(r.k)),
+    "Solo puedes pedir más tiempo una vez. A " .. ns.ShortName(r.a) .. " le llegará un aviso.",
+    labels, function(i) ns.Sync.Extend(r.id, options[i].id) end)
+end

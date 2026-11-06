@@ -191,6 +191,42 @@ local stillThere = false
 for _, it in ipairs(board.list.items) do if it.r.id == id and it.pending == 0 then stillThere = true end end
 H.ok(not stillThere, "aceptado: ya no se puede aceptar desde el tablón (sale como tu encargo)")
 
+-- Ana pide más tiempo (una vez): solo plazos más largos, y a Bea le llega el aviso.
+local beaPushes = {}
+local beaPush = ns.Alerts.Push
+ns.Alerts.Push = function(a) beaPushes[#beaPushes + 1] = a.text; return beaPush(a) end
+ana.ns.UI.Open("board")
+board:Refresh()
+local myRow = board.list.rows[1]
+H.eq(myRow.view:GetText(), "Más tiempo", "en mi encargo: botón Más tiempo")
+myRow.view:Click()
+local opts = ana.env.HDFProfChoice
+H.eq(opts.buttons[1]:GetText(), "Lo hago hoy", "solo ofrece plazos más largos")
+H.ok(not opts.buttons[2]:IsShown(), "una sola opción")
+opts.buttons[1]:Click()
+H.Advance(10)
+local extended = false
+for _, t in ipairs(beaPushes) do if t:find("necesita más tiempo", 1, true) then extended = true end end
+H.ok(extended, "a Bea le avisa: necesita más tiempo")
+ns.Alerts.Push = beaPush
+H.eq(ns.Data.RequestInfo(ns.G().requests[id], ns.Now()).owner, "Ana-Reino", "sigue siendo de Ana")
+board:Refresh()
+H.ok(not board.list.rows[1].view:IsEnabled(), "más tiempo solo una vez")
+
+-- Aviso a Ana cuando le quedan menos de 15 minutos.
+local anaPushes = {}
+local anaPush = ana.ns.Alerts.Push
+ana.ns.Alerts.Push = function(a) anaPushes[#anaPushes + 1] = a.text; return anaPush(a) end
+local acm = ana.ns.G().requests[id].c["Ana-Reino"]
+local savedBy = acm.by
+acm.by = ana.ns.Now() + 600
+ana.ns.Alerts.CheckDeadlines()
+ana.ns.Alerts.CheckDeadlines()
+H.eq(#anaPushes, 1, "un solo aviso de plazo")
+H.ok(anaPushes[1] and anaPushes[1]:find("Te quedan", 1, true), "aviso: te quedan 10 minutos")
+acm.by = savedBy
+ana.ns.Alerts.Push = anaPush
+
 -- Bea confirma lo recibido.
 ns.UI.Open("requests", id)
 H.ok(requests.detail.b1:IsEnabled(), "Recibido activo")
@@ -210,7 +246,7 @@ H.eq(requests.state.filter, 1, "los filtros dan la vuelta")
 ns.UI.ShowPage("mine")
 local mine = panel.pageFrames.mine
 H.ok(mine:IsShown(), "página Mis cosas")
-H.ok(mine.stats:GetText():find("Tu versión: 0.14.0", 1, true) ~= nil, "muestra la versión")
+H.ok(mine.stats:GetText():find("Tu versión: 0.15.0", 1, true) ~= nil, "muestra la versión")
 H.ok(mine.stats:GetText():find("Pestaña en: |cff40ff40GuildFrame", 1, true) ~= nil, "diagnóstico: pestaña en la ventana de hermandad")
 H.ok(mine.stats:GetText():find("Correo: |cff40ff40compatible", 1, true) ~= nil, "diagnóstico: correo")
 local anaMine
