@@ -7,9 +7,10 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 
 - **Pedidos** (la que está hecha): cada miembro pide lo que necesita a quien sabe fabricarlo o
   recolectarlo, pagando si quiere.
-- **Mazmorras** y **Eventos**: se ven pero aún no se pueden abrir (próximamente).
+- **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
+- **Eventos**: se ve pero aún no se puede abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.16.2). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.17.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -109,6 +110,25 @@ los materiales que te faltan (contando bolsas y banco):
 - Se ve junto a cada nombre, hay una clasificación en Mis cosas y las peticiones de quien tiene
   **más karma salen antes** en las listas.
 
+### Mazmorras
+- **Proponer mazmorra**: eliges la mazmorra de la lista (las de Classic y las **9 nuevas de WoW
+  Forever**, marcadas como *nueva*, con su rango de niveles), la hora (**Ahora** o una hora
+  concreta, en tramos de 15 minutos) y con qué roles vas tú (o ninguno si solo la organizas).
+  Te propone la que mejor encaja con tu nivel.
+- A los de la hermandad que tienen el nivel les llega un **aviso**.
+- **Apuntarse**: marcas **todos los roles** que puedes hacer (Tanque, Sanador, DPS). Solo deja
+  marcar los que puede tu clase (un mago no puede tanquear). Se puede cambiar o desapuntarse.
+- Se ve quién se ha apuntado en cada rol, con su nivel (en rojo si no llega al mínimo) y si está
+  conectado.
+- **Hacer grupo** (solo quien la propuso): el addon elige **1 tanque, 1 sanador y 3 DPS**.
+  Prueba todas las combinaciones (alguien que vale para varios roles va donde más falta) y da
+  prioridad a los **conectados**, a los que **llegan al nivel** y a los **primeros en
+  apuntarse**. El resto quedan de **suplentes**. Se puede rehacer si alguien se va.
+- A los elegidos les llega un aviso ("¡Vas de tanque! Te invitará Ana"), y a todos los
+  apuntados un **recordatorio 10 minutos antes**.
+- **Invitar al grupo**: quien la propuso invita a los 4 elegidos con un botón.
+- **Cancelar**: la quedada se ve como cancelada. Las quedadas se borran solas 12 horas después.
+
 ### Modo demostración (para probar)
 En **Mis cosas**, marca **Modo demostración**: aparecen jugadores de ejemplo con sus recetas y
 peticiones. Solo los ves tú; nunca se envían a la hermandad. Algunas peticiones están hechas a tu
@@ -119,6 +139,9 @@ aviso con **Lo hago yo**). Para probar todo el proceso:
 2. Pulsa **Enviar (ejemplo)**: hace como si mandaras el correo (no se envía nada) y la petición
    se completa.
 3. A los pocos segundos el de ejemplo lo "recibe", te da las gracias y **sube tu karma**.
+
+También salen dos quedadas de mazmorra: una **tuya** con 8 apuntados para probar **Hacer
+grupo**, y otra de un jugador de ejemplo para probar a apuntarte.
 
 Al desmarcarlo desaparece todo lo de ejemplo.
 

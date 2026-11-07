@@ -19,7 +19,10 @@ local HELP = table.concat({
     .. "(pedidos de ejemplo para probar).",
   "|cffffd100Karma|r: +1 por cada pedido que entregas y -1 por cada uno que recibes. "
     .. "A quien más ayuda le atienden antes.",
-  "|cffffd100Mazmorras|r y |cffffd100Eventos|r: próximamente.",
+  "|cffffd100Mazmorras|r: propón una mazmorra (ahora o a una hora) y los demás se apuntan con los "
+    .. "roles que pueden hacer. Quien la propone pulsa |cffffffffHacer grupo|r: el addon elige 1 tanque, "
+    .. "1 sanador y 3 DPS, y con |cffffffffInvitar al grupo|r los invita.",
+  "|cffffd100Eventos|r: próximamente.",
   "|cff999999Para que tus recetas salgan a los demás, abre una vez la ventana de cada profesión.|r",
 }, "\n\n")
 
@@ -71,6 +74,11 @@ ns.UI.RegisterPage("home", function(page)
     if s.new > 0 then parts[#parts + 1] = string.format("|cffffd100%d nuevos|r", s.new) end
     if s.servable > 0 then parts[#parts + 1] = string.format("|cff40ff40%d puedes hacerlos|r", s.servable) end
     if s.toSend > 0 then parts[#parts + 1] = string.format("|cff66ccfftienes %d encargos por enviar|r", s.toSend) end
+    local runs = 0
+    for _, r in pairs(ns.Dungeons.Runs() or {}) do
+      if ns.Dungeons.State(r, ns.Now()) == "open" then runs = runs + 1 end
+    end
+    if runs > 0 then parts[#parts + 1] = string.format("|cffffd100%d quedadas de mazmorra|r", runs) end
     page.status:SetText(table.concat(parts, ", ") .. ".")
   end
 end)

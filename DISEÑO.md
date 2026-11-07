@@ -55,6 +55,17 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - Objetos pedidos que **nadie sabe hacer**: se listan aparte y se avisa cuando alguien aprende la receta.
 - **Contador** de encargos completados por fabricante.
 
+## Mazmorras (quedadas)
+- Proponer: mazmorra de la lista (Classic + 9 nuevas de WoW Forever, con id fijo), hora (ahora o
+  en tramos de 15 min) y roles de quien propone.
+- Apuntarse con varios roles, solo los que permite la clase. Se guarda nivel y clase.
+- "Hacer grupo" (solo quien propone): 1 tanque, 1 sanador, 3 DPS; prueba todas las combinaciones
+  tanque/sanador y llena el máximo de huecos; desempata por conectado > llega al nivel > primero
+  en apuntarse. Resto: suplentes. Se puede rehacer.
+- Avisos: quedada nueva (si tu nivel encaja), "vas de X" a los elegidos, recordatorio 10 min antes.
+- Botón "Invitar al grupo". Se cancela; se borra 12 h después de terminar.
+- Se sincroniza como las peticiones (mensaje M), por bloques con dueño: autor y cada apuntado.
+
 ## Avisos / ruido
 - Modo **"no disponible"**: no recibes avisos y apareces detrás en las listas.
 - **Silencio en combate, mazmorras y bandas**; los avisos se guardan y se muestran al salir.

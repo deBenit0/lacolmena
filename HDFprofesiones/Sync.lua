@@ -3,7 +3,7 @@
 -- Mensajes (una letra + datos):
 --   H  hola: resumen de lo que tengo (versión de cada ficha y huella de cada petición)
 --   W  quiero: lista de fichas/peticiones que me faltan
---   P  ficha de un fabricante        Q  petición
+--   P  ficha de un fabricante        Q  petición        M  quedada de mazmorra
 --   R  pido los materiales de una receta      I  materiales de una receta
 --
 -- Al entrar, cada uno manda su resumen. Los demás le envían lo que le falta y
@@ -18,7 +18,7 @@ ns.Sync = Sync
 local rand = ns.Random
 local started = false
 local pending = {}            -- envíos programados: ["P:nombre"] = { token, ver }
-local want = { e = {}, r = {} } -- lo que pediremos con un W
+local want = { e = {}, r = {}, m = {} } -- lo que pediremos con un W
 local wantScheduled = false
 local infoAsked = {}
 Sync.peers = {}               -- [personaje] = versión del addon
@@ -83,6 +83,15 @@ local function requestAlreadySent(id, since)
   end
 end
 
+local function runAlreadySent(id, since)
+  return function()
+    local list = ns.Dungeons.Runs()
+    local r = list and list[id]
+    local s = inflight["M:" .. id]
+    return not r or (s ~= nil and s.t >= since and s.h == ns.Dungeons.Hash(r))
+  end
+end
+
 local function infoAlreadySent(ik, since)
   return function()
     local s = inflight["I:" .. ik]
@@ -110,6 +119,15 @@ function Sync.PushRequest(id, priority, since)
     since and requestAlreadySent(id, since) or nil)
 end
 
+function Sync.PushRun(id, priority, since)
+  local list = ns.Dungeons.Runs()
+  local r = list and list[id]
+  if not r or r.demo then return end
+  cancel("M", id)
+  Comm.Send("M", id .. "~" .. ns.Dungeons.Hash(r) .. "~" .. Codec.Serialize(r), "GUILD", nil, priority,
+    since and runAlreadySent(id, since) or nil)
+end
+
 function Sync.PushInfo(ik, since)
   local info = Data.GetInfo(ik)
   if not info or not info.v or #info.v == 0 then return end
@@ -132,6 +150,8 @@ local function schedule(kind, id, delay, ver)
       Sync.PushEntry(id, nil, since)
     elseif kind == "Q" then
       Sync.PushRequest(id, nil, since)
+    elseif kind == "M" then
+      Sync.PushRun(id, nil, since)
     elseif kind == "I" then
       Sync.PushInfo(id, since)
     end
@@ -163,7 +183,14 @@ function Sync.BuildDigest()
   for id, req in pairs(g.requests) do
     if not req.demo then r[compress(id, realm)] = Data.RequestHash(req) end
   end
-  return { pv = ns.PROTOCOL, av = ns.VERSION, e = e, r = r }
+  local m
+  for id, run in pairs(ns.Dungeons.Runs() or {}) do
+    if not run.demo then
+      m = m or {}
+      m[compress(id, realm)] = ns.Dungeons.Hash(run)
+    end
+  end
+  return { pv = ns.PROTOCOL, av = ns.VERSION, e = e, r = r, m = m }
 end
 
 function Sync.SendHello()
@@ -174,7 +201,7 @@ end
 local function flushWant()
   wantScheduled = false
   local realm = ns.Realm()
-  local e, r, any = {}, {}, false
+  local e, r, m, any = {}, {}, {}, false
   for name, v in pairs(want.e) do
     e[compress(name, realm)] = v
     any = true
@@ -183,9 +210,14 @@ local function flushWant()
     r[#r + 1] = compress(id, realm)
     any = true
   end
+  for id in pairs(want.m) do
+    m[#m + 1] = compress(id, realm)
+    any = true
+  end
   wipe(want.e)
   wipe(want.r)
-  if any then Comm.Send("W", Codec.Serialize({ e = e, r = r }), "GUILD", nil, "high") end
+  wipe(want.m)
+  if any then Comm.Send("W", Codec.Serialize({ e = e, r = r, m = #m > 0 and m or nil }), "GUILD", nil, "high") end
 end
 
 local function scheduleWant()
@@ -259,7 +291,22 @@ Comm.Register("H", function(sender, payload)
   for id in pairs(theirR) do
     if not g.requests[id] then want.r[id] = true end
   end
-  if next(want.e) or next(want.r) then scheduleWant() end
+  -- Quedadas de mazmorra.
+  local theirM = {}
+  if type(d.m) == "table" then
+    for k, v in pairs(d.m) do
+      if type(k) == "string" and type(v) == "string" then theirM[expand(k, realm)] = v end
+    end
+  end
+  for id, run in pairs(ns.Dungeons.Runs() or {}) do
+    if not run.demo and theirM[id] ~= ns.Dungeons.Hash(run) then
+      schedule("M", id, run.a == me and rand(0.2, 1) or rand(2, 8))
+    end
+  end
+  for id in pairs(theirM) do
+    if not (ns.Dungeons.Runs() or {})[id] then want.m[id] = true end
+  end
+  if next(want.e) or next(want.r) or next(want.m) then scheduleWant() end
 end)
 
 Comm.Register("W", function(sender, payload)
@@ -289,9 +336,19 @@ Comm.Register("W", function(sender, payload)
       end
     end
   end
+  if type(w.m) == "table" then
+    for _, k in ipairs(w.m) do
+      if type(k) == "string" then
+        local id = expand(k, realm)
+        want.m[id] = nil
+        local run = (ns.Dungeons.Runs() or {})[id]
+        if run and not run.demo then schedule("M", id, run.a == me and rand(0.1, 0.5) or rand(0.5, 4)) end
+      end
+    end
+  end
 end)
 
--- Cabeceras: "a~b~resto" (P y Q) o "a~resto" (I).
+-- Cabeceras: "a~b~resto" (P, Q y M) o "a~resto" (I).
 local function header2(payload)
   return payload:match("^([^~]*)~([^~]*)~(.*)$")
 end
@@ -309,6 +366,11 @@ end)
 Comm.RegisterPeek("Q", function(sender, payload)
   local id, h = header2(payload)
   if id and h then markInflight("Q:" .. id, nil, h) end
+end)
+
+Comm.RegisterPeek("M", function(sender, payload)
+  local id, h = header2(payload)
+  if id and h then markInflight("M:" .. id, nil, h) end
 end)
 
 Comm.RegisterPeek("I", function(sender, payload)
@@ -352,6 +414,24 @@ Comm.Register("Q", function(sender, payload)
     if merged.a == ns.Me() and Data.CheckThanks(merged, ns.Now()) then Sync.PublishMine() end
     ns.Fire("DATA_CHANGED", "request", r.id)
     ns.Fire("REQUEST_UPDATED", old, merged)
+  end
+end)
+
+Comm.Register("M", function(sender, payload)
+  local id, _, body = header2(payload)
+  local run = body and ns.Dungeons.Sanitize(Codec.Deserialize(body))
+  if not run or run.id ~= id or not Guild.Accepts(run.a) or not ns.G() then return end
+  markInflight("M:" .. run.id, nil, ns.Dungeons.Hash(run))
+  want.m[run.id] = nil
+  local changed, old, merged, behind = ns.Dungeons.Apply(run, ns.Now())
+  if behind then
+    schedule("M", run.id, rand(1.5, 5))
+  else
+    cancel("M", run.id)
+  end
+  if changed then
+    ns.Fire("DATA_CHANGED", "dungeon", run.id)
+    ns.Fire("RUN_UPDATED", old, merged)
   end
 end)
 
@@ -438,6 +518,37 @@ function Sync.Renew(id)
   return afterRequestAction(Data.RenewRequest(id, ns.Now()))
 end
 
+-- Quedadas de mazmorra.
+local function afterRunAction(r, err)
+  if not r then
+    if err then ns.Print(err) end
+    return nil, err
+  end
+  Sync.PushRun(r.id, "high")
+  ns.Fire("DATA_CHANGED", "dungeon", r.id)
+  return r
+end
+
+function Sync.CreateRun(opts)
+  return afterRunAction(ns.Dungeons.Create(opts, ns.Now()))
+end
+
+function Sync.SignUpRun(id, roles)
+  return afterRunAction(ns.Dungeons.SignUp(id, roles, ns.Now()))
+end
+
+function Sync.LeaveRun(id)
+  return afterRunAction(ns.Dungeons.Leave(id, ns.Now()))
+end
+
+function Sync.MakeGroup(id)
+  return afterRunAction(ns.Dungeons.MakeGroup(id, ns.Now()))
+end
+
+function Sync.CancelRun(id)
+  return afterRunAction(ns.Dungeons.Cancel(id, ns.Now()))
+end
+
 function Sync.SetUnavailable(value)
   local c = ns.MyChar()
   if not c then return end
@@ -452,6 +563,7 @@ function Sync.Start()
   if started or not ns.G() or not ns.Me() then return end
   started = true
   Data.Purge(ns.Now())
+  ns.Dungeons.Purge(ns.Now())
   Sync.PublishMine()
   ns.After(1, Sync.SendHello)
   -- Resumen en el chat cuando ya se ha puesto al día.
@@ -479,6 +591,7 @@ ns.Listen("GUILD_CHANGED", function(key)
   wipe(pending)
   wipe(want.e)
   wipe(want.r)
+  wipe(want.m)
   Data.indexDirty = true
   ns.Fire("DATA_CHANGED", "guild")
   if key then ns.After(8, Sync.Start) end
@@ -489,6 +602,7 @@ ns.Listen("LOGIN", function()
     ns.SafeCall(function()
       if not ns.G() then return end
       Data.Purge(ns.Now())
+      ns.Dungeons.Purge(ns.Now())
       Sync.PublishMine() -- por si ha terminado algún cooldown
       ns.Fire("DATA_CHANGED", "tick")
     end)

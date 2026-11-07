@@ -10,7 +10,7 @@ local hosts = {}
 local SECTIONS = {
   { id = "home", label = "Inicio" },
   { id = "orders", label = "Pedidos" },
-  { id = "dungeons", label = "Mazmorras", soon = true },
+  { id = "dungeons", label = "Mazmorras" },
   { id = "events", label = "Eventos", soon = true },
 }
 ns.MOTTO = "Mi vida por el fundillo"
@@ -23,6 +23,7 @@ local PAGES = {
   -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
   { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
   { id = "mine", section = "orders", label = "Mis cosas", tab = "mine" },
+  { id = "dungeons", section = "dungeons" },
 }
 local PAGE_BY_ID = {}
 for _, p in ipairs(PAGES) do PAGE_BY_ID[p.id] = p end
@@ -83,10 +84,10 @@ local function createPanel()
         GameTooltip:Show()
       end)
       b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    elseif s.id == "home" then
-      b:SetScript("OnClick", function() UI.ShowPage("home") end)
-    else
+    elseif s.id == "orders" then
       b:SetScript("OnClick", function() UI.ShowPage(UI.lastOrders or "board") end)
+    else
+      b:SetScript("OnClick", function() UI.ShowPage(s.id) end)
     end
     panel.sections[s.id] = b
   end
@@ -123,7 +124,7 @@ local function createPanel()
     local create = UI.pages[p.id]
     if create then
       local f = CreateFrame("Frame", nil, panel.content)
-      if p.section == "home" then
+      if p.section ~= "orders" then
         f:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -76) -- sin pestañas debajo: más sitio
         f:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 16)
       else

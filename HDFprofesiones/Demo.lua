@@ -122,6 +122,32 @@ local function addMyRequests(g, now)
   return made
 end
 
+-- Quedadas de mazmorra de ejemplo: una tuya (para probar "Hacer grupo") y otra de Bruno.
+function Demo.AddRuns(g, now)
+  local D = ns.Dungeons
+  if not D then return end
+  local list = D.Runs()
+  local mine = D.Recommended(D.MyLevel())
+  local dg = D.Dungeon(mine)
+  local function add(id, author, d, at, people, levelOf)
+    local r = { id = id, a = author, t = now - 900, d = d, at = at, av = now, s = {} }
+    for j, name in ipairs(people) do
+      local e = g.entries[full(name)]
+      local class = e and e.c or "WARRIOR"
+      r.s[full(name)] = { r = D.RolesFor(class), l = levelOf(j), c = class, st = now - 800 + j * 40, sv = now }
+    end
+    r = D.Sanitize(r)
+    r.demo = true
+    list[r.id] = r
+  end
+  local base = math.max(dg.min, math.min(D.MyLevel(), dg.max))
+  add(ns.Me() .. ":quedadademo", ns.Me(), mine, now + 25 * 60,
+    { "Gerda", "Ivette", "Mortis", "Kael", "Tula", "Chispa", "Selene", "Pico" },
+    function(j) return j == 5 and (dg.min - 3) or (base - (j % 3)) end)
+  add(full("Bruno") .. ":quedadademo", full("Bruno"), 18, now - 5 * 60,
+    { "Bruno", "Olaf", "Alba", "Faro" }, function() return 60 end)
+end
+
 -- Lo que dicen los jugadores de ejemplo (en tu chat; nadie más lo ve).
 local function say(author, text)
   ns.Print("|cffff8040[ejemplo]|r " .. ns.ShortName(author) .. ": " .. text)
@@ -247,6 +273,7 @@ function Demo.Enable()
     g.requests[r.id] = r
   end
   Demo.mine = addMyRequests(g, now)
+  Demo.AddRuns(g, now)
   Data.indexDirty = true
   ns.Fire("DATA_CHANGED", "demo")
 end
@@ -259,6 +286,9 @@ function Demo.Disable(silent)
   end
   for id, r in pairs(g.requests) do
     if r.demo then g.requests[id] = nil end
+  end
+  for id, r in pairs(g.runs or {}) do
+    if r.demo then g.runs[id] = nil end
   end
   wipe(Demo.online)
   wipe(Demo.seen)

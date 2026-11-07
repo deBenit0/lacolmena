@@ -64,7 +64,7 @@ local function createFrame()
   f:SetScript("OnClick", function(self)
     local alert = self.alert
     Alerts.HideCurrent()
-    if alert and ns.UI then ns.UI.Open("requests", alert.id) end
+    if alert and ns.UI then ns.UI.Open(alert.page or "requests", alert.id) end
   end)
   f:Hide()
   return f
@@ -231,8 +231,52 @@ function Alerts.CheckDeadlines()
     if type(t) ~= "number" or now - t > 3 * 86400 then g.warned[key] = nil end
   end
 end
+-- Quedadas de mazmorra: una nueva para mi nivel y si me han elegido para el grupo.
+local DUNGEON_ICON = "Interface\\Icons\\INV_Misc_Key_03"
+function Alerts.OnRunUpdated(old, new)
+  local g, me, now = ns.G(), ns.Me(), ns.Now()
+  local D = ns.Dungeons
+  if not new or not g or not me or D.State(new, now) ~= "open" then return end
+  g.runAlerted = g.runAlerted or {}
+  local dg = D.Dungeon(new.d)
+  local when = new.at > now + 120 and ("a las " .. D.Clock(new.at)) or "ahora"
+  if not old and new.a ~= me and not g.runAlerted[new.id] then
+    local level = D.MyLevel()
+    if level >= dg.min and level <= dg.max + 3 then
+      g.runAlerted[new.id] = true
+      Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON,
+        text = string.format("%s propone %s %s", ns.ShortName(new.a), dg.name, when) })
+    end
+  end
+  local place = D.MyPlace(new)
+  if place and place ~= "suplente" and new.a ~= me and D.MyPlace(old) ~= place then
+    Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON,
+      text = string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.ShortName(new.a)) })
+  end
+end
+ns.Listen("RUN_UPDATED", function(old, new) ns.SafeCall(Alerts.OnRunUpdated, old, new) end)
+
+-- Recordatorio a los apuntados poco antes de la hora.
+function Alerts.CheckRuns()
+  local g, me, now = ns.G(), ns.Me(), ns.Now()
+  local D = ns.Dungeons
+  if not g or not me then return end
+  g.warned = g.warned or {}
+  for id, r in pairs(D.Runs() or {}) do
+    local su = r.s and r.s[me]
+    local left = r.at - now
+    local key = "run:" .. id .. ":" .. r.at
+    if su and not su.o and D.State(r, now) == "open" and left > 0 and left <= D.REMIND_BEFORE and not g.warned[key] then
+      g.warned[key] = now
+      Alerts.Push({ id = id, page = "dungeons", icon = DUNGEON_ICON,
+        text = string.format("%s empieza en %s", D.Dungeon(r.d).name, ns.FormatDuration(left)) })
+    end
+  end
+end
+
 C_Timer.NewTicker(60, function()
   ns.SafeCall(Alerts.CheckDeadlines)
+  ns.SafeCall(Alerts.CheckRuns)
   if ns.UI and ns.UI.IsShown() then ns.UI.Refresh() end -- para que corran los plazos en pantalla
 end)
 ns.On("PLAYER_REGEN_ENABLED", function() ns.After(1, Alerts.Flush) end)
