@@ -58,18 +58,23 @@ ns.UI.RegisterPage("mine", function(page)
   end)
   page.quiet:SetPoint("TOPLEFT", 170, -290)
 
+  page.chatPost = W.Check(page, "Escribir mis pedidos en el chat de hermandad", function(checked)
+    ns.db.settings.chatPost = checked
+  end)
+  page.chatPost:SetPoint("TOPLEFT", 4, -314)
+
   page.demo = W.Check(page, "Modo demostración (jugadores de ejemplo, solo los ves tú)", function(checked)
     ns.Demo.Set(checked)
   end)
-  page.demo:SetPoint("TOPLEFT", 4, -314)
+  page.demo:SetPoint("TOPLEFT", 4, -340)
 
   -- Para la prueba en el juego: autocomprobación e informe de errores.
   page.check = W.Button(page, "Comprobar el addon", 140, 22, function() ns.Diag.Show() end)
-  page.check:SetPoint("TOPLEFT", 8, -346)
+  page.check:SetPoint("TOPLEFT", 8, -370)
   page.report = W.Button(page, "Copiar informe", 130, 22, function() ns.Diag.Show() end)
   page.report:SetPoint("LEFT", page.check, "RIGHT", 6, 0)
   page.errors = W.Text(page, "GameFontHighlightSmall")
-  page.errors:SetPoint("TOPLEFT", 10, -374)
+  page.errors:SetPoint("TOPLEFT", 10, -398)
 
   page.statsTitle = W.Text(page, "GameFontNormal")
   page.statsTitle:SetPoint("TOPLEFT", 320, -6)
@@ -107,6 +112,7 @@ ns.UI.RegisterPage("mine", function(page)
     page.unavailable:SetChecked(c.u and true or false)
     page.alerts:SetChecked(ns.db.settings.alerts and true or false)
     page.sound:SetChecked(ns.db.settings.sound and true or false)
+    page.chatPost:SetChecked(ns.db.settings.chatPost ~= false)
     if ns.Alerts.IsQuiet() then
       page.quiet:SetText("No molestar: " .. ns.FormatDuration(ns.Alerts.QuietUntil() - ns.Now()))
     else
