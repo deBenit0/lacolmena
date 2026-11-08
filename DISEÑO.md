@@ -55,6 +55,15 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - Objetos pedidos que **nadie sabe hacer**: se listan aparte y se avisa cuando alguien aprende la receta.
 - **Contador** de encargos completados por fabricante.
 
+## Ofertas
+- Un miembro ofrece objetos concretos que tiene (cantidad y precio por unidad, gratis por defecto).
+- Viajan dentro de la ficha de cada jugador: ofertas (of), "lo quiero" (cl) y envíos (od). Cada
+  uno escribe solo en la suya, así no hay conflictos.
+- "Lo quiero" con cantidad (hasta lo libre); caduca a las 48 h. El que ofrece lo manda por correo
+  y se apunta solo; contra reembolso si tiene precio. Karma +1 al que da, −1 al que recibe.
+- Tablón: pedidos y ofertas juntos; buscador, Ver (todo/pedidos/ofertas) y categoría
+  (materiales, pociones y comida, bolsas, armas y armaduras, otros).
+
 ## Mazmorras (quedadas)
 - Proponer: mazmorra de la lista (Classic + 9 nuevas de WoW Forever, con id fijo), hora (ahora o
   en tramos de 15 min) y roles de quien propone.

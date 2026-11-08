@@ -39,6 +39,10 @@ function Mail.OnSent()
       ns.ShortName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k))
     ns.Sync.PushRequest(r.id, "high")
   end
+  -- Lo que queda puede ser de mis ofertas.
+  for _, d in ipairs(ns.Offers.RegisterMail(mail.to, mail.items, ns.Now())) do
+    ns.Print("apuntado en tu oferta: %dx %s enviadas a %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who))
+  end
   if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
 end
 
@@ -71,3 +75,25 @@ end
 if SendMail then hooksecurefunc("SendMail", function(recipient) ns.SafeCall(Mail.OnSendMail, recipient) end) end
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
+
+-- Lo mismo para una oferta mía: destinatario, asunto y, si tiene precio, contra reembolso.
+function Mail.PrepareOffer(who, id, amount, price)
+  if not Mail.CanPrepare() then return false end
+  if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
+  SendMailNameEditBox:SetText(ns.ShortName(who))
+  if SendMailSubjectEditBox then
+    SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName("i" .. id)))
+  end
+  local cod = (price or 0) * amount
+  if cod > 0 then
+    if SendMailCODButton and SendMailMoney and MoneyInputFrame_SetCopper then
+      SendMailCODButton:Click()
+      MoneyInputFrame_SetCopper(SendMailMoney, cod)
+    elseif SetSendMailCOD then
+      SetSendMailCOD(cod)
+    end
+    ns.Print("correo contra reembolso de %s: se le cobrará al recogerlo.", ns.FormatMoney(cod))
+  end
+  ns.Print("pon %dx %s en el correo y envíalo: se apuntará solo.", amount, ns.KeyLabel("i" .. id))
+  return true
+end

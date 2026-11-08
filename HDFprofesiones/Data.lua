@@ -3,6 +3,7 @@
 -- Ficha de fabricante (una por personaje, la publica su dueño):
 --   { n = "Nombre-Reino", v = versión, c = clase, l = nivel, u = no disponible,
 --     av = versión del addon, th = { [fabricante] = encargos confirmados por este autor },
+--     of / cl / od = ofertas, "lo quiero" y envíos de ofertas (ver Offers.lua),
 --     p = { [profesión] = { r = nivel, m = máximo, i = objetos, e = encantamientos,
 --                           cd = { [receta] = fin del cooldown } } } }
 --
@@ -127,6 +128,7 @@ function Data.SanitizeEntry(e)
     end
     out.p = any and profs or nil
   end
+  if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
   return out
 end
 
@@ -198,6 +200,7 @@ function Data.BuildMyEntry(now)
     anyProf = true
   end
   e.p = anyProf and profs or nil
+  if ns.Offers then ns.Offers.BuildInto(e, now) end
   return e
 end
 

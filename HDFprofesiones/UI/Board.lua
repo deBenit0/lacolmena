@@ -1,8 +1,39 @@
--- Página "Tablón": los pedidos de la gente en este momento, con un botón para ver cada uno y
--- otro para aceptar el encargo sin más pasos. Arriba, mis encargos por enviar; los pedidos
--- nuevos desde la última visita salen marcados, y en lo que puedo hacer dice si tengo los materiales.
+-- Página "Tablón": lo que pide y lo que ofrece la gente en este momento.
+-- - Pedidos: ver cada uno o aceptar el encargo sin más pasos. En lo que puedo hacer dice si
+--   tengo los materiales.
+-- - Ofertas: objetos concretos (bolsas, pociones...) que alguien da; "Lo quiero" y te los manda.
+-- Arriba, lo que tengo que enviar. Se puede buscar y filtrar por tipo y categoría de objeto.
+-- Lo nuevo desde la última visita sale marcado.
 local _, ns = ...
 local W, Data = ns.W, ns.Data
+
+-- Filtros: qué se ve y qué categoría de objeto.
+local SHOW = {
+  { id = "all", label = "Ver: todo" },
+  { id = "requests", label = "Ver: pedidos" },
+  { id = "offers", label = "Ver: ofertas" },
+}
+local CATEGORIES = {
+  { id = nil, label = "Categoría: todas" },
+  { id = "mats", label = "Materiales" },
+  { id = "cons", label = "Pociones y comida" },
+  { id = "bags", label = "Bolsas" },
+  { id = "gear", label = "Armas y armaduras" },
+  { id = "other", label = "Otros" },
+}
+
+-- Categoría de un objeto por su clase en el juego.
+local function category(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return "other" end
+  local _, class = ns.ItemInstant(id)
+  if class == 7 or class == 5 then return "mats" end
+  if class == 0 then return "cons" end
+  if class == 1 or class == 11 then return "bags" end
+  if class == 2 or class == 4 then return "gear" end
+  return "other"
+end
+ns.UI.ItemCategory = category
 
 -- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y nadie lo ha cogido)
 local function canAccept(r, info, me)
@@ -52,11 +83,16 @@ local function materialsStatus(r, amount)
   end
 end
 
--- Pedidos del tablón y sus números (también los usa la página de inicio).
+local function priceText(copper)
+  if not copper or copper <= 0 then return "|cff40ff40gratis|r" end
+  return ns.FormatMoney(copper) .. " c/u"
+end
+
+-- Pedidos y ofertas del tablón, y sus números (también los usa la página de inicio).
 local function collect(seenAt)
   local g, me, now = ns.G(), ns.Me(), ns.Now()
   local items = {}
-  local stats = { open = 0, servable = 0, new = 0, toSend = 0 }
+  local stats = { open = 0, servable = 0, new = 0, toSend = 0, offers = 0 }
   if not g then return items, stats end
   for _, r in pairs(g.requests) do
     local info = Data.RequestInfo(r, now)
@@ -65,17 +101,32 @@ local function collect(seenAt)
     local visible = info.state == "open" or (mine and Data.IsActiveState(info.state))
     if pending > 0 or visible then
       local item = {
-        r = r, info = info, me = me, now = now, mine = r.a == me, pending = pending,
+        kind = "req", id = r.id, k = r.k, author = r.a, t = r.t or 0,
+        r = r, info = info, me = me, now = now, mine = mine, pending = pending,
         canServe = Data.CanServe(r, now), acceptable = canAccept(r, info, me),
         karma = Data.KarmaFor(r.a),
-        new = r.a ~= me and pending == 0 and (r.t or 0) > (seenAt or 0),
+        new = not mine and pending == 0 and (r.t or 0) > (seenAt or 0),
       }
       if pending > 0 then stats.toSend = stats.toSend + 1 end
-      if visible and not item.mine then stats.open = stats.open + 1 end
+      if visible and not mine then stats.open = stats.open + 1 end
       if item.canServe then stats.servable = stats.servable + 1 end
       if item.new and visible then stats.new = stats.new + 1 end
       items[#items + 1] = item
     end
+  end
+  for _, o in ipairs(ns.Offers.List(now)) do
+    local mine = o.owner == me
+    local item = {
+      kind = "offer", id = "o:" .. o.key, k = "i" .. o.id, author = o.owner, t = o.t or 0,
+      o = o, me = me, now = now, mine = mine,
+      pending = (mine and #o.claims > 0) and o.pending or 0, -- tengo que mandárselo a alguien
+      claimed = o.myClaim > 0, karma = Data.KarmaFor(o.owner),
+      new = not mine and (o.t or 0) > (seenAt or 0),
+    }
+    if not mine then stats.offers = stats.offers + 1 end
+    if item.pending > 0 then stats.toSend = stats.toSend + 1 end
+    if item.new then stats.new = stats.new + 1 end
+    items[#items + 1] = item
   end
   return items, stats
 end
@@ -87,40 +138,371 @@ function ns.UI.BoardStats()
 end
 
 local function rank(x)
-  if x.pending > 0 then return 0 end -- mis encargos por enviar
+  if x.pending > 0 then return 0 end -- lo que tengo que enviar (encargos y ofertas pedidas)
+  if x.claimed then return 1 end     -- ofertas que he pedido
   if x.mine then return 5 end
   if x.canServe then return 2 end
   if x.new then return 3 end
   return 4
 end
 
+local function settings()
+  local s = ns.db.settings
+  s.board = s.board or { show = 1, cat = 1 }
+  return s.board
+end
+
+---------------------------------------------------------------------------
+-- Ventana "Ofrecer objeto"
+---------------------------------------------------------------------------
+local offerDialog
+local PRICES = {
+  { label = "Gratis", copper = 0 },
+  { label = "50 plata", copper = 5000 },
+  { label = "1 oro", copper = 10000 },
+  { label = "5 oro", copper = 50000 },
+}
+
+local function markSelected(buttons, selected)
+  for i, b in ipairs(buttons) do
+    local fs = b.GetFontString and b:GetFontString()
+    if i == selected then
+      b:LockHighlight()
+      if fs then fs:SetTextColor(1, 1, 1) end
+    else
+      b:UnlockHighlight()
+      if fs then fs:SetTextColor(1, 0.82, 0) end
+    end
+  end
+end
+
+local function createOfferDialog()
+  local d = W.Panel("HDFProfOfferDialog", UIParent, 420, 270)
+  offerDialog = d
+  d:SetFrameStrata("DIALOG")
+  d:SetToplevel(true)
+  d:SetPoint("CENTER", 0, 60)
+  d:Hide()
+  tinsert(UISpecialFrames, "HDFProfOfferDialog")
+  local title = W.Text(d, "GameFontNormal")
+  title:SetPoint("TOP", 0, -18)
+  title:SetText("Ofrecer un objeto a la hermandad")
+  local close = CreateFrame("Button", nil, d, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -6, -6)
+
+  -- Objeto: se arrastra al cuadro o se hace mayús+clic en él con la caja activa.
+  d.itemButton = CreateFrame("Button", nil, d)
+  d.itemButton:SetSize(36, 36)
+  d.itemButton:SetPoint("TOPLEFT", 24, -48)
+  d.iconTex = d.itemButton:CreateTexture(nil, "ARTWORK")
+  d.iconTex:SetAllPoints()
+  d.iconTex:SetTexture(ns.QUESTION_ICON)
+  local function fromCursor()
+    if not GetCursorInfo then return end
+    local kind, id = GetCursorInfo()
+    if kind == "item" and id then
+      if ClearCursor then ClearCursor() end
+      d:SetItem(tonumber(id))
+    end
+  end
+  d.itemButton:SetScript("OnReceiveDrag", fromCursor)
+  d.itemButton:SetScript("OnClick", fromCursor)
+  W.KeyTooltip(d.itemButton, function() return d.id and ("i" .. d.id) end)
+  d.link = W.Input(d, 290)
+  d.link.hdfLink = true
+  d.link:SetPoint("TOPLEFT", d.itemButton, "TOPRIGHT", 12, -2)
+  W.Placeholder(d.link, "Mayús+clic en un objeto de tus bolsas")
+  d.link:HookScript("OnTextChanged", function(self)
+    local id = tonumber((self:GetText() or ""):match("item:(%d+)"))
+    if id and id ~= d.id then d:SetItem(id) end
+  end)
+  d.itemName = W.Text(d, "GameFontHighlightSmall")
+  d.itemName:SetPoint("TOPLEFT", d.link, "BOTTOMLEFT", 0, -4)
+  d.itemName:SetText("|cff999999o arrástralo al cuadro de la izquierda|r")
+
+  local qtyLabel = W.Text(d, "GameFontNormalSmall")
+  qtyLabel:SetPoint("TOPLEFT", 24, -104)
+  qtyLabel:SetText("Cuántos ofreces")
+  d.qty = W.Input(d, 50, true)
+  d.qty:SetPoint("LEFT", qtyLabel, "RIGHT", 14, 0)
+  d.qty:SetMaxLetters(4)
+  d.have = W.Text(d, "GameFontHighlightSmall")
+  d.have:SetPoint("LEFT", d.qty, "RIGHT", 10, 0)
+
+  local priceLabel = W.Text(d, "GameFontNormalSmall")
+  priceLabel:SetPoint("TOPLEFT", 24, -136)
+  priceLabel:SetText("Precio por unidad")
+  d.prices = {}
+  for i, p in ipairs(PRICES) do
+    local b = W.Button(d, p.label, 80, 22)
+    if i == 1 then b:SetPoint("TOPLEFT", 24, -152) else b:SetPoint("LEFT", d.prices[i - 1], "RIGHT", 4, 0) end
+    b:SetScript("OnClick", function() d:SetPrice(p.copper) end)
+    d.prices[i] = b
+  end
+  local other = W.Text(d, "GameFontHighlightSmall")
+  other:SetPoint("TOPLEFT", 26, -186)
+  other:SetText("u otro:")
+  d.gold = W.Input(d, 50, true)
+  d.gold:SetPoint("LEFT", other, "RIGHT", 12, 0)
+  d.gold:SetMaxLetters(5)
+  local goldLabel = W.Text(d, "GameFontHighlightSmall")
+  goldLabel:SetPoint("LEFT", d.gold, "RIGHT", 4, 0)
+  goldLabel:SetText("oro")
+  d.silver = W.Input(d, 30, true)
+  d.silver:SetPoint("LEFT", goldLabel, "RIGHT", 14, 0)
+  d.silver:SetMaxLetters(2)
+  local silverLabel = W.Text(d, "GameFontHighlightSmall")
+  silverLabel:SetPoint("LEFT", d.silver, "RIGHT", 4, 0)
+  silverLabel:SetText("plata (se cobra con el correo)")
+
+  function d:Price()
+    return (tonumber(self.gold:GetText()) or 0) * 10000 + (tonumber(self.silver:GetText()) or 0) * 100
+  end
+  function d:SetPrice(copper)
+    self.setting = true
+    local g, sv = math.floor(copper / 10000), math.floor(copper / 100) % 100
+    self.gold:SetText(g > 0 and tostring(g) or "")
+    self.silver:SetText(sv > 0 and tostring(sv) or "")
+    self.setting = false
+    self:MarkPrice()
+  end
+  function d:MarkPrice()
+    local copper, selected = self:Price(), nil
+    for i, p in ipairs(PRICES) do if p.copper == copper then selected = i end end
+    markSelected(self.prices, selected)
+  end
+  d.gold:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
+  d.silver:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
+
+  function d:SetItem(id)
+    self.id = id
+    local name, icon, link = ns.KeyInfo("i" .. id)
+    self.iconTex:SetTexture(icon or ns.QUESTION_ICON)
+    self.itemName:SetText(link or name or ns.KeyName("i" .. id))
+    local have = ns.Scan.Have(id)
+    self.have:SetText(string.format("|cffbbbbbb(tienes %d)|r", have))
+    if (tonumber(self.qty:GetText()) or 0) < 1 then self.qty:SetText(tostring(math.max(1, have))) end
+  end
+
+  d.info = W.Text(d, "GameFontHighlightSmall")
+  d.info:SetPoint("BOTTOMLEFT", 24, 24)
+  d.info:SetTextColor(0.7, 0.7, 0.7)
+  d.info:SetText("Quien lo quiera pulsa \"Lo quiero\"; se lo mandas por correo.")
+  local publish = W.Button(d, "Ofrecer", 96, 22, function() d:Publish() end)
+  publish:SetPoint("BOTTOMRIGHT", -22, 18)
+  local cancel = W.Button(d, "Cancelar", 86, 22, function() d:Hide() end)
+  cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
+
+  function d:Publish()
+    local ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
+    if not ok then
+      ns.Print(err)
+      return
+    end
+    self:Hide()
+    ns.UI.Open("board")
+  end
+end
+
+function ns.UI.OpenOfferDialog(id)
+  if not ns.G() then
+    ns.Print("no estás en ninguna hermandad.")
+    return
+  end
+  if not offerDialog then createOfferDialog() end
+  local d = offerDialog
+  d.id = nil
+  d.link:SetText("")
+  d.qty:SetText("")
+  d.have:SetText("")
+  d.iconTex:SetTexture(ns.QUESTION_ICON)
+  d.itemName:SetText("|cff999999o arrástralo al cuadro de la izquierda|r")
+  d:SetPrice(0)
+  if id then d:SetItem(id) end
+  d:Show()
+end
+
+---------------------------------------------------------------------------
+-- Página
+---------------------------------------------------------------------------
 ns.UI.RegisterPage("board", function(page)
-  local state = { onlyMine = false }
+  local state = { onlyMine = false, search = "" }
 
+  -- Fila 1: ofrecer, buscar y filtros.
+  page.offer = W.Button(page, "Ofrecer objeto", 112, 22, function() ns.UI.OpenOfferDialog() end)
+  page.offer:SetPoint("TOPLEFT", 4, -2)
+  page.search = W.Input(page, 150)
+  page.search:SetPoint("LEFT", page.offer, "RIGHT", 12, 0)
+  W.Placeholder(page.search, "Buscar...")
+  page.search:HookScript("OnTextChanged", function(self)
+    state.search = (self:GetText() or ""):lower()
+    page:Refresh()
+  end)
+  page.showButton = W.Button(page, "", 116, 22, function()
+    local f = settings()
+    f.show = f.show % #SHOW + 1
+    page:Refresh()
+  end)
+  page.showButton:SetPoint("LEFT", page.search, "RIGHT", 8, 0)
+  page.catButton = W.Button(page, "", 150, 22, function()
+    local f = settings()
+    f.cat = f.cat % #CATEGORIES + 1
+    page:Refresh()
+  end)
+  page.catButton:SetPoint("LEFT", page.showButton, "RIGHT", 4, 0)
+
+  -- Fila 2: resumen, "solo lo que puedo hacer" y listas completas.
   page.summary = W.Text(page, "GameFontNormalSmall")
-  page.summary:SetPoint("TOPLEFT", 6, -7)
-
+  page.summary:SetPoint("TOPLEFT", 6, -33)
   page.onlyMine = W.Check(page, "Solo lo que puedo hacer", function(checked)
     state.onlyMine = checked
     page:Refresh()
   end)
-  page.onlyMine:SetPoint("TOPLEFT", 262, -1)
-
+  page.onlyMine:SetPoint("TOPLEFT", 262, -27)
   page.history = W.Button(page, "Historial", 80, 22, function()
     ns.UI.Open("requests")
     ns.UI.FilterRequests("ended")
   end)
-  page.history:SetPoint("TOPRIGHT", -2, -2)
+  page.history:SetPoint("TOPRIGHT", -2, -28)
   page.myRequests = W.Button(page, "Mis pedidos", 92, 22, function()
     ns.UI.Open("requests")
     ns.UI.FilterRequests("mine")
   end)
   page.myRequests:SetPoint("RIGHT", page.history, "LEFT", -4, 0)
 
-  local list = W.List(page, 604, 366, {
-    rows = 7,
-    rowHeight = 50,
-    keyOf = function(item) return item.r.id end,
+  local function updateRequestRow(row, item)
+    local r, info = item.r, item.info
+    local tags = ""
+    if item.pending > 0 then tags = tags .. "|cff66ccff[Tu encargo]|r " end
+    if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
+    if item.mine then tags = tags .. "|cff999999[Tuyo]|r " end
+    local title = tags .. string.format("%dx %s", r.q, ns.KeyLabel(r.k))
+    if item.canServe and item.pending == 0 then title = title .. "  |cff40ff40(puedes hacerlo)|r" end
+    row.title:SetText(title)
+
+    local parts = { "Pide " .. ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ")" }
+    parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (r.t or item.now))
+    if item.pending > 0 then
+      local by = r.c[item.me].by
+      local left = by and (by - item.now)
+      local color = (left and left <= 15 * 60) and "|cffff4040" or "|cffffffff"
+      parts[#parts + 1] = by and ("plazo: " .. color .. (left > 0 and ("quedan " .. ns.FormatDuration(left))
+        or "se acaba") .. "|r") or "por enviar"
+    elseif item.mine and info.owner then
+      local cm = r.c[info.owner]
+      parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
+        .. (cm.by and (" (plazo " .. ns.FormatDuration(math.max(0, cm.by - item.now)) .. ")") or "")
+    else
+      parts[#parts + 1] = "nadie lo ha cogido"
+    end
+    local urgency = urgencyText(r)
+    if urgency then parts[#parts + 1] = urgency end
+    if r.g then parts[#parts + 1] = "propina " .. ns.FormatMoney(r.g) end
+    row.sub:SetText(table.concat(parts, "  |cff666666·|r  "))
+
+    local mats
+    if not item.mine then
+      mats = materialsStatus(r, item.pending > 0 and item.pending or info.remaining)
+    end
+    if not mats and r.m and not item.mine then mats = "|cffbbbbbbLos materiales los pone quien pide.|r" end
+    row.mats:SetText(mats or "")
+
+    row.view:Show()
+    if item.pending > 0 then
+      -- Mi encargo: pedir más tiempo (una vez). Para ver el pedido, clic en la fila.
+      row.view:SetText("Más tiempo")
+      row.view:SetEnabled(#Data.ExtendOptions(r, item.now) > 0)
+      row.view:SetScript("OnClick", function() W.ExtendRequest(r) end)
+    else
+      row.view:SetText("Ver pedido")
+      row.view:SetEnabled(true)
+      row.view:SetScript("OnClick", function() ns.UI.Open("requests", r.id) end)
+    end
+    if item.pending > 0 then
+      -- Mi encargo: enviarlo directamente.
+      if r.demo then
+        row.accept:SetText("Enviar (ejemplo)")
+        row.accept:SetEnabled(true)
+        row.accept:SetScript("OnClick", function() ns.Demo.SimulateMail(r) end)
+      else
+        row.accept:SetText("Preparar correo")
+        local can = ns.Mail.CanPrepare()
+        row.accept:SetEnabled(can)
+        if not can then row.accept.tip = "Abre el buzón para preparar el correo." end
+        row.accept:SetScript("OnClick", function() ns.Mail.Prepare(r, item.pending) end)
+      end
+    else
+      row.accept:SetText("Aceptar encargo")
+      row.accept:SetEnabled(item.acceptable)
+      row.accept:SetScript("OnClick", function() W.AcceptRequest(r) end)
+    end
+  end
+
+  local function updateOfferRow(row, item)
+    local o = item.o
+    local tags = "|cff40c0ff[Oferta]|r "
+    if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
+    if item.mine then tags = tags .. "|cff999999[Tuya]|r " end
+    row.title:SetText(tags .. string.format("%dx %s", o.q, ns.KeyLabel(item.k)) .. "  (" .. priceText(o.g) .. ")")
+    local parts = { "Ofrece " .. ns.ShortName(o.owner) .. " (" .. Data.KarmaText(o.owner) .. ")" }
+    parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (o.t or item.now))
+    parts[#parts + 1] = o.free > 0 and string.format("quedan %d libres", o.free) or "|cffff9933todo pedido|r"
+    row.sub:SetText(table.concat(parts, "  |cff666666·|r  "))
+    if item.mine then
+      local who = {}
+      for _, c in ipairs(o.claims) do who[#who + 1] = ns.ShortName(c.name) .. " " .. c.left end
+      row.mats:SetText(#who > 0 and ("|cff66ccffLo quieren: " .. table.concat(who, ", ")
+        .. ". Mándaselo por correo: se apunta solo.|r") or "|cff999999Nadie lo ha pedido todavía.|r")
+    elseif item.claimed then
+      row.mats:SetText(string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.ShortName(o.owner)))
+    else
+      local have = ns.Scan.Have(o.id)
+      row.mats:SetText(have > 0 and string.format("|cffbbbbbbTienes %d.|r", have) or "")
+    end
+
+    if item.mine then
+      row.view:Show()
+      row.view:SetText("Quitar oferta")
+      row.view:SetEnabled(true)
+      row.view:SetScript("OnClick", function()
+        W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
+      end)
+      local first = o.claims[1]
+      row.accept:SetText("Preparar correo")
+      local can = first ~= nil and ns.Mail.CanPrepare()
+      row.accept:SetEnabled(can)
+      if not first then
+        row.accept.tip = "Cuando alguien lo pida, podrás preparar el correo."
+      elseif not can then
+        row.accept.tip = "Abre el buzón para preparar el correo."
+      end
+      row.accept:SetScript("OnClick", function() ns.Mail.PrepareOffer(first.name, o.id, first.left, o.g) end)
+    elseif item.claimed then
+      row.view:Hide()
+      row.accept:SetText("Ya no lo quiero")
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function() ns.Offers.Unclaim(o.key) end)
+    else
+      row.view:Hide()
+      row.accept:SetText("Lo quiero")
+      row.accept:SetEnabled(o.free > 0)
+      row.accept:SetScript("OnClick", function()
+        if o.free <= 1 then
+          ns.Offers.Claim(o.key, 1, ns.Now())
+        else
+          W.AskAmount(string.format("¿Cuántos quieres? (quedan %d)", o.free), 1, function(n)
+            local ok, err = ns.Offers.Claim(o.key, n, ns.Now())
+            if not ok and err then ns.Print(err) end
+          end)
+        end
+      end)
+    end
+  end
+
+  local list = W.List(page, 604, 340, {
+    rows = 6,
+    rowHeight = 54,
+    keyOf = function(item) return item.id end,
     buildRow = function(row)
       row.icon = row:CreateTexture(nil, "ARTWORK")
       row.icon:SetSize(36, 36)
@@ -132,9 +514,9 @@ ns.UI.RegisterPage("board", function(page)
         fs:SetWordWrap(false)
         return fs
       end
-      row.title = line("GameFontHighlight", 4)
-      row.sub = line("GameFontHighlightSmall", -12)
-      row.mats = line("GameFontHighlightSmall", -26)
+      row.title = line("GameFontHighlight", 6)
+      row.sub = line("GameFontHighlightSmall", -10)
+      row.mats = line("GameFontHighlightSmall", -24)
       row.accept = W.Button(row, "Aceptar encargo", 114, 22)
       row.accept:SetPoint("RIGHT", -2, 0)
       if row.accept.SetMotionScriptsWhileDisabled then row.accept:SetMotionScriptsWhileDisabled(true) end
@@ -147,80 +529,19 @@ ns.UI.RegisterPage("board", function(page)
       row.accept:SetScript("OnLeave", function() GameTooltip:Hide() end)
       row.view = W.Button(row, "Ver pedido", 90, 22)
       row.view:SetPoint("RIGHT", row.accept, "LEFT", -4, 0)
-      W.KeyTooltip(row, function(self) return self.item and self.item.r.k end)
+      W.KeyTooltip(row, function(self) return self.item and self.item.k end)
     end,
     updateRow = function(row, item)
-      local r, info = item.r, item.info
-      local _, icon = ns.KeyInfo(r.k)
+      local _, icon = ns.KeyInfo(item.k)
       row.icon:SetTexture(icon)
-      local tags = ""
-      if item.pending > 0 then tags = tags .. "|cff66ccff[Tu encargo]|r " end
-      if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
-      if item.mine then tags = tags .. "|cff999999[Tuyo]|r " end
-      local title = tags .. string.format("%dx %s", r.q, ns.KeyLabel(r.k))
-      if item.canServe and item.pending == 0 then title = title .. "  |cff40ff40(puedes hacerlo)|r" end
-      row.title:SetText(title)
-
-      local parts = { "Pide " .. ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ")" }
-      parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (r.t or item.now))
-      if item.pending > 0 then
-        local by = r.c[item.me].by
-        local left = by and (by - item.now)
-        local color = (left and left <= 15 * 60) and "|cffff4040" or "|cffffffff"
-        parts[#parts + 1] = by and ("plazo: " .. color .. (left > 0 and ("quedan " .. ns.FormatDuration(left))
-          or "se acaba") .. "|r") or "por enviar"
-      elseif item.mine and info.owner then
-        local cm = r.c[info.owner]
-        parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
-          .. (cm.by and (" (plazo " .. ns.FormatDuration(math.max(0, cm.by - item.now)) .. ")") or "")
-      else
-        parts[#parts + 1] = "nadie lo ha cogido"
-      end
-      local urgency = urgencyText(r)
-      if urgency then parts[#parts + 1] = urgency end
-      if r.g then parts[#parts + 1] = "propina " .. ns.FormatMoney(r.g) end
-      row.sub:SetText(table.concat(parts, "  |cff666666·|r  "))
-
-      local mats
-      if not item.mine then
-        mats = materialsStatus(r, item.pending > 0 and item.pending or info.remaining)
-      end
-      if not mats and r.m and not item.mine then mats = "|cffbbbbbbLos materiales los pone quien pide.|r" end
-      row.mats:SetText(mats or "")
-
-      if item.pending > 0 then
-        -- Mi encargo: pedir más tiempo (una vez). Para ver el pedido, clic en la fila.
-        row.view:SetText("Más tiempo")
-        row.view:SetEnabled(#Data.ExtendOptions(r, item.now) > 0)
-        row.view:SetScript("OnClick", function() W.ExtendRequest(r) end)
-      else
-        row.view:SetText("Ver pedido")
-        row.view:SetEnabled(true)
-        row.view:SetScript("OnClick", function() ns.UI.Open("requests", r.id) end)
-      end
       row.accept.tip = nil
-      if item.pending > 0 then
-        -- Mi encargo: enviarlo directamente.
-        if r.demo then
-          row.accept:SetText("Enviar (ejemplo)")
-          row.accept:SetEnabled(true)
-          row.accept:SetScript("OnClick", function() ns.Demo.SimulateMail(r) end)
-        else
-          row.accept:SetText("Preparar correo")
-          local can = ns.Mail.CanPrepare()
-          row.accept:SetEnabled(can)
-          if not can then row.accept.tip = "Abre el buzón para preparar el correo." end
-          row.accept:SetScript("OnClick", function() ns.Mail.Prepare(r, item.pending) end)
-        end
-      else
-        row.accept:SetText("Aceptar encargo")
-        row.accept:SetEnabled(item.acceptable)
-        row.accept:SetScript("OnClick", function() W.AcceptRequest(r) end)
-      end
+      if item.kind == "offer" then updateOfferRow(row, item) else updateRequestRow(row, item) end
     end,
-    onSelect = function(item) ns.UI.Open("requests", item.r.id) end,
+    onSelect = function(item)
+      if item.kind == "req" then ns.UI.Open("requests", item.r.id) end
+    end,
   })
-  list:SetPoint("TOPLEFT", 0, -28)
+  list:SetPoint("TOPLEFT", 0, -54)
 
   page.empty = W.Text(page, "GameFontNormal", "CENTER")
   page.empty:SetPoint("CENTER", list, "CENTER", 0, 20)
@@ -229,33 +550,56 @@ ns.UI.RegisterPage("board", function(page)
   page.askButton = W.Button(page, "Pedir materiales", 140, 22, function() ns.UI.ShowPage("materials") end)
   page.askButton:SetPoint("TOP", page.empty, "BOTTOM", 0, -12)
 
-  page.list = list
+  page.list, page.state = list, state
+
+  -- ¿Pasa los filtros? (tipo, categoría, búsqueda y "solo lo que puedo hacer")
+  local function passes(item, f)
+    local show = SHOW[f.show].id
+    if show == "requests" and item.kind ~= "req" then return false end
+    if show == "offers" and item.kind ~= "offer" then return false end
+    local cat = CATEGORIES[f.cat].id
+    if cat and category(item.k) ~= cat then return false end
+    if state.search ~= "" then
+      local text = (ns.KeyName(item.k) .. " " .. ns.ShortName(item.author)):lower()
+      if not text:find(state.search, 1, true) then return false end
+    end
+    -- "Solo lo que puedo hacer": pedidos que puedo hacer y lo que tengo que enviar.
+    if state.onlyMine and not item.canServe and item.pending == 0 then return false end
+    return true
+  end
 
   function page:Refresh()
+    local f = settings()
+    if not SHOW[f.show] then f.show = 1 end
+    if not CATEGORIES[f.cat] then f.cat = 1 end
+    page.showButton:SetText(SHOW[f.show].label)
+    page.catButton:SetText(CATEGORIES[f.cat].label)
     local all, stats = collect(page.seenAt)
     local items = {}
     for _, item in ipairs(all) do
-      if not state.onlyMine or item.canServe or item.pending > 0 then items[#items + 1] = item end
+      if passes(item, f) then items[#items + 1] = item end
     end
     table.sort(items, function(a, b)
       local ra, rb = rank(a), rank(b)
       if ra ~= rb then return ra < rb end
-      local pa, pb = a.r.pr or 9, b.r.pr or 9
+      local pa, pb = a.r and a.r.pr or 9, b.r and b.r.pr or 9
       if pa ~= pb then return pa < pb end -- primero los que corren prisa
       if a.karma ~= b.karma then return a.karma > b.karma end -- luego por karma
-      if (a.r.t or 0) ~= (b.r.t or 0) then return (a.r.t or 0) > (b.r.t or 0) end
-      return a.r.id < b.r.id
+      if a.t ~= b.t then return a.t > b.t end
+      return a.id < b.id
     end)
     list:SetItems(items)
-    local text = string.format("Abiertos: |cffffffff%d|r   Puedes: |cff40ff40%d|r", stats.open, stats.servable)
-    if stats.new > 0 then text = text .. string.format("   Nuevos: |cffffd100%d|r", stats.new) end
+    local text = string.format("Pedidos: |cffffffff%d|r  Ofertas: |cff40c0ff%d|r  Puedes: |cff40ff40%d|r",
+      stats.open, stats.offers, stats.servable)
+    if stats.new > 0 then text = text .. string.format("  Nuevos: |cffffd100%d|r", stats.new) end
     page.summary:SetText(text)
     local none = #items == 0
     page.empty:SetShown(none)
     page.askButton:SetShown(none)
     if none then
-      page.empty:SetText(state.onlyMine and "Ahora mismo no hay pedidos que puedas hacer."
-        or "No hay pedidos abiertos ahora mismo.\n|cff999999(Para ver ejemplos, activa el modo demostración en Mis cosas.)|r")
+      local filtered = #all > 0
+      page.empty:SetText(filtered and "No hay nada con estos filtros."
+        or "No hay pedidos ni ofertas ahora mismo.\n|cff999999(Para ver ejemplos, activa el modo demostración en Mis cosas.)|r")
     end
   end
 

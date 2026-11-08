@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos**: se ve pero aún no se puede abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.17.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.18.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -39,10 +39,27 @@ Los pedidos de la gente en este momento, en este orden:
 4. El resto y al final los tuyos (*[Tuyo]*, con quién lo hace y su plazo). Dentro de cada grupo,
    primero los que **corren prisa** y luego por karma.
 
+**Buscar y filtrar:** caja **Buscar...** (por nombre del objeto o de quien lo pide u ofrece),
+**Ver: todo / pedidos / ofertas** y **Categoría**: materiales, pociones y comida, bolsas, armas
+y armaduras u otros. El tablón recuerda los filtros.
+
 Cada pedido dice quién lo pide, su **prisa**, la **propina** y si pone los materiales, con
 **Ver pedido** (todos los detalles) y **Aceptar encargo**. Con **Solo lo que puedo hacer** filtras, y los
 botones **Mis pedidos** e **Historial** abren la lista completa (con **< Tablón** para volver).
 La antigua pestaña "Peticiones" está ahora dentro del tablón.
+
+### Ofertas (ofrecer objetos)
+- **Ofrecer objeto** (en el tablón): arrastras el objeto al cuadro o haces mayús+clic en él en
+  tus bolsas, dices **cuántos** ofreces y el **precio por unidad** (*Gratis*, *50 plata*, *1 oro*,
+  *5 oro* u otro). Máximo 20 ofertas; duran 14 días.
+- En el tablón salen como **[Oferta]**. Los demás pulsan **Lo quiero** y dicen cuántos (no se
+  puede pedir más de lo que queda libre). Pueden echarse atrás con **Ya no lo quiero**.
+- Al que ofrece le llega un aviso ("Bea quiere 3x Bolsa de lana"). En su oferta ve quién la
+  quiere y, con el buzón abierto, **Preparar correo** pone destinatario, asunto y, si tiene
+  precio, el **contra reembolso**.
+- Al **enviar el correo se apunta solo**: baja lo que queda en la oferta y al que lo pidió le
+  llega un aviso. Karma: +1 al que da y −1 al que recibe.
+- Un "lo quiero" que no se manda en 48 horas caduca.
 
 ### Pedir materiales
 **Solo materiales de verdad** (cueros, telas, barras, piezas, elementales, esencias...; sin pociones,
@@ -140,7 +157,8 @@ aviso con **Lo hago yo**). Para probar todo el proceso:
    se completa.
 3. A los pocos segundos el de ejemplo lo "recibe", te da las gracias y **sube tu karma**.
 
-También salen dos quedadas de mazmorra: una **tuya** con 8 apuntados para probar **Hacer
+También salen **ofertas de ejemplo** (bolsas, pociones, comida): pide una con **Lo quiero** y a
+los pocos segundos te la "mandan". Y dos quedadas de mazmorra: una **tuya** con 8 apuntados para probar **Hacer
 grupo**, y otra de un jugador de ejemplo para probar a apuntarte.
 
 Al desmarcarlo desaparece todo lo de ejemplo.
