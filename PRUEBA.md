@@ -71,6 +71,12 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
    → Los dos reciben el recordatorio "... empieza en ...".
 6. **A** pulsa **Cancelar**. → Los dos la ven cancelada.
 
+## 3b. Pedir equipo y quedadas
+
+1. Ve a **Pedidos → Pedir equipo**. → Salen los grupos por tipo (Armas, Pecho...). Abre uno y
+   pide algo con **Pedir a la hermandad**.
+2. Cancela una quedada de mazmorra. → Desaparece de la lista de Mazmorras (solo salen activas).
+
 ## 4. Hermandad (necesita un oficial: rango 0 o 1)
 
 1. **El oficial** va a **Pedidos → Hermandad**, escribe un anuncio y pulsa **Publicar**.

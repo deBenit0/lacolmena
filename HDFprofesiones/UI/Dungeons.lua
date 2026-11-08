@@ -380,8 +380,11 @@ ns.UI.RegisterPage("dungeons", function(page)
     local items, open = {}, 0
     for _, r in pairs(D.Runs() or {}) do
       local st = D.State(r, now)
-      if st == "open" then open = open + 1 end
-      items[#items + 1] = { r = r, state = st, me = me, now = now }
+      -- solo las activas: las canceladas y las ya pasadas no se enseñan
+      if st == "open" then
+        open = open + 1
+        items[#items + 1] = { r = r, state = st, me = me, now = now }
+      end
     end
     table.sort(items, function(a, b)
       if (a.state == "open") ~= (b.state == "open") then return a.state == "open" end

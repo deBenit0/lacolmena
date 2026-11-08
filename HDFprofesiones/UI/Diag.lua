@@ -15,6 +15,15 @@ local CHECKS = {
     if ns.G() then return true, ns.guildName or "" end
     return false, "el addon solo funciona dentro de una hermandad"
   end },
+  { "Pestañas del addon", function()
+    local broken = {}
+    for id in pairs(ns.UI.brokenPages or {}) do broken[#broken + 1] = id end
+    if #broken > 0 then return false, "no se han podido montar: " .. table.concat(broken, ", ") end
+    local panel = HDFProfPanel
+    if not panel then return nil, "abre el addon una vez y vuelve a comprobar" end
+    local ok = panel.pageFrames and panel.pageFrames.dungeons ~= nil
+    return ok, ok and ("versión " .. ns.VERSION .. ", Mazmorras incluida") or "falta la de Mazmorras"
+  end },
   { "Lista de la hermandad", function()
     if not (GetNumGuildMembers and GetGuildRosterInfo) then return false, "el juego no da la lista de miembros" end
     local n = ns.Guild.count or 0

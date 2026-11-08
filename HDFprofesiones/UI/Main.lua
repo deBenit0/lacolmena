@@ -21,7 +21,7 @@ local PAGES = {
   { id = "home", section = "home" },
   { id = "board", section = "orders", label = "Tablón", tab = "board" },
   { id = "materials", section = "orders", label = "Pedir materiales", tab = "materials" },
-  -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
+  { id = "equipment", section = "orders", label = "Pedir equipo", tab = "equipment" },
   { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
   { id = "guild", section = "orders", label = "Hermandad", tab = "guild" },
   { id = "mine", section = "orders", label = "Mis cosas", tab = "mine" },
@@ -145,8 +145,8 @@ local function createPanel()
   for _, p in ipairs(PAGES) do
     if p.label then
       i = i + 1
-      local b = W.Button(panel, p.label, 136, 22, function() UI.ShowPage(p.id) end)
-      b:SetPoint("TOPLEFT", 20 + (i - 1) * 140, -74)
+      local b = W.Button(panel, p.label, 118, 22, function() UI.ShowPage(p.id) end)
+      b:SetPoint("TOPLEFT", 20 + (i - 1) * 122, -74)
       panel.tabs[p.id] = b
     end
   end
@@ -173,8 +173,14 @@ local function createPanel()
         f:SetAllPoints()
       end
       f:Hide()
-      create(f)
-      panel.pageFrames[p.id] = f
+      -- Cada página por separado: si una falla al montarse, las demás siguen funcionando y el
+      -- error queda en el informe (Mis cosas → Copiar informe).
+      if ns.SafeCall(create, f) then
+        panel.pageFrames[p.id] = f
+      else
+        UI.brokenPages = UI.brokenPages or {}
+        UI.brokenPages[p.id] = true
+      end
     end
   end
   panel:SetScript("OnShow", function() UI.Refresh() end)

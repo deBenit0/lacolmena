@@ -406,7 +406,7 @@ end
 -- Página
 ---------------------------------------------------------------------------
 ns.UI.RegisterPage("board", function(page)
-  local state = { onlyMine = false, search = "" }
+  local state = { onlyMine = settings().onlyMine and true or false, search = "" }
 
   -- Fila 1: buscar y filtros. (Para ofrecer: desde tu ventana de profesión.)
   page.search = W.Input(page, 200)
@@ -432,8 +432,11 @@ ns.UI.RegisterPage("board", function(page)
   -- Fila 2: resumen, "solo lo que puedo hacer" y listas completas.
   page.summary = W.Text(page, "GameFontNormalSmall")
   page.summary:SetPoint("TOPLEFT", 6, -33)
-  page.onlyMine = W.Check(page, "Solo lo que puedo hacer", function(checked)
+  -- Solo lo de mis profesiones: lo que yo puedo hacer (o recolectar) y lo que tengo que enviar.
+  -- Se recuerda.
+  page.onlyMine = W.Check(page, "Solo mis profesiones", function(checked)
     state.onlyMine = checked
+    settings().onlyMine = checked or nil
     page:Refresh()
   end)
   page.onlyMine:SetPoint("TOPLEFT", 262, -27)
@@ -712,6 +715,7 @@ ns.UI.RegisterPage("board", function(page)
 
   function page:Refresh()
     local f = settings()
+    page.onlyMine:SetChecked(state.onlyMine)
     if not SHOW[f.show] then f.show = 1 end
     if not CATEGORIES[f.cat] then f.cat = 1 end
     page.showButton:SetText(SHOW[f.show].label)

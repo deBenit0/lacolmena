@@ -512,10 +512,15 @@ function Missing.LayoutModern(form)
   for slot in form.reagentSlotPool:EnumerateActive() do
     local id, need = modernSlotItem(slot)
     if not slot.hdfAsk then
-      slot.hdfAsk = smallButton(slot, "Pedir", 44)
-      slot.hdfAsk:SetPoint("RIGHT", slot, "RIGHT", 0, 0)
-      slot.hdfAsk:SetFrameLevel(slot:GetFrameLevel() + 10)
+      slot.hdfAsk = smallButton(slot, "Pedir", 38)
+      slot.hdfAsk:SetHeight(14)
     end
+    -- Sobre la parte de abajo del icono del material: así no tapa el nombre (a la derecha)
+    -- ni la casilla de abajo (en Forever van muy juntas).
+    local icon = type(slot.Button) == "table" and slot.Button or slot
+    slot.hdfAsk:ClearAllPoints()
+    slot.hdfAsk:SetPoint("BOTTOM", icon, "BOTTOM", 0, 1)
+    slot.hdfAsk:SetFrameLevel(icon:GetFrameLevel() + 10)
     slot.hdfAsk:SetShown(id ~= nil)
     slot.hdfAsk:SetScript("OnClick", function() ns.SafeCall(Missing.AskModernReagent, id, need) end)
   end

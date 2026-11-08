@@ -67,6 +67,7 @@ form.reagentSlotPool = { EnumerateActive = function()
 end }
 local function newSlot(schematic)
   local slot = env.CreateFrame("Frame", nil, form)
+  slot.Button = env.CreateFrame("Button", nil, slot) -- el icono del material
   slot.GetReagentSlotSchematic = function() return schematic end
   return slot
 end
@@ -80,6 +81,8 @@ H.FireEvent(ana, "ADDON_LOADED", "Blizzard_Professions")
 H.ok(form.hdfHooked, "se engancha al formulario de recetas")
 form:Init({ recipeID = 1001, name = "Barra" })
 H.ok(active[1].hdfAsk and active[1].hdfAsk:IsShown(), "botón Pedir en el material básico")
+local p1, rel1, p2 = active[1].hdfAsk:GetPoint(1)
+H.ok(p1 == "BOTTOM" and rel1 == active[1].Button and p2 == "BOTTOM", "Pedir va sobre la parte de abajo del icono (no tapa el nombre)")
 H.ok(not (active[2].hdfAsk and active[2].hdfAsk:IsShown()), "sin botón en el material opcional")
 H.ok(form.hdfOffer and form.hdfOffer:IsShown(), "botón Ofrecer junto al objeto")
 active[1].hdfAsk:Click()

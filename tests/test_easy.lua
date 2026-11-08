@@ -101,7 +101,16 @@ H.ok(req3 ~= nil, "petición para Bea")
 pepe.ns.UI.OpenRequestDialog({ k = "i4234" })
 local dialog = pepe.env.HDFProfRequestDialog
 H.ok(not dialog.more:IsShown(), "pedir es directo: prisa y propina ocultas")
-H.eq(dialog.summary:GetText(), "sin prisa, sin propina", "resumen de lo elegido")
+H.eq(dialog.summary:GetText(), "sin prisa", "resumen de lo elegido")
+-- Propina a la derecha de la cantidad: cada clic, la siguiente.
+H.eq(dialog.tipButton:GetText(), "Sin propina", "propina visible junto a la cantidad")
+dialog.tipButton:Click()
+H.eq(dialog.tipButton:GetText(), "Propina: 50 plata", "un clic: 50 plata")
+dialog.tipButton:Click()
+H.eq(dialog.tipButton:GetText(), "Propina: 1 oro", "otro: 1 oro")
+for _ = 1, 3 do dialog.tipButton:Click() end
+H.eq(dialog.tipButton:GetText(), "Sin propina", "vuelve a sin propina")
+H.ok(not dialog.gold:IsVisible(), "escribir otra cantidad de oro, desactivado")
 dialog.plus:Click()
 H.eq(dialog.qty:GetText(), "2", "cantidad con +")
 dialog.minus:Click()

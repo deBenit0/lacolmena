@@ -142,6 +142,11 @@ dlg:Publish()
 H.ok(not dlg:IsShown(), "propuesta")
 H.ok(page.detail.title:GetText():find("Salón de los Thanes", 1, true), "se ve en el detalle")
 H.ok(page.detail.make:IsShown(), "Hacer grupo para quien la propone")
+-- En la lista solo las activas: la cancelada de antes no sale.
+local listed = {}
+for _, it in ipairs(page.list.items) do listed[it.r.id] = it.state end
+H.ok(listed[run.id] == nil, "la quedada cancelada ya no sale en la lista")
+for _, st in pairs(listed) do H.eq(st, "open", "en la lista solo las activas") end
 
 -- Modo demostración: quedada propia de ejemplo para probar "Hacer grupo".
 ana.ns.Demo.Set(true)

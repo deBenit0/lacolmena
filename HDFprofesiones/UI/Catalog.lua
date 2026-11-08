@@ -139,6 +139,28 @@ local function materialGroup(key)
   return nil
 end
 
+-- Tipos de equipo (por la ranura donde se pone), como los tipos de material.
+local GEAR_GROUPS = {
+  INVTYPE_WEAPON = "Armas", INVTYPE_2HWEAPON = "Armas", INVTYPE_WEAPONMAINHAND = "Armas",
+  INVTYPE_WEAPONOFFHAND = "Armas", INVTYPE_RANGED = "Armas a distancia", INVTYPE_RANGEDRIGHT = "Armas a distancia",
+  INVTYPE_THROWN = "Armas a distancia", INVTYPE_SHIELD = "Escudos y mano izquierda", INVTYPE_HOLDABLE = "Escudos y mano izquierda",
+  INVTYPE_HEAD = "Cabeza", INVTYPE_NECK = "Cuello y anillos", INVTYPE_FINGER = "Cuello y anillos",
+  INVTYPE_SHOULDER = "Hombros", INVTYPE_CLOAK = "Espalda", INVTYPE_CHEST = "Pecho", INVTYPE_ROBE = "Pecho",
+  INVTYPE_WRIST = "Muñecas", INVTYPE_HAND = "Manos", INVTYPE_WAIST = "Cintura", INVTYPE_LEGS = "Piernas",
+  INVTYPE_FEET = "Pies", INVTYPE_TRINKET = "Abalorios", INVTYPE_BAG = "Bolsas", INVTYPE_QUIVER = "Bolsas",
+  INVTYPE_AMMO = "Munición", INVTYPE_BODY = "Camisas y tabardos", INVTYPE_TABARD = "Camisas y tabardos",
+}
+
+-- Grupo de equipo de un objeto ("g:Pecho", "Pecho"...).
+local function gearGroup(key)
+  local kind, id = ns.ParseKey(key)
+  if kind == "e" then return "g:enchant", "Encantamientos" end
+  local equipLoc = ns.ItemInstant(id)
+  if equipLoc == nil then equipLoc = select(6, ns.KeyInfo(key)) end
+  local label = GEAR_GROUPS[equipLoc or ""] or "Otros"
+  return "g:" .. label, label
+end
+
 -- ¿Es equipo? (armas, armaduras, bolsas... y los encantamientos, que se ponen al equipo)
 local function isEquipment(key)
   local kind, id = ns.ParseKey(key)
@@ -629,12 +651,18 @@ local function buildCatalog(page, mode)
         end
       end
     else
-      -- Equipo, agrupado por profesión.
+      -- Equipo: una vez cada objeto, agrupado por tipo (como los materiales).
       for key, rec in pairs(index) do
         if isEquipment(key) then
+          local profs = {}
           for pk in pairs(rec.profs) do
             profSet[pk] = true
-            if not state.prof or state.prof == pk then add(key, pk, rec) end
+            profs[#profs + 1] = pk
+          end
+          table.sort(profs, function(x, y) return tostring(x) < tostring(y) end)
+          if not state.prof or rec.profs[state.prof] then
+            local groupKey, groupLabel = gearGroup(key)
+            add(key, rec.profs[state.prof or false] and state.prof or profs[1], rec, groupKey, groupLabel)
           end
         end
       end

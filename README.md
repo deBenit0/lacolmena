@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.25.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.26.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -42,6 +42,9 @@ Los pedidos de la gente en este momento, en este orden:
 3. **¡Nuevo!**: lo que ha llegado desde la última vez que miraste el tablón.
 4. El resto y al final los tuyos (*[Tuyo]*, con quién lo hace y su plazo). Dentro de cada grupo,
    primero los que **corren prisa** y luego por karma.
+
+**Solo mis profesiones** (casilla, se recuerda): deja solo lo que tú puedes hacer o recolectar
+y lo que tienes que enviar.
 
 **Buscar y filtrar:** caja **Buscar...** (por nombre del objeto o de quien lo pide u ofrece),
 **Ver: todo / pedidos / ofertas** y **Categoría**: materiales, pociones y comida, bolsas, armas
@@ -81,11 +84,16 @@ recuerda cuáles dejas abiertos. Con **+ Favorito** marcas lo que pides a menudo
 todo. Al elegir un material ves para qué recetas tuyas sirve, quién lo da, la cantidad con − y +,
 y los botones **Pedir a la hermandad** y **Susurrar**.
 
-*(La pestaña "Pedir equipo" está retirada de momento: se rehará más adelante.)*
+### Pedir equipo
+El mismo sistema que *Pedir materiales*, para armas, armaduras, bolsas y encantamientos que
+fabrica la hermandad: cada objeto una vez, **agrupado por tipo** (Armas, Cabeza, Pecho, Manos,
+Bolsas, Encantamientos...), grupos plegados, buscador, favoritos y desplegable de profesión.
+Se oculta el equipo de mucho menos nivel que el tuyo.
 
 ### Al pedir: directo
-La ventana de pedir solo tiene el objeto, la **cantidad** (con − y +) y el botón **Pedir**. Lo
-demás está en **Más opciones** (al lado se ve lo elegido: "sin prisa, sin propina"):
+La ventana de pedir tiene el objeto, la **cantidad** (con − y +), a su derecha la **propina**
+(cada clic: sin propina, 50 plata, 1, 2 o 5 oro; escribir otra cantidad está desactivado por
+ahora) y el botón **Pedir**. La prisa y "Aporto los materiales" están en **Más opciones**:
 
 ### Más opciones al pedir: prisa y propina
 - **¿Qué prisa tienes?**: *Sin prisa*, *Ya*, *Antes de 2 horas* u *Hoy*. Se ve en el tablón y

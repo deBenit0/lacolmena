@@ -70,6 +70,7 @@ H.ok(not anyNew, "al volver ya no son nuevos")
 board.onlyMine:SetChecked(true)
 board.onlyMine:GetScript("OnClick")(board.onlyMine)
 for _, it in ipairs(board.list.items) do H.ok(it.canServe, "filtro: solo las que puedo hacer") end
+H.ok(ns.db.settings.board.onlyMine, "el filtro Solo mis profesiones se recuerda")
 board.onlyMine:SetChecked(false)
 board.onlyMine:GetScript("OnClick")(board.onlyMine)
 local alert = penv.HDFProfAlert -- ya salió (y se cerró solo) al activar el modo
