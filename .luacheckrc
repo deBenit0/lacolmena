@@ -18,7 +18,7 @@ read_globals = {
   "ACCEPT", "CANCEL", "YES", "NO", "ITEM_QUALITY_COLORS", "RAID_CLASS_COLORS", "CUSTOM_CLASS_COLORS",
   "GetCoinTextureString",
   -- Sistema
-  "C_Timer", "C_ChatInfo", "C_Item", "C_Spell", "C_Container", "C_GuildInfo", "Enum",
+  "C_Timer", "C_ChatInfo", "C_Club", "issecretvalue", "C_Item", "C_Spell", "C_Container", "C_GuildInfo", "Enum",
   "GetTime", "GetServerTime", "GetNormalizedRealmName", "GetRealmName", "GetBuildInfo",
   -- Unidad y hermandad
   "UnitName", "UnitLevel", "UnitClass", "UnitAffectingCombat", "InCombatLockdown", "IsInInstance",

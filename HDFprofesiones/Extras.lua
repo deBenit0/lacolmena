@@ -90,7 +90,7 @@ end)
 Extras.ANNOUNCE_GAP = 60 -- el mismo anuncio, como mucho una vez por minuto
 local announced = {}
 
-local function sendGuild(text)
+function Extras.SendGuild(text)
   -- Forever: C_ChatInfo.SendChatMessage (la global solo queda como obsoleta).
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
   if not send or not (IsInGuild and IsInGuild()) then return false end
@@ -104,6 +104,10 @@ end
 
 function Extras.AnnounceText(kind, obj)
   local tag = "[" .. ns.TITLE .. "] "
+  if kind == "request" and ns.ChatLog then
+    local text = ns.ChatLog.Text(obj) -- con la marca, para que lo recupere quien entre más tarde
+    if text then return text end
+  end
   if kind == "request" then
     local text = tag .. "Pido " .. itemText(obj.k, obj.q)
     if obj.g then text = text .. " (propina " .. math.floor(obj.g / 10000) .. " oro)" end
@@ -127,7 +131,7 @@ function Extras.Announce(kind, obj, id)
     return false
   end
   local text = Extras.AnnounceText(kind, obj)
-  if not text or not sendGuild(text) then return false end
+  if not text or not Extras.SendGuild(text) then return false end
   announced[id] = now
   return true
 end

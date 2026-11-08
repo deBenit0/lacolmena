@@ -197,6 +197,7 @@ H.newFrame = newFrame
 -- Red simulada (canal de hermandad)
 ---------------------------------------------------------------------------
 H.clients = {}
+H.guildChat = {} -- historial del chat de hermandad
 H.roster = {} -- miembros de la hermandad: { name, class, level, rankIndex, online }
 H.traffic = { messages = 0, bytes = 0, byType = {} }
 H.LATENCY = 0.1
@@ -252,7 +253,7 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Offers.lua", "Social.lua", "Orders.lua", "Extras.lua", "Missing.lua", "Dungeons.lua", "Demo.lua", "Preload.lua", "Alerts.lua",
+  "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Offers.lua", "Social.lua", "Orders.lua", "Extras.lua", "ChatLog.lua", "Missing.lua", "Dungeons.lua", "Demo.lua", "Preload.lua", "Alerts.lua",
   "UI/Widgets.lua", "UI/Main.lua", "UI/Home.lua", "UI/Board.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua", "UI/Dungeons.lua", "UI/Guild.lua", "UI/Diag.lua", "QoL.lua",
 }
 
@@ -376,12 +377,37 @@ local function makeEnv(client)
     },
     -- mensajes de addon
     C_ChatInfo = {
+      -- chat de hermandad: se guarda en el historial (como las Comunidades) y llega a los conectados
+      SendChatMessage = function(text, kind)
+        if kind ~= "GUILD" or not client.online then return end
+        H.guildChat[#H.guildChat + 1] = { content = text, author = { name = client.name }, destroyed = false }
+        for _, c in pairs(H.clients) do
+          if not c.dead and c.online then
+            addTimer(H.time + H.LATENCY, function() H.FireEvent(c, "CHAT_MSG_GUILD", text, client.name .. "-Reino") end, c)
+          end
+        end
+      end,
       RegisterAddonMessagePrefix = function() return true end,
       SendAddonMessage = function(prefix, text, channel, target)
         if not client.online then return false end
         deliver(client, prefix, text, channel, target)
         return true
       end,
+    },
+    -- Comunidades: historial del chat de hermandad (lo que ya está "descargado" es todo)
+    C_Club = {
+      GetGuildClubId = function() return 1 end,
+      GetStreams = function() return { { streamId = 7, streamType = 1, name = "Hermandad" } } end,
+      GetMessageRanges = function()
+        if #H.guildChat == 0 then return {} end
+        return { { oldestMessageId = { epoch = 1, position = 0 }, newestMessageId = { epoch = 2, position = 0 } } }
+      end,
+      GetMessagesInRange = function() return H.copy(H.guildChat) end,
+      RequestMoreMessagesBefore = function(clubId, streamId)
+        addTimer(H.time + 0.5, function() H.FireEvent(client, "CLUB_MESSAGE_HISTORY_RECEIVED", clubId, streamId) end, client)
+        return false
+      end,
+      IsBeginningOfStream = function() return true end,
     },
     -- objetos y hechizos
     GetItemInfo = function(id)
@@ -545,6 +571,7 @@ function H.SendMail(client, to, attachments, ok)
 end
 
 function H.Reset()
+  H.guildChat = {}
   H.clients = {}
   H.roster = {}
   timers = {}

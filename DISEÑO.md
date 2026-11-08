@@ -153,3 +153,11 @@ comerciar el objeto pedido, lista de objetos que nadie sabe hacer con aviso al a
 - Al entrar, cada uno manda un resumen; los demás le envían lo que le falta. Los reenvíos
   se descartan justo antes de salir si otro ya ha empezado a enviar lo mismo.
 - Pruebas: `lua5.1 tests/run.lua` (WoW simulado con varios jugadores conectados).
+
+## Pedidos en el chat de hermandad (0.28.0)
+- Al publicar un pedido, el addon escribe una línea en el chat de hermandad con una marca
+  `(HDF1 <id> <datos>)`. Se puede desactivar en Mis cosas.
+- Al entrar, lee el historial del chat de hermandad (C_Club, Comunidades) y recupera los pedidos que
+  no conocía: llegan aunque quien pide ya no esté conectado. El autor lo pone el servidor.
+- La copia del chat lleva la versión del autor un punto por debajo: gana siempre la de verdad.
+- Los pedidos purgados se recuerdan (g.gone) para que no vuelvan desde el historial.

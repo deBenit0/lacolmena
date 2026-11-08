@@ -44,6 +44,14 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
    (se ve junto a los nombres).
 8. **A** recoge el correo. → El juego le cobra los 50 plata.
 
+## 1b. Pedidos sin coincidir conectados
+
+1. **B** sale del juego. **A** pide algo. → En el chat de hermandad sale *"[Los hijos del Fundillo]
+   Pido ... (HDF1 ...)"*.
+2. **A** sale del juego y luego **B** entra.
+   → A los pocos segundos, B tiene el pedido de A en el Tablón. En *Comprobar el addon*,
+   "Historial del chat de hermandad" dice cuántos pedidos ha recuperado.
+
 ## 2. Ofertas (B ofrece, A lo quiere)
 
 1. **B** abre su profesión, elige una receta que fabrique algo que tenga (una bolsa, una

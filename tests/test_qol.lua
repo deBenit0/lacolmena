@@ -65,7 +65,7 @@ H.eq(cris.ns.Data.RequestInfo(cris.ns.G().requests[req2.id], cris.ns.Now()).deli
 local whispers = {}
 for _, c in ipairs({ ana, bea, cris }) do
   c.env.ERR_GUILD_JOIN_S = "%s se ha unido a la hermandad."
-  c.env.SendChatMessage = function(text, kind, _, to) whispers[#whispers + 1] = { from = c.name, text = text, kind = kind, to = to } end
+  c.env.C_ChatInfo.SendChatMessage = function(text, kind, _, to) whispers[#whispers + 1] = { from = c.name, text = text, kind = kind, to = to } end
 end
 local pushes = {}
 local push = bea.ns.Alerts.Push
