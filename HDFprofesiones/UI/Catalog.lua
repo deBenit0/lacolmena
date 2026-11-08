@@ -15,6 +15,51 @@ local function isLowGear(minLevel, equipLoc, playerLevel)
   return minLevel and minLevel > 0 and minLevel < playerLevel - 10 or false
 end
 
+-- ¿Puede usarlo mi personaje? (clase y nivel, reglas de Classic)
+-- Armadura: tela (1), cuero (2), malla (3), placas (4); escudo (6).
+local ARMOR_MAX = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, SHAMAN = 3, ROGUE = 2, DRUID = 2, MAGE = 1, PRIEST = 1, WARLOCK = 1 }
+local SHIELDS = { WARRIOR = true, PALADIN = true, SHAMAN = true }
+-- Armas por subclase: 0 hacha 1M, 1 hacha 2M, 2 arco, 3 arma de fuego, 4 maza 1M, 5 maza 2M,
+-- 6 arma de asta, 7 espada 1M, 8 espada 2M, 10 bastón, 13 puño, 15 daga, 16 arrojadiza,
+-- 18 ballesta, 19 varita.
+local function set(list)
+  local t = {}
+  for _, v in ipairs(list) do t[v] = true end
+  return t
+end
+local WEAPONS = {
+  WARRIOR = set({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 }),
+  PALADIN = set({ 0, 1, 4, 5, 6, 7, 8 }),
+  HUNTER = set({ 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 }),
+  ROGUE = set({ 2, 3, 4, 7, 13, 15, 16, 18 }),
+  PRIEST = set({ 4, 10, 15, 19 }),
+  SHAMAN = set({ 0, 1, 4, 5, 10, 13, 15 }),
+  MAGE = set({ 7, 10, 15, 19 }),
+  WARLOCK = set({ 7, 10, 15, 19 }),
+  DRUID = set({ 4, 5, 10, 13, 15 }),
+}
+
+local function canUse(key, class, level, minLevel)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return true end -- encantamientos: para cualquiera
+  if minLevel and minLevel > level then return false end
+  local equipLoc, classID, subclassID = ns.ItemInstant(id)
+  if classID == 4 then -- armadura
+    if equipLoc == "INVTYPE_CLOAK" or subclassID == 0 then return true end -- capas, anillos, abalorios...
+    if subclassID == 6 then return SHIELDS[class] or false end
+    if subclassID and subclassID >= 1 and subclassID <= 4 then
+      local max = ARMOR_MAX[class] or 1
+      if level < 40 and max >= 3 then max = max - 1 end -- malla y placas, a partir del 40
+      return subclassID <= max
+    end
+    return false -- reliquias (libros, ídolos, tótems): casi nunca se fabrican
+  elseif classID == 2 then -- armas
+    local allowed = WEAPONS[class]
+    return allowed == nil or allowed[subclassID] or false
+  end
+  return true -- bolsas y lo demás
+end
+
 local function qualityColor(quality)
   local c = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
   return (c and c.hex) or "|cffffffff"
@@ -244,8 +289,8 @@ local function buildCatalog(page, mode)
   end)
   page:HookScript("OnHide", function() menu:Hide() end)
 
-  local filterSetting = materials and "onlyMyReagents" or "hideLowGear"
-  local lowCheck = W.Check(page, materials and "Solo lo que usan mis recetas" or "Ocultar equipo de nivel bajo",
+  local filterSetting = materials and "onlyMyReagents" or "onlyUsable"
+  local lowCheck = W.Check(page, materials and "Solo lo que usan mis recetas" or "Solo lo que puedo usar",
     function(checked)
       ns.db.settings[filterSetting] = checked
       page:Refresh()
@@ -576,6 +621,7 @@ local function buildCatalog(page, mode)
     local index = Data.GetIndex()
     local profSet, groups = {}, {}
     local playerLevel = UnitLevel("player") or 60
+    local myClass = ns.Dungeons.MyClass()
     local mine = materials and myReagents() or nil
     local onlyMine = materials and ns.db.settings.onlyMyReagents
     if onlyMine and not next(mine) then
@@ -594,7 +640,11 @@ local function buildCatalog(page, mode)
       local label = name or ns.KeyName(key)
       local lower = label:lower()
       if state.search ~= "" and not lower:find(state.search, 1, true) then return end
-      if not materials and ns.db.settings.hideLowGear and isLowGear(minLevel, equipLoc, playerLevel) then return end
+      -- Equipo: solo lo que puede usar mi clase a mi nivel (y no lo de mucho menos nivel).
+      if not materials and ns.db.settings.onlyUsable
+        and (not canUse(key, myClass, playerLevel, minLevel) or isLowGear(minLevel, equipLoc, playerLevel)) then
+        return
+      end
       local seen, count, online = {}, 0, 0
       local function countWho(who)
         if not seen[who] then
