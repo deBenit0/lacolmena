@@ -44,7 +44,8 @@ function Mail.RegisterDelivery(to, items, how)
     ns.Sync.PushRequest(r.id, "high")
   end
   local offered = 0
-  for _, d in ipairs(ns.Offers.RegisterMail(to, items, now)) do
+  local offeredList = ns.Offers.RegisterMail(to, items, now)
+  for _, d in ipairs(offeredList) do
     offered = offered + 1
     ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who), how)
   end
@@ -52,8 +53,17 @@ function Mail.RegisterDelivery(to, items, how)
   for _, d in ipairs(donated) do
     ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
   end
+  -- Mis estadísticas.
+  ns.Extras.AddStat("delivered", #changed)
+  ns.Extras.AddStat("offers", offered)
+  ns.Extras.AddStat("donated", #donated)
+  for _, r in ipairs(changed) do ns.Extras.CountTip(r) end
   local total = #changed + offered + #donated
-  ns.Social.AddHelp(total)
+  local helpIds = {}
+  for _, r in ipairs(changed) do helpIds[#helpIds + 1] = "r:" .. r.id end
+  for _, d in ipairs(offeredList) do helpIds[#helpIds + 1] = "o:" .. d.id .. ":" .. d.who end
+  for _, d in ipairs(donated) do helpIds[#helpIds + 1] = "n:" .. d.owner .. ":" .. d.id end
+  ns.Social.AddHelps(helpIds)
   if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
   return total
 end

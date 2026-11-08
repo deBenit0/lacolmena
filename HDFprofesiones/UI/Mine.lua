@@ -169,6 +169,17 @@ ns.UI.RegisterPage("mine", function(page)
       local e = g.entries[ranking[i].name]
       stats[#stats + 1] = string.format("%d. %s  %s", i, ns.ColoredName(ranking[i].name, e and e.c), Data.KarmaText(ranking[i].name))
     end
+    -- Mis estadísticas: esta semana, la anterior y en total.
+    local st = ns.Extras.Stats(now)
+    stats[#stats + 1] = " "
+    stats[#stats + 1] = "|cffffd100Tus números|r |cff999999(esta semana / la anterior / total)|r"
+    for _, s in ipairs(ns.Extras.STAT_NAMES) do
+      local function v(t)
+        local n = t[s.id] or 0
+        return s.money and ns.FormatMoney(n) or tostring(n)
+      end
+      stats[#stats + 1] = string.format("%s: %s / %s / %s", s.label, v(st.this), v(st.last), v(st.total))
+    end
     stats[#stats + 1] = "Sincronización: " .. (ns.Sync.IsStarted() and "activa" or "esperando a la hermandad...")
     local done, total = ns.Preload.Progress()
     if total > 0 and done < total then

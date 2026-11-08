@@ -85,7 +85,11 @@ end
 
 function Orders.Dismiss(id)
   ns.db.settings.dismissedOrders = ns.db.settings.dismissedOrders or {}
-  ns.db.settings.dismissedOrders[id] = ns.Now()
+  local list = ns.db.settings.dismissedOrders
+  list[id] = ns.Now()
+  for k, t in pairs(list) do -- olvidar los de hace más de 3 días (ya han caducado)
+    if ns.Now() - t > Orders.TTL * 3 then list[k] = nil end
+  end
   ns.Fire("DATA_CHANGED", "orders")
 end
 

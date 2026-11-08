@@ -69,6 +69,8 @@ local function cleanup()
   for id, r in pairs(g.requests) do
     if not roster[r.a] and not r.demo then
       g.requests[id] = nil
+      g.alerted[id], g.thanked[id] = nil, nil
+      if g.karmaSeen then g.karmaSeen[id] = nil end
       removed = true
     end
   end

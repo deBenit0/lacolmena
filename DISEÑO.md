@@ -74,6 +74,15 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - Miembro de la semana: ayudas (envíos de pedidos, ofertas y donaciones) por semana (wk).
 - Pestañas Eventos y Raids visibles pero desactivadas.
 
+## Confianza y límites
+- Cada dato lo publica su dueño y viaja reenviado entre miembros; WoW no permite firmarlos.
+  Un miembro con un addon modificado podría mentir (p. ej. decir que ha enviado algo). Lo más
+  dañino está limitado: nadie se da karma a sí mismo, cada persona da como mucho 100 puntos a
+  otra, se rechazan versiones del futuro (no se puede bloquear para siempre un dato ajeno) y un
+  alt solo cuenta si su principal lo confirma (misma cuenta).
+- Al entrar sin datos (otro PC, reinstalación) el addon recupera primero tu ficha de la
+  hermandad antes de publicar la suya, para no perder karma, ofertas ni aportaciones.
+
 ## Mazmorras (quedadas)
 - Proponer: mazmorra de la lista (Classic + 9 nuevas de WoW Forever, con id fijo), hora (ahora o
   en tramos de 15 min) y roles de quien propone.

@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.24.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.25.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -173,6 +173,13 @@ los materiales que te faltan (contando bolsas y banco):
   la esquina inferior derecha (clic derecho en el asa: como estaba). Se recuerda.
 - **Al entrar, lo importante primero**: los pedidos y quedadas se envían antes que las fichas de
   recetas, para que lleguen antes cuando se conectan muchos a la vez.
+- **Recetas que faltan**: en *Hermandad*, el botón **Faltan (N)** lista lo que se pide y nadie
+  sabe hacer. Cuando alguien aprende esa receta, a quien lo pidió le llega un aviso.
+- **Anunciar en el chat**: en tus pedidos (*Ver pedido* → **Anunciar en el chat**) y en tus
+  ofertas sin peticiones (**Anunciar**), para los de la hermandad que no tienen el addon. Como
+  mucho una vez por minuto.
+- **Tus números**: en *Mis cosas*, pedidos y ofertas entregados, aportaciones, cosas recibidas y
+  propinas ganadas, esta semana, la anterior y en total.
 - **Resumen al entrar**: al conectarte, una ventanita con lo que ha pasado mientras no estabas
   (pedidos tuyos aceptados o entregados, pedidos nuevos que puedes hacer, ofertas tuyas pedidas,
   pedidos de hermandad, quedadas y el anuncio).

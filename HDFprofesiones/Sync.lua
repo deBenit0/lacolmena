@@ -271,6 +271,16 @@ Comm.Register("H", function(sender, payload)
       if type(k) == "string" and type(v) == "string" then theirR[expand(k, realm)] = v end
     end
   end
+  -- ¿Estaba esperando a recuperar mi ficha? Si alguien la tiene, la pido (y sigo esperando);
+  -- si me contestan sin tenerla y nadie la ha mencionado, soy nuevo: publico ya.
+  if Sync.waitingOwn then
+    if theirE[me] then
+      Sync.ownSeen = true
+    elseif not Sync.ownSeen then
+      Sync.waitingOwn = nil
+      ns.After(0.5, Sync.PublishMine)
+    end
+  end
   -- Lo que tengo y le falta (o tiene más antiguo): se lo envío.
   for name, ent in pairs(g.entries) do
     local v = theirE[name]
@@ -385,10 +395,15 @@ Comm.Register("P", function(sender, payload)
   local name, _, body = header2(payload)
   local e = body and Data.SanitizeEntry(Codec.Deserialize(body))
   if not e or e.n ~= name or not Guild.Accepts(e.n) or not ns.G() then return end
+  if Data.FromFuture(e, ns.Now()) then return end -- versión del futuro: no es legítima
   markInflight("P:" .. e.n, e.v)
   local p = pending["P:" .. e.n]
   if p and (p.ver or 0) <= e.v then cancel("P", e.n) end
   if want.e[e.n] and want.e[e.n] <= e.v then want.e[e.n] = nil end
+  if e.n == ns.Me() and Sync.waitingOwn then
+    Sync.waitingOwn = nil -- ya tengo mi ficha: ahora sí se puede publicar (con lo recuperado)
+    ns.Coalesce("publishMine", 1, function() Sync.PublishMine() end)
+  end
   local changed, stale = Data.ApplyEntry(e)
   if changed then
     ns.Fire("DATA_CHANGED", "entry", e.n)
@@ -404,6 +419,7 @@ Comm.Register("Q", function(sender, payload)
   local id, _, body = header2(payload)
   local r = body and Data.SanitizeRequest(Codec.Deserialize(body))
   if not r or r.id ~= id or not Guild.Accepts(r.a) or not ns.G() then return end
+  if Data.FromFuture(r, ns.Now()) then return end
   markInflight("Q:" .. r.id, nil, Data.RequestHash(r))
   want.r[r.id] = nil
   local changed, old, merged, behind = Data.ApplyRequest(r, ns.Now())
@@ -414,7 +430,10 @@ Comm.Register("Q", function(sender, payload)
   end
   if changed then
     -- Si es mía y alguien ha entregado (por correo), sumo su encargo.
-    if merged.a == ns.Me() and Data.CheckThanks(merged, ns.Now()) then Sync.PublishMine() end
+    if merged.a == ns.Me() and Data.CheckThanks(merged, ns.Now()) then
+      Sync.PublishMine()
+      ns.Extras.AddStat("received", 1)
+    end
     ns.Fire("DATA_CHANGED", "request", r.id)
     ns.Fire("REQUEST_UPDATED", old, merged)
   end
@@ -424,6 +443,7 @@ Comm.Register("M", function(sender, payload)
   local id, _, body = header2(payload)
   local run = body and ns.Dungeons.Sanitize(Codec.Deserialize(body))
   if not run or run.id ~= id or not Guild.Accepts(run.a) or not ns.G() then return end
+  if Data.FromFuture(run, ns.Now()) then return end
   markInflight("M:" .. run.id, nil, ns.Dungeons.Hash(run))
   want.m[run.id] = nil
   local changed, old, merged, behind = ns.Dungeons.Apply(run, ns.Now())
@@ -466,8 +486,14 @@ end)
 ---------------------------------------------------------------------------
 -- Mi ficha y acciones locales sobre peticiones
 ---------------------------------------------------------------------------
+Sync.OWN_ENTRY_WAIT = 10
+
 function Sync.PublishMine()
   if not ns.G() or not ns.MyChar() then return end
+  if Sync.waitingOwn then return end -- esperando a recuperar mi ficha de la hermandad
+  -- Antes de hablar con la hermandad no se crea mi ficha si este ordenador no la tiene:
+  -- Sync.Start decide si hay que recuperarla primero.
+  if not started and not ns.G().entries[ns.Me()] then return end
   local changed = Data.UpdateMyEntry(ns.Now())
   if changed then
     ns.Fire("DATA_CHANGED", "entry", ns.Me())
@@ -505,7 +531,10 @@ end
 
 function Sync.ConfirmDelivery(id, crafter, amount)
   local r, thanksChanged = Data.ConfirmDelivery(id, crafter, amount, ns.Now())
-  if r and thanksChanged == true then Sync.PublishMine() end
+  if r and thanksChanged == true then
+    Sync.PublishMine()
+    ns.Extras.AddStat("received", 1)
+  end
   return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
 end
 
@@ -567,7 +596,24 @@ function Sync.Start()
   started = true
   Data.Purge(ns.Now())
   ns.Dungeons.Purge(ns.Now())
-  Sync.PublishMine()
+  -- Si este ordenador no tiene mi ficha (otro PC o reinstalación), primero la recupero de la
+  -- hermandad: si publicase ya una nueva y vacía, pisaría la buena (karma, ofertas...).
+  local g = ns.G()
+  if g and not g.entries[ns.Me()] then
+    Sync.waitingOwn, Sync.ownSeen = true, nil
+    local tries = 0
+    local function giveUp()
+      if not Sync.waitingOwn then return end
+      -- si alguien dijo tenerla, darle algo más de tiempo para que llegue (hasta 30 s)
+      tries = tries + 1
+      if Sync.ownSeen and tries < 3 then return ns.After(Sync.OWN_ENTRY_WAIT, giveUp) end
+      Sync.waitingOwn = nil
+      Sync.PublishMine()
+    end
+    ns.After(Sync.OWN_ENTRY_WAIT, giveUp)
+  else
+    Sync.PublishMine()
+  end
   ns.After(1, Sync.SendHello)
   -- Resumen en el chat cuando ya se ha puesto al día.
   ns.After(45, function()

@@ -192,6 +192,8 @@ function Demo.AddGuild(g, now)
   end
   local olaf = g.entries[full("Olaf")]
   if olaf then olaf.mn = full("Bruno") end
+  local bruno = g.entries[full("Bruno")]
+  if bruno then bruno.al = { full("Bruno"), full("Olaf") } end
   local week = S.Week(now)
   local helps = { Bruno = { 4, 9 }, Olaf = { 2, 3 }, Ivette = { 6, 5 }, Tula = { 3, 11 }, Kael = { 1, 2 } }
   for name, h in pairs(helps) do

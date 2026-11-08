@@ -595,15 +595,21 @@ ns.UI.RegisterPage("board", function(page)
         W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
       end)
       local first = o.claims[1]
-      row.accept:SetText("Preparar correo")
-      local can = first ~= nil and ns.Mail.CanPrepare()
-      row.accept:SetEnabled(can)
       if not first then
-        row.accept.tip = "Cuando alguien lo pida, podrás preparar el correo."
-      elseif not can then
-        row.accept.tip = "Abre el buzón para preparar el correo."
+        -- Nadie la ha pedido aún: anunciarla en el chat de hermandad.
+        row.accept:SetText("Anunciar")
+        row.accept:SetEnabled(true)
+        row.accept.tip = "Anunciarla en el chat de hermandad (para los que no tienen el addon)."
+        row.accept:SetScript("OnClick", function()
+          if ns.Extras.Announce("offer", o, o.key) then ns.Print("oferta anunciada en el chat de hermandad.") end
+        end)
+      else
+        row.accept:SetText("Preparar correo")
+        local can = ns.Mail.CanPrepare()
+        row.accept:SetEnabled(can)
+        if not can then row.accept.tip = "Abre el buzón para preparar el correo." end
+        row.accept:SetScript("OnClick", function() ns.Mail.PrepareOffer(first.name, o.id, first.left, o.g) end)
       end
-      row.accept:SetScript("OnClick", function() ns.Mail.PrepareOffer(first.name, o.id, first.left, o.g) end)
     elseif item.claimed then
       row.view:Hide()
       row.accept:SetText("Ya no lo quiero")

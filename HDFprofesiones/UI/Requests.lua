@@ -203,6 +203,9 @@ ns.UI.RegisterPage("requests", function(page)
   detail.pri:SetPoint("BOTTOMLEFT", detail.b1, "TOPLEFT", 0, 4)
   detail.mod = W.Button(detail, "Cerrar (oficial)", 120, 20)
   detail.mod:SetPoint("LEFT", detail.pri, "RIGHT", 4, 0)
+  -- Quien pide: anunciarlo en el chat de hermandad (para los que no tienen el addon).
+  detail.announce = W.Button(detail, "Anunciar en el chat", 140, 20)
+  detail.announce:SetPoint("BOTTOMLEFT", detail.b1, "TOPLEFT", 0, 4)
 
   detail.empty = W.Text(detail, "GameFontNormal", "CENTER")
   detail.empty:SetTextColor(0.6, 0.6, 0.6)
@@ -243,7 +246,13 @@ ns.UI.RegisterPage("requests", function(page)
       end
       setButton(detail.b1, "Recibido", active and target ~= nil, function()
         local left = math.max(1, (target.pending > 0) and target.pending or (r.q - info.delivered))
-        W.AskAmount(string.format("¿Cuántos has recibido de %s?", ns.ShortName(target.name)), left, function(n)
+        -- Lo que llega por correo o comerciando ya se apunta solo: aquí solo lo dado en mano.
+        local byMail = target.mailed or 0
+        local text = byMail > 0
+          and string.format("%s ya te ha enviado %d por correo (contado). ¿Cuántos MÁS te ha dado en mano?",
+            ns.ShortName(target.name), byMail)
+          or string.format("¿Cuántos te ha dado %s en mano? (lo del correo se cuenta solo)", ns.ShortName(target.name))
+        W.AskAmount(text, left, function(n)
           ns.Sync.ConfirmDelivery(r.id, target.name, n)
         end)
       end)
@@ -286,6 +295,17 @@ ns.UI.RegisterPage("requests", function(page)
     local officer = r ~= nil and ns.Social.AmOfficer() and Data.IsActiveState(Data.RequestInfo(r, ns.Now()).state)
     detail.pri:SetShown(officer)
     detail.mod:SetShown(officer and r.a ~= ns.Me())
+    local canAnnounce = r ~= nil and r.a == ns.Me() and Data.IsActiveState(Data.RequestInfo(r, ns.Now()).state)
+    detail.announce:SetShown(canAnnounce)
+    if canAnnounce then
+      if officer then
+        detail.announce:ClearAllPoints()
+        detail.announce:SetPoint("LEFT", detail.pri, "RIGHT", 4, 0)
+      end
+      detail.announce:SetScript("OnClick", function()
+        if ns.Extras.Announce("request", r, r.id) then ns.Print("anunciado en el chat de hermandad.") end
+      end)
+    end
     if officer then
       local isPri = ns.Social.IsPriority(r.id)
       detail.pri:SetText(isPri and "Quitar prioridad" or "Prioridad")

@@ -171,10 +171,12 @@ function QoL.OnJoin(name)
       text = string.format("%s se ha unido a la hermandad", ns.ShortName(name)) })
   end
   local settings = QoL.WelcomeSettings()
-  if settings.on and QoL.IAmWelcomer() and SendChatMessage then
+  -- Forever: C_ChatInfo.SendChatMessage (la global SendChatMessage solo queda como obsoleta).
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  if settings.on and QoL.IAmWelcomer() and send then
     local text = settings.text and settings.text ~= "" and settings.text or QoL.DEFAULT_WELCOME
     text = text:format(ns.guildName or ns.TITLE, ns.ShortName(name), ns.TITLE)
-    ns.After(5, function() pcall(SendChatMessage, text:sub(1, 255), "WHISPER", nil, ns.ShortName(name)) end)
+    ns.After(5, function() pcall(send, text:sub(1, 255), "WHISPER", nil, ns.ShortName(name)) end)
   end
 end
 

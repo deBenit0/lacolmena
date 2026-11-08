@@ -59,21 +59,30 @@ H.Advance(15)
 needs = cris.ns.Social.Needs(cris.ns.Now())
 H.ok(needs[1].given == 10 and needs[1].left == 0, "solo cuenta hasta lo que hacía falta")
 
--- Miembro de la semana: Bea ha ayudado 2 veces esta semana.
+-- Miembro de la semana: Bea aportó dos veces a la MISMA necesidad: cuenta como 1 ayuda
+-- (trocear los envíos no infla las ayudas).
 local ranking = cris.ns.Social.Ranking("this", cris.ns.Now())
-H.ok(ranking[1] and ranking[1].name == "Bea-Reino" and ranking[1].n == 2, "Bea lidera esta semana con 2 ayudas")
+H.ok(ranking[1] and ranking[1].name == "Bea-Reino" and ranking[1].n == 1, "Bea lidera esta semana (1 ayuda, no 2)")
 H.Advance(7 * 86400)
 H.Advance(30)
 bea.ns.Sync.PublishMine()
 H.Advance(30)
 local best = cris.ns.Social.MemberOfTheWeek(cris.ns.Now())
-H.ok(best and best.name == "Bea-Reino" and best.n == 2, "la semana siguiente, Bea es el miembro de la semana")
+H.ok(best and best.name == "Bea-Reino" and best.n == 1, "la semana siguiente, Bea es el miembro de la semana")
 
 -- Alts: Bea entra con Beita (misma cuenta). Su principal es Bea (más nivel).
 local beaDB = H.Logout(bea)
 local beita = H.Login("Beita", { class = "MAGE", level = 20, savedDB = beaDB })
 H.Advance(30)
 H.eq(beita.ns.Social.MyMain(), "Bea-Reino", "el principal es el de más nivel")
+-- Hasta que Bea no lo confirme (al entrar con ella), no cuenta: nadie se puede declarar alt de otro.
+H.eq(cris.ns.Social.MainOf("Beita-Reino"), "Beita-Reino", "sin confirmar por la principal, no cuenta")
+local beitaDB = H.Logout(beita)
+local bea2 = H.Login("Bea", { class = "WARRIOR", savedDB = beitaDB })
+H.Advance(30)
+local beaDB2 = H.Logout(bea2)
+beita = H.Login("Beita", { class = "MAGE", level = 20, savedDB = beaDB2 })
+H.Advance(30)
 H.eq(cris.ns.Social.MainOf("Beita-Reino"), "Bea-Reino", "los demás saben que Beita es alt de Bea")
 H.eq(cris.ns.Social.Who("Beita-Reino"), "Beita (Bea)", "se muestra como Beita (Bea)")
 -- Karma por persona: lo que haga Beita suma a Bea.

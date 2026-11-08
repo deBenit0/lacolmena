@@ -134,10 +134,54 @@ function Data.SanitizeEntry(e)
   return out
 end
 
+-- ¿Trae alguna versión (v, av, cv, dv, sv) muy por delante del reloj? Se mira a fondo
+-- (bloques de cada fabricante o apuntado). Esas versiones son horas: el futuro no es legítimo.
+local VERSION_FIELDS = { v = true, av = true, cv = true, dv = true, sv = true }
+function Data.FromFuture(obj, now, depth)
+  if type(obj) ~= "table" then return false end
+  depth = depth or 0
+  local limit = now + Data.FUTURE_MARGIN
+  for k, v in pairs(obj) do
+    if VERSION_FIELDS[k] and type(v) == "number" and v > limit then return true end
+    if type(v) == "table" and depth < 3 and Data.FromFuture(v, now, depth + 1) then return true end
+  end
+  return false
+end
+
 -- Si nos llega nuestra propia ficha más nueva (p. ej. tras reinstalar), recuperamos sus recetas.
+-- También recupera lo demás de la ficha (karma dado, encargos, ofertas, aportaciones, ayudas,
+-- anuncio y necesidades), pero solo si en este ordenador no estaba: así, al jugar desde otro
+-- PC o tras reinstalar, no se pierde y no se pisa lo que ya hubiera aquí.
+local function restoreRest(e, c)
+  local g, me = ns.G(), ns.Me()
+  if not g or not me then return end
+  g.karma = g.karma or {}
+  local karma = g.karma[me]
+  if (not karma or (not next(karma.kc or {}) and (karma.kd or 0) == 0)) and (e.kc or e.kd) then
+    g.karma[me] = { kc = deepCopy(e.kc or {}), kd = e.kd or 0 }
+  end
+  if e.th and not next(g.thanks[me] or {}) then g.thanks[me] = deepCopy(e.th) end
+  local function fill(field, value)
+    if value ~= nil and (c[field] == nil or (type(c[field]) == "table" and next(c[field]) == nil)) then
+      c[field] = deepCopy(value)
+    end
+  end
+  fill("offers", e.of)
+  fill("donated", e.dn)
+  fill("needs", e.nd)
+  fill("mc", e.mc)
+  fill("mp", e.mp)
+  fill("guildOrders", e.go)
+  if e.an and not c.announce then c.announce = deepCopy(e.an) end
+  if e.wk and not c.week then c.week = deepCopy(e.wk) end
+  if e.od and not next(c.sent or {}) then c.sent = deepCopy(e.od) end
+end
+
 function Data.RestoreMine(e)
   local c = ns.MyChar()
-  if not c or not e.p then return end
+  if not c then return end
+  restoreRest(e, c)
+  if not e.p then return end
   for pk, p in pairs(e.p) do
     local prof = c.profs[pk]
     if not prof then
@@ -349,8 +393,13 @@ function Data.KarmaFor(name)
   local person = mainOf(name)
   local copper = 0
   for ename, e in pairs(g.entries) do
+    -- nadie se puede dar karma a sí mismo (ni a sus alts), y cada autor da como mucho
+    -- Data.KARMA_CAP puntos a cada persona
+    local giver = mainOf(ename)
     for who, v in pairs(e.kc or {}) do
-      if who == person or mainOf(who) == person then copper = copper + v end
+      if giver ~= person and (who == person or mainOf(who) == person) then
+        copper = copper + math.min(v, Data.KARMA_CAP * Data.KARMA_POINT)
+      end
     end
     if e.kd and (ename == person or mainOf(ename) == person) then copper = copper - e.kd end
   end
@@ -380,8 +429,8 @@ function Data.ThanksFor(name)
   local g = ns.G()
   if not g then return 0 end
   local total = 0
-  for _, e in pairs(g.entries) do
-    if e.th and e.th[name] then total = total + e.th[name] end
+  for ename, e in pairs(g.entries) do
+    if ename ~= name and e.th and e.th[name] then total = total + math.min(e.th[name], Data.KARMA_CAP) end
   end
   return total
 end
@@ -677,7 +726,9 @@ function Data.RequestInfo(r, now)
     info.state, info.ended = "done", last
   elseif now > info.expires then
     info.state, info.ended = "expired", info.expires
-  elseif info.remaining <= 0 then
+  elseif info.remaining <= 0 or info.owner then
+    -- con encargado, aunque se haya ampliado la cantidad: nadie más puede cogerlo hasta que
+    -- él entregue (o caduque su plazo) y entonces vuelve a estar abierto lo que falte
     info.state = "accepted"
   else
     info.state = "open"
@@ -831,6 +882,7 @@ function Data.ConfirmDelivery(id, crafter, amount, now)
     cm.n = amount
     cm.cv = bump(cm.cv, now)
   end
+  -- "Recibido" es lo entregado EN MANO, además de lo que ya contó el correo o el comercio.
   cm.d = deliveredOf(cm) + amount
   cm.dv = bump(cm.dv, now)
   r.c[crafter] = cm
@@ -840,6 +892,10 @@ end
 -- Contador de encargos: lo lleva el autor. Suma uno a cada fabricante que entrega todo
 -- lo que prometió (o que completa la petición), confirmado a mano o enviado por correo.
 Data.KARMA_POINT = 10000 -- el karma se guarda en "cobre" por compatibilidad: 1 punto = 10000
+Data.KARMA_CAP = 100      -- como mucho 100 puntos de cada persona a otra
+-- Versiones del futuro: los datos llevan la hora como versión. Si llega algo con una versión
+-- muy por delante del reloj, se rechaza (si no, quien lo mandase bloquearía para siempre ese dato).
+Data.FUTURE_MARGIN = 600
 
 -- Karma por pedido: cuando el encargado entrega todo, él gana 1 punto y yo (autor) pierdo 1.
 function Data.CheckThanks(r, now)

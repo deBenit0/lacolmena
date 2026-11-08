@@ -50,6 +50,14 @@ end
 
 function Social.SanitizeInto(out, e)
   if type(e.mn) == "string" and e.mn ~= e.n then out.mn = e.mn end
+  -- personajes de la misma cuenta (para confirmar que un alt es de verdad de ese principal)
+  if type(e.al) == "table" then
+    local al = {}
+    for i = 1, math.min(#e.al, 12) do
+      if type(e.al[i]) == "string" then al[#al + 1] = e.al[i] end
+    end
+    if #al > 0 then out.al = al end
+  end
   if type(e.wk) == "table" and tonumber(e.wk.w) then
     out.wk = { w = floor(tonumber(e.wk.w)), n = floor(tonumber(e.wk.n) or 0), pn = floor(tonumber(e.wk.pn) or 0) }
   end
@@ -58,7 +66,7 @@ function Social.SanitizeInto(out, e)
     for k, d in pairs(e.dn) do
       local n = type(d) == "table" and tonumber(d.n)
       if type(k) == "string" and ns.Offers.ParseKey(k) and n and n >= 1 then
-        dn[k] = { n = floor(n), t = tonumber(d.t) or 0 }
+        dn[k] = { n = floor(n), t = tonumber(d.t) or 0, nt = tonumber(d.nt) }
         any = true
       end
     end
@@ -114,11 +122,16 @@ function Social.BuildInto(e, now)
   if not c then return end
   local main = Social.MyMain()
   if main and main ~= e.n then e.mn = main end
+  local chars = Social.MyChars()
+  if #chars > 1 then
+    e.al = {}
+    for i = 1, math.min(#chars, 12) do e.al[i] = chars[i].name end
+  end
   local wk = myWeek(now)
   if wk.n > 0 or wk.pn > 0 then e.wk = { w = wk.w, n = wk.n, pn = wk.pn } end
   local dn = {}
   for k, d in pairs(c.donated) do
-    if now - (d.t or 0) <= Social.NEED_TTL * 2 then dn[k] = { n = d.n, t = d.t } else c.donated[k] = nil end
+    if now - (d.t or 0) <= Social.NEED_TTL * 2 then dn[k] = { n = d.n, t = d.t, nt = d.nt } else c.donated[k] = nil end
   end
   if next(dn) then e.dn = dn end
   -- Lo de oficial se publica siempre; los demás solo lo tienen en cuenta si lo soy.
@@ -192,7 +205,13 @@ function Social.MainOf(name)
   local g = ns.G()
   local e = g and g.entries[name]
   local main = e and e.mn
-  if main and main ~= name then return main end
+  if not main or main == name then return name end
+  -- Solo vale si el principal también lo dice (los dos son de la misma cuenta): así nadie
+  -- puede declararse alt de otro para cambiarle el karma.
+  local mainEntry = g.entries[main]
+  for _, other in ipairs(mainEntry and mainEntry.al or {}) do
+    if other == name then return main end
+  end
   return name
 end
 
@@ -281,7 +300,7 @@ function Social.Needs(now)
     if name == ns.Me() then dn = mine() and mine().donated end
     for k, d in pairs(dn or {}) do
       given[k] = given[k] or {}
-      given[k][#given[k] + 1] = { name = name, n = d.n, t = d.t }
+      given[k][#given[k] + 1] = { name = name, n = d.n, t = d.t, nt = d.nt }
     end
   end
   for owner, e in pairs(g.entries) do
@@ -293,8 +312,8 @@ function Social.Needs(now)
           local key = owner .. ":" .. id
           local item = { owner = owner, id = id, key = key, q = need.q, t = need.t, given = 0, donors = {} }
           for _, d in ipairs(given[key] or {}) do
-            -- solo cuenta lo donado después de crearla
-            if (d.t or 0) >= (need.t or 0) then
+            -- solo cuenta lo aportado a ESTA necesidad (si se vuelve a crear, empieza de cero)
+            if (d.nt and d.nt == need.t) or (not d.nt and (d.t or 0) >= (need.t or 0)) then
               item.given = item.given + d.n
               item.donors[#item.donors + 1] = { name = d.name, n = d.n }
             end
@@ -343,7 +362,8 @@ function Social.RegisterMail(recipient, items, now)
       local credit = min(items[need.id] or 0, need.left)
       if credit > 0 then
         local d = c.donated[need.key] or { n = 0 }
-        d.n, d.t = d.n + credit, now
+        if d.nt ~= need.t then d = { n = 0 } end -- otra necesidad con el mismo objeto: de cero
+        d.n, d.t, d.nt = d.n + credit, now, need.t
         c.donated[need.key] = d
         items[need.id] = items[need.id] - credit
         done[#done + 1] = { id = need.id, n = credit, owner = need.owner }
@@ -357,11 +377,33 @@ end
 ---------------------------------------------------------------------------
 -- Ayudas de la semana (pedidos enviados, ofertas y donaciones) y miembro de la semana
 ---------------------------------------------------------------------------
-function Social.AddHelp(n)
-  if not n or n <= 0 or not mine() then return end
+-- Una ayuda por cada cosa (pedido, oferta a alguien, necesidad) y semana, aunque se mande
+-- en varios correos: así no se inflan troceando los envíos.
+function Social.AddHelps(ids)
+  local c = mine()
+  if not c or type(ids) ~= "table" then return end
   local wk = myWeek(ns.Now())
-  wk.n = wk.n + n
-  ns.Sync.PublishMine()
+  c.helped = c.helped or {}
+  local added = 0
+  for _, id in ipairs(ids) do
+    if c.helped[id] ~= wk.w then
+      c.helped[id] = wk.w
+      added = added + 1
+    end
+  end
+  for id, w in pairs(c.helped) do
+    if w < wk.w - 1 then c.helped[id] = nil end
+  end
+  if added > 0 then
+    wk.n = wk.n + added
+    ns.Sync.PublishMine()
+  end
+end
+
+function Social.AddHelp(n)
+  local ids = {}
+  for i = 1, n or 0 do ids[i] = "anon:" .. ns.Now() .. ":" .. i end
+  Social.AddHelps(ids)
 end
 
 -- Ayudas por persona (sumando sus alts): { {name = principal, n} }, de más a menos.

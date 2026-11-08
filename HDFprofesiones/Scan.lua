@@ -164,15 +164,26 @@ function Scan.ModernOutput(recipeID, schematic)
   return (id and id > 0) and id or nil
 end
 
+-- Lo que no cambia de una receta (objeto, cantidad y materiales) se guarda la primera vez:
+-- el juego avisa de cambios en la lista muy a menudo y no hace falta volver a pedirlo.
+local recipeCache = {}
+Scan.recipeCache = recipeCache
+
 function Scan.ModernRow(recipeID)
   local T = modernAPI()
   local info = T and T.GetRecipeInfo(recipeID)
   if type(info) ~= "table" or not info.learned then return nil end
-  local schematic = T.GetRecipeSchematic(recipeID, false)
-  local itemID = Scan.ModernOutput(recipeID, schematic)
-  local row = { key = itemID and ("i" .. itemID) or ("e" .. recipeID),
-    made = (type(schematic) == "table" and schematic.quantityMin and schematic.quantityMin > 0) and schematic.quantityMin or 1 }
-  row.reagents = Scan.ModernReagents(schematic)
+  local cached = recipeCache[recipeID]
+  if not cached then
+    local schematic = T.GetRecipeSchematic(recipeID, false)
+    local itemID = Scan.ModernOutput(recipeID, schematic)
+    cached = { key = itemID and ("i" .. itemID) or ("e" .. recipeID),
+      made = (type(schematic) == "table" and schematic.quantityMin and schematic.quantityMin > 0) and schematic.quantityMin or 1,
+      reagents = Scan.ModernReagents(schematic) }
+    -- solo se guarda si está completa (si falta algún dato, se vuelve a pedir la próxima vez)
+    if cached.reagents then recipeCache[recipeID] = cached end
+  end
+  local row = { key = cached.key, made = cached.made, reagents = cached.reagents }
   if T.GetRecipeCooldown then
     local ok, cd = pcall(T.GetRecipeCooldown, recipeID)
     if ok and type(cd) == "number" then row.cooldown = cd end

@@ -5,7 +5,7 @@ local seedDB
 do
   H.AddMember("Semilla")
   local seed = H.Login("Semilla")
-  H.Advance(15)
+  H.Advance(25) -- el primero en entrar espera unos segundos por si alguien tenía ya su ficha
   local g = seed.ns.G()
   for i = 1, 30 do
     local name = "Viejo" .. i

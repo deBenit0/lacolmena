@@ -552,8 +552,12 @@ local function attachModern()
     local b = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     b:SetSize(160, 22)
     b:SetText("Pedir en la hermandad")
-    if page.CreateMultipleInputBox then
-      b:SetPoint("RIGHT", page.CreateMultipleInputBox, "LEFT", -30, 0)
+    -- Blizzard pone "Crear todo" 30 píxeles a la izquierda de la cantidad: vamos encima de
+    -- "Crear" para no taparlo.
+    if page.CreateButton then
+      b:SetPoint("BOTTOMRIGHT", page.CreateButton, "TOPRIGHT", 0, 4)
+    elseif page.CreateAllButton then
+      b:SetPoint("RIGHT", page.CreateAllButton, "LEFT", -8, 0)
     else
       b:SetPoint("BOTTOMLEFT", form, "BOTTOMLEFT", 8, 8)
     end

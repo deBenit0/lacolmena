@@ -300,6 +300,7 @@ function Offers.CheckReceived(now)
     local got = owner and (Offers.SentTo(owner, me, id) - (claim.b or 0)) or 0
     if owner and got >= claim.q then
       c.claims[k] = nil
+      ns.Extras.AddStat("received", 1)
       g.karma = g.karma or {}
       g.karma[me] = g.karma[me] or { kc = {}, kd = 0 }
       local karma = g.karma[me]

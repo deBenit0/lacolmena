@@ -30,6 +30,10 @@ ns.UI.RegisterPage("guild", function(page)
   end)
   page.addNeed:SetPoint("TOPLEFT", 226, -2)
 
+  -- Recetas que faltan: lo que se pide y nadie de la hermandad sabe hacer.
+  page.missing = W.Button(page, "Faltan", 64, 20, function() ns.UI.ShowMissingRecipes() end)
+  page.missing:SetPoint("TOPLEFT", 158, -2)
+
   local list = W.List(page, 300, 362, {
     rows = 6,
     rowHeight = 56,
@@ -126,6 +130,8 @@ ns.UI.RegisterPage("guild", function(page)
   function page:Refresh()
     local now = ns.Now()
     local officer = S.AmOfficer()
+    local nMissing = #ns.Extras.MissingRecipes(now)
+    page.missing:SetText("Faltan (" .. nMissing .. ")")
     local needs = S.Needs(now)
     list:SetItems(needs)
     page.addNeed:SetShown(officer)
@@ -171,3 +177,43 @@ ns.UI.RegisterPage("guild", function(page)
     end
   end
 end)
+
+-- Ventana "Recetas que faltan".
+local missingWindow
+function ns.UI.ShowMissingRecipes()
+  if not missingWindow then
+    local f = W.Panel("HDFProfMissingRecipes", UIParent, 420, 330)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 40)
+    f:Hide()
+    tinsert(UISpecialFrames, "HDFProfMissingRecipes")
+    f.title = W.Text(f, "GameFontNormal")
+    f.title:SetPoint("TOP", 0, -16)
+    f.title:SetText("Lo que se pide y nadie sabe hacer")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -6, -6)
+    f.text = W.Text(f, "GameFontHighlightSmall")
+    f.text:SetPoint("TOPLEFT", 20, -42)
+    f.text:SetWidth(380)
+    f.text:SetJustifyV("TOP")
+    f.text:SetSpacing(3)
+    f.hint = W.Text(f, "GameFontDisableSmall")
+    f.hint:SetPoint("BOTTOMLEFT", 20, 16)
+    f.hint:SetWidth(380)
+    f.hint:SetText("Si alguien aprende una de estas recetas, a quien lo pidió le llega un aviso.")
+    missingWindow = f
+  end
+  local list = ns.Extras.MissingRecipes(ns.Now())
+  local lines = {}
+  for i = 1, math.min(15, #list) do
+    local e = list[i]
+    local who = ns.ShortName(e.askers[1]) .. (#e.askers > 1 and (" y " .. (#e.askers - 1) .. " más") or "")
+    lines[#lines + 1] = string.format("%s  |cff999999(lo pide %s)|r", ns.KeyLabel(e.key), who)
+  end
+  if #list > 15 then lines[#lines + 1] = string.format("|cff999999y %d más...|r", #list - 15) end
+  missingWindow.text:SetText(#lines > 0 and table.concat(lines, "\n")
+    or "|cff40ff40Todo lo que se pide lo sabe hacer alguien de la hermandad.|r")
+  missingWindow:Show()
+  return missingWindow
+end
