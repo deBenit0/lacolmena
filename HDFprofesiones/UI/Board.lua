@@ -177,7 +177,7 @@ local function markSelected(buttons, selected)
 end
 
 local function createOfferDialog()
-  local d = W.Panel("HDFProfOfferDialog", UIParent, 420, 270)
+  local d = W.Panel("HDFProfOfferDialog", UIParent, 380, 196)
   offerDialog = d
   d:SetFrameStrata("DIALOG")
   d:SetToplevel(true)
@@ -186,14 +186,15 @@ local function createOfferDialog()
   tinsert(UISpecialFrames, "HDFProfOfferDialog")
   local title = W.Text(d, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
-  title:SetText("Ofrecer un objeto a la hermandad")
+  title:SetText("Ofrecer a la hermandad")
   local close = CreateFrame("Button", nil, d, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
-  -- Objeto: se arrastra al cuadro o se hace mayús+clic en él con la caja activa.
+  -- Objeto. Si no viene elegido (botón del Tablón), se elige arrastrándolo al cuadro o con
+  -- mayús+clic en él con la caja de texto activa.
   d.itemButton = CreateFrame("Button", nil, d)
-  d.itemButton:SetSize(36, 36)
-  d.itemButton:SetPoint("TOPLEFT", 24, -48)
+  d.itemButton:SetSize(32, 32)
+  d.itemButton:SetPoint("TOPLEFT", 24, -44)
   d.iconTex = d.itemButton:CreateTexture(nil, "ARTWORK")
   d.iconTex:SetAllPoints()
   d.iconTex:SetTexture(ns.QUESTION_ICON)
@@ -208,52 +209,75 @@ local function createOfferDialog()
   d.itemButton:SetScript("OnReceiveDrag", fromCursor)
   d.itemButton:SetScript("OnClick", fromCursor)
   W.KeyTooltip(d.itemButton, function() return d.id and ("i" .. d.id) end)
-  d.link = W.Input(d, 290)
+  d.itemName = W.Text(d, "GameFontHighlight")
+  d.itemName:SetPoint("LEFT", d.itemButton, "RIGHT", 10, 0)
+  d.itemName:SetPoint("RIGHT", d, "RIGHT", -20, 0)
+  d.itemName:SetWordWrap(false)
+  d.link = W.Input(d, 270)
   d.link.hdfLink = true
-  d.link:SetPoint("TOPLEFT", d.itemButton, "TOPRIGHT", 12, -2)
-  W.Placeholder(d.link, "Mayús+clic en un objeto de tus bolsas")
+  d.link:SetPoint("LEFT", d.itemButton, "RIGHT", 12, 0)
+  W.Placeholder(d.link, "Arrástralo aquí o mayús+clic en él")
   d.link:HookScript("OnTextChanged", function(self)
     local id = tonumber((self:GetText() or ""):match("item:(%d+)"))
     if id and id ~= d.id then d:SetItem(id) end
   end)
-  d.itemName = W.Text(d, "GameFontHighlightSmall")
-  d.itemName:SetPoint("TOPLEFT", d.link, "BOTTOMLEFT", 0, -4)
-  d.itemName:SetText("|cff999999o arrástralo al cuadro de la izquierda|r")
 
+  -- Cantidad con - y +.
   local qtyLabel = W.Text(d, "GameFontNormalSmall")
-  qtyLabel:SetPoint("TOPLEFT", 24, -104)
-  qtyLabel:SetText("Cuántos ofreces")
+  qtyLabel:SetPoint("TOPLEFT", 24, -94)
+  qtyLabel:SetText("Cantidad")
+  local function qtyValue() return math.max(1, tonumber(d.qty:GetText()) or 1) end
+  d.minus = W.Button(d, "-", 24, 22, function() d.qty:SetText(tostring(math.max(1, qtyValue() - 1))) end)
+  d.minus:SetPoint("LEFT", qtyLabel, "RIGHT", 14, 0)
   d.qty = W.Input(d, 50, true)
-  d.qty:SetPoint("LEFT", qtyLabel, "RIGHT", 14, 0)
+  d.qty:SetPoint("LEFT", d.minus, "RIGHT", 8, 0)
   d.qty:SetMaxLetters(4)
+  d.qty:SetJustifyH("CENTER")
+  d.plus = W.Button(d, "+", 24, 22, function() d.qty:SetText(tostring(math.min(Data.MAX_QTY, qtyValue() + 1))) end)
+  d.plus:SetPoint("LEFT", d.qty, "RIGHT", 4, 0)
   d.have = W.Text(d, "GameFontHighlightSmall")
-  d.have:SetPoint("LEFT", d.qty, "RIGHT", 10, 0)
+  d.have:SetPoint("LEFT", d.plus, "RIGHT", 10, 0)
 
-  local priceLabel = W.Text(d, "GameFontNormalSmall")
-  priceLabel:SetPoint("TOPLEFT", 24, -136)
-  priceLabel:SetText("Precio por unidad")
+  -- Precio: gratis salvo que se cambie en "Más opciones".
+  d.moreButton = W.Button(d, "Más opciones", 110, 20)
+  d.moreButton:SetPoint("TOPLEFT", 24, -124)
+  d.summary = W.Text(d, "GameFontHighlightSmall")
+  d.summary:SetPoint("LEFT", d.moreButton, "RIGHT", 10, 0)
+  local more = CreateFrame("Frame", nil, d)
+  more:SetAllPoints()
+  d.more = more
+  function d:SetExpanded(expanded)
+    more:SetShown(expanded)
+    self:SetHeight(expanded and 286 or 196)
+    self.moreButton:SetText(expanded and "Menos opciones" or "Más opciones")
+  end
+  d.moreButton:SetScript("OnClick", function() d:SetExpanded(not more:IsShown()) end)
+
+  local priceLabel = W.Text(more, "GameFontNormalSmall")
+  priceLabel:SetPoint("TOPLEFT", 24, -154)
+  priceLabel:SetText("Precio por unidad (se cobra con el correo)")
   d.prices = {}
   for i, p in ipairs(PRICES) do
-    local b = W.Button(d, p.label, 80, 22)
-    if i == 1 then b:SetPoint("TOPLEFT", 24, -152) else b:SetPoint("LEFT", d.prices[i - 1], "RIGHT", 4, 0) end
+    local b = W.Button(more, p.label, 76, 22)
+    if i == 1 then b:SetPoint("TOPLEFT", 24, -170) else b:SetPoint("LEFT", d.prices[i - 1], "RIGHT", 4, 0) end
     b:SetScript("OnClick", function() d:SetPrice(p.copper) end)
     d.prices[i] = b
   end
-  local other = W.Text(d, "GameFontHighlightSmall")
-  other:SetPoint("TOPLEFT", 26, -186)
+  local other = W.Text(more, "GameFontHighlightSmall")
+  other:SetPoint("TOPLEFT", 26, -204)
   other:SetText("u otro:")
-  d.gold = W.Input(d, 50, true)
+  d.gold = W.Input(more, 50, true)
   d.gold:SetPoint("LEFT", other, "RIGHT", 12, 0)
   d.gold:SetMaxLetters(5)
-  local goldLabel = W.Text(d, "GameFontHighlightSmall")
+  local goldLabel = W.Text(more, "GameFontHighlightSmall")
   goldLabel:SetPoint("LEFT", d.gold, "RIGHT", 4, 0)
   goldLabel:SetText("oro")
-  d.silver = W.Input(d, 30, true)
+  d.silver = W.Input(more, 30, true)
   d.silver:SetPoint("LEFT", goldLabel, "RIGHT", 14, 0)
   d.silver:SetMaxLetters(2)
-  local silverLabel = W.Text(d, "GameFontHighlightSmall")
+  local silverLabel = W.Text(more, "GameFontHighlightSmall")
   silverLabel:SetPoint("LEFT", d.silver, "RIGHT", 4, 0)
-  silverLabel:SetText("plata (se cobra con el correo)")
+  silverLabel:SetText("plata")
 
   function d:Price()
     return (tonumber(self.gold:GetText()) or 0) * 10000 + (tonumber(self.silver:GetText()) or 0) * 100
@@ -270,6 +294,7 @@ local function createOfferDialog()
     local copper, selected = self:Price(), nil
     for i, p in ipairs(PRICES) do if p.copper == copper then selected = i end end
     markSelected(self.prices, selected)
+    self.summary:SetText(copper > 0 and (ns.FormatMoney(copper) .. " c/u") or "|cff40ff40Gratis|r")
   end
   d.gold:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
   d.silver:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
@@ -279,15 +304,17 @@ local function createOfferDialog()
     local name, icon, link = ns.KeyInfo("i" .. id)
     self.iconTex:SetTexture(icon or ns.QUESTION_ICON)
     self.itemName:SetText(link or name or ns.KeyName("i" .. id))
-    local have = ns.Scan.Have(id)
-    self.have:SetText(string.format("|cffbbbbbb(tienes %d)|r", have))
+    self.itemName:Show()
+    self.link:Hide()
+    local have = ns.ItemCount(id)
+    self.have:SetText(string.format("|cffbbbbbbtienes %d|r", have))
     if (tonumber(self.qty:GetText()) or 0) < 1 then self.qty:SetText(tostring(math.max(1, have))) end
   end
 
   d.info = W.Text(d, "GameFontHighlightSmall")
   d.info:SetPoint("BOTTOMLEFT", 24, 24)
   d.info:SetTextColor(0.7, 0.7, 0.7)
-  d.info:SetText("Quien lo quiera pulsa \"Lo quiero\"; se lo mandas por correo.")
+  d.info:SetText("Quien lo quiera te lo pide; se lo mandas por correo.")
   local publish = W.Button(d, "Ofrecer", 96, 22, function() d:Publish() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(d, "Cancelar", 86, 22, function() d:Hide() end)
@@ -300,11 +327,12 @@ local function createOfferDialog()
       return
     end
     self:Hide()
-    ns.UI.Open("board")
+    ns.Print("ofrecido en el Tablón: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
   end
 end
 
-function ns.UI.OpenOfferDialog(id)
+-- Abre la ventana de ofrecer. Con "id", el objeto ya viene elegido (desde la profesión).
+function ns.UI.OpenOfferDialog(id, qty)
   if not ns.G() then
     ns.Print("no estás en ninguna hermandad.")
     return
@@ -313,11 +341,13 @@ function ns.UI.OpenOfferDialog(id)
   local d = offerDialog
   d.id = nil
   d.link:SetText("")
-  d.qty:SetText("")
+  d.link:Show()
+  d.itemName:Hide()
+  d.qty:SetText(qty and tostring(qty) or "")
   d.have:SetText("")
   d.iconTex:SetTexture(ns.QUESTION_ICON)
-  d.itemName:SetText("|cff999999o arrástralo al cuadro de la izquierda|r")
   d:SetPrice(0)
+  d:SetExpanded(false)
   if id then d:SetItem(id) end
   d:Show()
 end

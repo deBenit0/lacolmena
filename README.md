@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos**: se ve pero aún no se puede abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.19.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.20.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -49,9 +49,12 @@ botones **Mis pedidos** e **Historial** abren la lista completa (con **< Tablón
 La antigua pestaña "Peticiones" está ahora dentro del tablón.
 
 ### Ofertas (ofrecer objetos)
-- **Ofrecer objeto** (en el tablón): arrastras el objeto al cuadro o haces mayús+clic en él en
-  tus bolsas, dices **cuántos** ofreces y el **precio por unidad** (*Gratis*, *50 plata*, *1 oro*,
-  *5 oro* u otro). Máximo 20 ofertas; duran 14 días.
+- **Desde tu ventana de profesión** (lo más directo): elige una receta y pasa el ratón por el
+  objeto que fabrica (o púlsalo). Sale el botón **Ofrecer**: se abre una ventanita con el objeto
+  ya puesto y la cantidad que llevas. Pulsa **Ofrecer** y listo: **gratis** por defecto.
+- El precio por unidad (*50 plata*, *1 oro*, *5 oro* u otro) está en **Más opciones**.
+- También con **Ofrecer objeto** en el tablón, para cosas que no fabricas: arrastras el objeto o
+  haces mayús+clic en él. Máximo 20 ofertas; duran 14 días.
 - En el tablón salen como **[Oferta]**. Los demás pulsan **Lo quiero** y dicen cuántos (no se
   puede pedir más de lo que queda libre). Pueden echarse atrás con **Ya no lo quiero**.
 - Al que ofrece le llega un aviso ("Bea quiere 3x Bolsa de lana"). En su oferta ve quién la
@@ -76,7 +79,11 @@ y los botones **Pedir a la hermandad** y **Susurrar**.
 
 *(La pestaña "Pedir equipo" está retirada de momento: se rehará más adelante.)*
 
-### Al pedir: prisa y propina
+### Al pedir: directo
+La ventana de pedir solo tiene el objeto, la **cantidad** (con − y +) y el botón **Pedir**. Lo
+demás está en **Más opciones** (al lado se ve lo elegido: "sin prisa, sin propina"):
+
+### Más opciones al pedir: prisa y propina
 - **¿Qué prisa tienes?**: *Sin prisa*, *Ya*, *Antes de 2 horas* u *Hoy*. Se ve en el tablón y
   en el aviso; los que corren prisa salen antes.
 - **Ofrecer propina (opcional)**: botones *Nada*, *50 plata*, *1 oro*, *2 oro*, *5 oro*, o la que

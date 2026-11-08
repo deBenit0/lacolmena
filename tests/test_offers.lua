@@ -151,6 +151,34 @@ local found
 for _, it in ipairs(ana.ns.Offers.List(ana.ns.Now())) do if it.id == 2318 then found = it end end
 H.ok(found and found.q == 3 and found.g == 10000 and found.owner == "Bea-Reino", "Ana ve la oferta de Bea")
 
+-- Ofrecer desde la ventana de profesión: botón "Ofrecer" en el objeto que fabrica la receta.
+local TAILORING = {
+  name = "Sastrería", rank = 300, max = 300, selected = 1,
+  rows = { { name = "Bolsa de lana", item = 4240, reagents = { { 2592, 3 } } } },
+}
+local aenv = ana.env
+aenv.TradeSkillFrame = aenv.CreateFrame("Frame", "TradeSkillFrame")
+aenv.TradeSkillSkillIcon = aenv.CreateFrame("Button", "TradeSkillSkillIcon", aenv.TradeSkillFrame)
+H.OpenTradeSkill(ana, TAILORING)
+H.Advance(2)
+aenv.TradeSkillSkillIcon:GetScript("OnEnter")(aenv.TradeSkillSkillIcon)
+local ob = aenv.HDFProfOfferButton
+H.ok(ob and ob:IsShown(), "al pasar por el objeto sale Ofrecer")
+ob:Click()
+local od = aenv.HDFProfOfferDialog
+H.ok(od:IsShown() and od.id == 4240, "ventana de ofrecer con la bolsa ya elegida")
+H.ok(not od.link:IsShown(), "sin tener que elegir el objeto")
+H.ok(not od.more:IsShown(), "precio oculto (gratis por defecto)")
+H.ok(od.summary:GetText():find("Gratis", 1, true), "dice Gratis")
+od.qty:SetText("2")
+od.plus:Click()
+H.eq(od.qty:GetText(), "3", "cantidad con +")
+od:Publish()
+H.ok(not od:IsShown(), "ofrecida en un clic")
+local mineOffer
+for _, it in ipairs(ana.ns.Offers.List(ana.ns.Now())) do if it.owner == "Ana-Reino" and it.id == 4240 then mineOffer = it end end
+H.ok(mineOffer and mineOffer.q == 3 and not mineOffer.g, "3 bolsas gratis")
+
 -- Modo demostración: ofertas de ejemplo; al pedir una, te la "mandan".
 bea.ns.Demo.Set(true)
 local demoOffer

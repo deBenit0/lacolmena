@@ -26,8 +26,8 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
 1. **B** abre su ventana de profesión una vez.
    → En *Mis cosas* le salen sus recetas.
 2. **A** abre su ventana de profesión, pasa el ratón por un material y pulsa **Pedir**
-   (o usa *Pedidos → Pedir materiales*). Elige prisa (*Ya*) y una propina pequeña (*50 plata*) y
-   pulsa **Publicar**.
+   (o usa *Pedidos → Pedir materiales*). Pulsa **Más opciones**, elige prisa (*Ya*) y una propina
+   pequeña (*50 plata*) y pulsa **Pedir**.
    → A ve el pedido en su Tablón como *[Tuyo]*.
 3. **B** → Le salta un **aviso con sonido** "A pide 5x ... (ya)".
 4. **B** pulsa **Lo hago yo** en el aviso y elige **Antes de 2 horas**.
@@ -44,9 +44,9 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
 
 ## 2. Ofertas (B ofrece, A lo quiere)
 
-1. **B** pulsa **Ofrecer objeto** en el Tablón, arrastra a la caja un objeto de sus bolsas
-   (o mayús+clic en él), pone **2** y precio **Gratis**, y pulsa **Ofrecer**.
-   → Sale en el Tablón como *[Oferta]* para los dos.
+1. **B** abre su profesión, elige una receta que fabrique algo que tenga (una bolsa, una
+   poción...) y pasa el ratón por el objeto. Pulsa **Ofrecer**, pone **2** y pulsa **Ofrecer**.
+   → Sale en el Tablón como *[Oferta]* (gratis) para los dos.
 2. **A** prueba los filtros: **Ver: ofertas**, **Categoría** y el buscador con el nombre del objeto.
    → La oferta aparece y desaparece según el filtro.
 3. **A** pulsa **Lo quiero** y elige 1.

@@ -43,6 +43,11 @@ local CHECKS = {
     local ok = TradeSkillReagent1 and TradeSkillReagent1.hdfHooked
     return ok and true or false, ok and "enganchado" or "no se ha podido enganchar"
   end },
+  { "Botón \"Ofrecer\" en lo que fabricas", function()
+    if not TradeSkillFrame then return nil, "abre una profesión y vuelve a comprobar" end
+    local ok = TradeSkillSkillIcon and TradeSkillSkillIcon.hdfOffer
+    return ok and true or false, ok and "enganchado" or "no encuentro el icono del objeto"
+  end },
   { "Ventana de encantamiento", function()
     if not CraftFrame then return nil, "si eres encantador, abre Encantamiento y vuelve a comprobar" end
     local ok = CraftReagent1 ~= nil and CraftCreateButton ~= nil

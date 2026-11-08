@@ -370,11 +370,94 @@ local function hookReagents(prefix, isCraft)
   end
 end
 
+---------------------------------------------------------------------------
+-- Botón "Ofrecer" en el objeto que fabrica la receta elegida (al pasar el ratón o pulsarlo)
+---------------------------------------------------------------------------
+local offer = {}
+
+-- Objeto que fabrica la receta elegida (nil si es un encantamiento u otra cosa).
+local function productOf(isCraft)
+  if isCraft then
+    local i = GetCraftSelectionIndex and GetCraftSelectionIndex()
+    if not i or i == 0 or not GetCraftItemLink then return nil end
+    return itemIdFromLink(GetCraftItemLink(i))
+  end
+  local i = GetTradeSkillSelectionIndex and GetTradeSkillSelectionIndex()
+  if not i or i == 0 or not GetTradeSkillItemLink then return nil end
+  return itemIdFromLink(GetTradeSkillItemLink(i))
+end
+
+function Missing.OfferProduct(isCraft)
+  if not ns.G() then
+    ns.Print("no estás en ninguna hermandad.")
+    return
+  end
+  local id = productOf(isCraft)
+  if not id then
+    ns.Print("esta receta no fabrica un objeto: no se puede ofrecer.")
+    return
+  end
+  local have = ns.ItemCount(id)
+  ns.UI.OpenOfferDialog(id, have > 0 and have or 1)
+end
+
+local function offerButton()
+  if offer.button then return offer.button end
+  local b = CreateFrame("Button", "HDFProfOfferButton", UIParent, "UIPanelButtonTemplate")
+  b:SetSize(64, 18)
+  b:SetText("Ofrecer")
+  b:Hide()
+  b:SetScript("OnClick", function(self)
+    self:Hide()
+    ns.SafeCall(Missing.OfferProduct, offer.isCraft)
+  end)
+  b:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Ofrecer a la hermandad")
+    GameTooltip:AddLine("Lo ves en el Tablón como oferta; quien lo quiera te lo pide.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  b:SetScript("OnUpdate", function(self, elapsed)
+    local over = self:IsMouseOver() or (offer.icon and offer.icon:IsVisible() and offer.icon:IsMouseOver())
+    if over == true then
+      self.away = 0
+    else
+      self.away = (self.away or 0) + (elapsed or 0)
+      if self.away > 0.6 then self:Hide() end
+    end
+  end)
+  offer.button = b
+  return b
+end
+
+local function showOffer(icon, isCraft)
+  if not productOf(isCraft) then return end
+  local b = offerButton()
+  offer.icon, offer.isCraft = icon, isCraft
+  b:SetParent(icon)
+  b:ClearAllPoints()
+  b:SetPoint("TOPLEFT", icon, "BOTTOMLEFT", -2, -2)
+  b:SetFrameStrata(icon:GetFrameStrata() or "HIGH")
+  b:SetFrameLevel(icon:GetFrameLevel() + 10)
+  b.away = 0
+  b:Show()
+end
+
+local function hookProduct(icon, isCraft)
+  if not icon or icon.hdfOffer then return end
+  icon.hdfOffer = true
+  icon:HookScript("OnEnter", function(self) ns.SafeCall(showOffer, self, isCraft) end)
+  icon:HookScript("OnClick", function(self) ns.SafeCall(showOffer, self, isCraft) end)
+end
+
 ns.On("TRADE_SKILL_SHOW", function()
   addButton(TradeSkillFrame, TradeSkillCreateButton)
   hookReagents("TradeSkillReagent", false)
+  hookProduct(TradeSkillSkillIcon, false)
 end)
 ns.On("CRAFT_SHOW", function()
   addButton(CraftFrame, CraftCreateButton)
   hookReagents("CraftReagent", true)
+  hookProduct(CraftIcon, true)
 end)

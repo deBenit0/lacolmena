@@ -13,7 +13,8 @@ local HELP = table.concat({
     .. "de 2 horas u hoy; puede pedir más tiempo una vez). Si no lo entrega a tiempo, vuelve al tablón. "
     .. "Mándalo por correo y el pedido "
     .. "|cff40ff40se completa solo|r al enviarlo.",
-  "   |cffffffff· Ofrecer objeto|r: ofrece cosas que tienes (bolsas, pociones...), gratis o con precio. "
+  "   |cffffffff· Ofrecer|r: en tu profesión, pasa el ratón por lo que fabricas y pulsa |cffffffffOfrecer|r "
+    .. "(o usa Ofrecer objeto en el tablón). Gratis o con precio. "
     .. "Quien lo quiera pulsa |cffffffffLo quiero|r y se lo mandas por correo. En el tablón puedes buscar "
     .. "y filtrar por pedidos, ofertas y categoría.",
   "   |cffffffff· Pedir materiales|r: busca el material, elige cuántos, qué prisa tienes y si das "
