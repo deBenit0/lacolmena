@@ -1,0 +1,56 @@
+# Publica en Releases el addon para la hermandad.
+# Se pone en marcha cuando llega a main una versión nueva de HDFprofesiones (la del .toc):
+# si esa versión aún no tiene release, empaqueta SOLO la carpeta HDFprofesiones en un ZIP y
+# crea la release (con su etiqueta vX.Y.Z), lista para descomprimir en Interface\AddOns.
+# (Las pruebas se pasan antes, en la rama de desarrollo.)
+name: Publicar versión
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "HDFprofesiones/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Leer la versión del addon
+        id: version
+        run: |
+          v=$(sed -n 's/^## Version: *//p' HDFprofesiones/HDFprofesiones.toc | tr -d '\r')
+          echo "Versión: $v"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+      - name: Crear la release si no existe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "La release $TAG ya existe: nada que hacer."
+            exit 0
+          fi
+          zip -r -q "HDFprofesiones-$TAG.zip" HDFprofesiones
+          cat > notas.md <<'NOTAS'
+          ## Cómo instalarlo
+
+          1. Descarga **HDFprofesiones-*.zip** (abajo, en *Assets*).
+          2. Descomprímelo dentro de `World of Warcraft\_forever_\Interface\AddOns`.
+             Debe quedar `AddOns\HDFprofesiones\HDFprofesiones.toc`.
+          3. Si tenías una versión anterior, borra antes la carpeta `HDFprofesiones` vieja.
+          4. En el juego: ventana de hermandad (J) → pestaña del engranaje.
+
+          Todos los de la hermandad deben tener la misma versión.
+          NOTAS
+          gh release create "$TAG" "HDFprofesiones-$TAG.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Los hijos del Fundillo $TAG" \
+            --notes-file notas.md

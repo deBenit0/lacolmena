@@ -59,15 +59,19 @@ local function cleanup()
   -- Solo borramos si vemos la lista entera; si no, podríamos borrar a los desconectados.
   local g = ns.G()
   if not g or not Guild.full then return end
+  -- Si en la lista no estoy yo, los nombres vienen en otro formato (reino escrito distinto...):
+  -- no limpiar nada, o se borrarían datos buenos.
+  local me = ns.Me()
+  if not me or not roster[me] then return end
   local removed = false
   for name, e in pairs(g.entries) do
-    if not roster[name] and not e.demo then
+    if not roster[name] and not e.demo and name ~= me then
       g.entries[name] = nil
       removed = true
     end
   end
   for id, r in pairs(g.requests) do
-    if not roster[r.a] and not r.demo then
+    if not roster[r.a] and not r.demo and r.a ~= me then
       g.requests[id] = nil
       g.alerted[id], g.thanked[id] = nil, nil
       if g.karmaSeen then g.karmaSeen[id] = nil end
