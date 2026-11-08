@@ -29,28 +29,39 @@ jobs:
           echo "Versión: $v"
           echo "tag=v$v" >> "$GITHUB_OUTPUT"
 
-      - name: Crear la release si no existe
+      - name: Crear la release (o completarla)
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
+          # El "-forever" del nombre y el release.json hacen que WowUp lo reconozca para
+          # WoW Forever y avise de las versiones nuevas.
+          ZIP="HDFprofesiones-$TAG-forever.zip"
+          zip -r -q "$ZIP" HDFprofesiones
+          cat > release.json <<JSON
+          {"releases":[{"name":"HDFprofesiones","version":"$TAG","filename":"$ZIP","nolib":false,"metadata":[{"flavor":"forever","interface":16001}]}]}
+          JSON
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "La release $TAG ya existe: nada que hacer."
+            echo "La release $TAG ya existe: le pongo el ZIP para WowUp y el release.json."
+            gh release upload "$TAG" "$ZIP" release.json --clobber
             exit 0
           fi
-          zip -r -q "HDFprofesiones-$TAG.zip" HDFprofesiones
           cat > notas.md <<'NOTAS'
           ## Cómo instalarlo
 
-          1. Descarga **HDFprofesiones-*.zip** (abajo, en *Assets*).
+          **Con WowUp (se actualiza solo):** *Get Addons → Install from URL* y pega
+          `https://github.com/deBenit0/lacolmena`.
+
+          **A mano:**
+          1. Descarga **HDFprofesiones-*-forever.zip** (abajo, en *Assets*).
           2. Descomprímelo dentro de `World of Warcraft\_forever_\Interface\AddOns`.
              Debe quedar `AddOns\HDFprofesiones\HDFprofesiones.toc`.
-          3. Si tenías una versión anterior, borra antes la carpeta `HDFprofesiones` vieja.
+          3. Si tenías una versión anterior, cierra el juego y borra antes la carpeta `HDFprofesiones` vieja.
           4. En el juego: ventana de hermandad (J) → pestaña del engranaje.
 
           Todos los de la hermandad deben tener la misma versión.
           NOTAS
-          gh release create "$TAG" "HDFprofesiones-$TAG.zip" \
+          gh release create "$TAG" "$ZIP" release.json \
             --target "$GITHUB_SHA" \
             --title "Los hijos del Fundillo $TAG" \
             --notes-file notas.md
