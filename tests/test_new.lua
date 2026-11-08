@@ -113,14 +113,43 @@ local req = ns.Sync.CreateRequest({ k = "i4234", q = 10, g = 9000 })
 H.Advance(10)
 ana.ns.Sync.Commit(req.id, 1)
 H.Advance(10)
-local aenv, cod = ana.env, nil
+-- Buzón como el de Classic: sin objetos, "Contra reembolso" está desactivado y se
+-- envía dinero; al adjuntar objetos se puede marcar el reembolso.
+local aenv = ana.env
+local mail = { money = 0, items = 0, mode = 1 }
 aenv.MailFrame = aenv.CreateFrame("Frame", "MailFrame")
 aenv.SendMailNameEditBox = aenv.CreateFrame("EditBox", "SendMailNameEditBox")
-aenv.SendMailCODButton = aenv.CreateFrame("CheckButton", "SendMailCODButton")
 aenv.SendMailMoney = aenv.CreateFrame("Frame", "SendMailMoney")
-aenv.MoneyInputFrame_SetCopper = function(_, c) cod = c end
+local codButton = aenv.CreateFrame("CheckButton", "SendMailCODButton")
+aenv.SendMailCODButton = codButton
+codButton.GetChecked = function() return mail.mode == 2 end
+codButton.IsEnabled = function() return mail.items > 0 end
+codButton.Click = function() if mail.items > 0 then mail.mode = 2 end end
+aenv.SendMailRadioButton_OnClick = function(i) mail.mode = i end
+aenv.HasSendMailItem = function(i) return i <= mail.items end
+aenv.MoneyInputFrame_SetCopper = function(_, c) mail.money = c end
+aenv.MoneyInputFrame_GetCopper = function() return mail.money end
+local function attach(n)
+  mail.items = n
+  if n == 0 then mail.mode = 1 end -- el juego vuelve a "Enviar dinero"
+  H.FireEvent(ana, "MAIL_SEND_INFO_UPDATE")
+  H.Advance(0.1)
+end
 local areq = ana.ns.G().requests[req.id]
 ana.ns.Mail.Prepare(areq, 4)
 H.eq(aenv.SendMailNameEditBox:GetText(), "Pepe", "destinatario")
-H.eq(cod, 3600, "contra reembolso proporcional: 9000 x 4/10")
+H.eq(mail.money, 0, "sin objetos no se pone dinero (se regalaría)")
+H.eq(mail.mode, 1, "sigue en Enviar dinero mientras no hay objetos")
+attach(1)
+H.eq(mail.mode, 2, "al adjuntar objetos: Contra reembolso")
+H.eq(mail.money, 3600, "contra reembolso proporcional: 9000 x 4/10")
+attach(0)
+H.eq(mail.money, 0, "si se quitan los objetos, se quita la cantidad (nunca se regala)")
+attach(2)
+H.ok(mail.mode == 2 and mail.money == 3600, "al volver a adjuntar, otra vez reembolso")
+-- Si cambia el destinatario, el addon deja de tocar el correo.
+aenv.SendMailNameEditBox:SetText("Otro")
+mail.money, mail.mode = 0, 1
+attach(1)
+H.ok(mail.money == 0 and mail.mode == 1, "otro destinatario: no toca nada")
 H.eq(#H.errors, 0, "sin errores de Lua")

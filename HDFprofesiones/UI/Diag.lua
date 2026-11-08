@@ -59,8 +59,8 @@ local CHECKS = {
   end },
   { "Contra reembolso", function()
     if not SendMailNameEditBox then return nil, "abre el buzón y vuelve a comprobar" end
-    local ok = (SendMailCODButton ~= nil and SendMailMoney ~= nil and MoneyInputFrame_SetCopper ~= nil)
-      or SetSendMailCOD ~= nil
+    local ok = SendMailCODButton ~= nil and SendMailMoney ~= nil and MoneyInputFrame_SetCopper ~= nil
+      and SendMailRadioButton_OnClick ~= nil and HasSendMailItem ~= nil
     return ok, ok and "el buzón lo tiene" or "no lo encuentro: la propina habrá que pagarla a mano"
   end },
   { "Invitar al grupo", function()
@@ -72,8 +72,8 @@ local CHECKS = {
     return ok, ok and "compatible" or "no; usa mayús+clic"
   end },
   { "Mayús+clic en objetos", function()
-    local ok = ChatEdit_InsertLink ~= nil and GetCurrentKeyBoardFocus ~= nil
-    return ok, ok and "compatible" or "no; usa arrastrar"
+    local ok = W.LinkHooked and GetCurrentKeyBoardFocus ~= nil
+    return ok and true or false, ok and "compatible" or "no; usa arrastrar"
   end },
   { "Logo de NorrisPlay", function()
     local tex = UIParent:CreateTexture(nil, "BACKGROUND")

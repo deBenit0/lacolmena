@@ -151,6 +151,21 @@ local found
 for _, it in ipairs(ana.ns.Offers.List(ana.ns.Now())) do if it.id == 2318 then found = it end end
 H.ok(found and found.q == 3 and found.g == 10000 and found.owner == "Bea-Reino", "Ana ve la oferta de Bea")
 
+-- Mayús+clic como en el juego actual: el juego llama a ChatFrameUtil.InsertLink y el addon
+-- pega el enlace en su caja activa.
+bea.ns.UI.OpenOfferDialog()
+local dd = env.HDFProfOfferDialog
+bea.focus = dd.link
+env.ChatFrameUtil.InsertLink(H.itemLink(929))
+bea.focus = nil
+H.ok(dd.link:GetText():find("item:929", 1, true), "mayús+clic pega el enlace en la caja (ChatFrameUtil.InsertLink)")
+dd.link:GetScript("OnTextChanged")(dd.link, false) -- en el juego SetText lo dispara solo
+H.eq(dd.id, 929, "y el objeto queda elegido")
+dd:Hide()
+-- Susurrar usa la función nueva del chat.
+bea.ns.SendTell("Ana-Reino")
+H.eq(bea.tells and bea.tells[1], "Ana-Reino", "Susurrar con ChatFrameUtil.SendTell")
+
 -- Ofrecer desde la ventana de profesión: botón "Ofrecer" en el objeto que fabrica la receta.
 local TAILORING = {
   name = "Sastrería", rank = 300, max = 300, selected = 1,

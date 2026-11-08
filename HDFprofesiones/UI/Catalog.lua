@@ -417,7 +417,7 @@ local function buildCatalog(page, mode)
   detail.askAll:SetPoint("BOTTOMLEFT", 8, 8)
   detail.whisper = W.Button(detail, "Susurrar", 96, 22, function()
     local c = crafters:Selected()
-    if c and ChatFrame_SendTell then ChatFrame_SendTell(c.name) end
+    if c then ns.SendTell(c.name) end
   end)
   detail.whisper:SetPoint("LEFT", detail.askAll, "RIGHT", 4, 0)
 

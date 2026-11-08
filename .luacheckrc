@@ -9,7 +9,7 @@ globals = { "HDFProfesiones", "HDFProfesionesDB", "StaticPopupDialogs", "UISpeci
 
 read_globals = {
   -- Lua de WoW
-  "wipe", "tinsert", "hooksecurefunc", "geterrorhandler", "time", "date", "C_PartyInfo", "InviteUnit", "GetCursorInfo", "ClearCursor", "debugstack", "seterrorhandler", "TradeSkillReagent1", "CraftReagent1", "TradeSkillSkillIcon", "CraftIcon",
+  "wipe", "tinsert", "hooksecurefunc", "geterrorhandler", "time", "date", "C_PartyInfo", "InviteUnit", "GetCursorInfo", "ClearCursor", "debugstack", "seterrorhandler", "TradeSkillReagent1", "CraftReagent1", "TradeSkillSkillIcon", "CraftIcon", "ChatFrameUtil", "SendMailRadioButton_OnClick", "SendMailFrame_Update", "MoneyInputFrame_GetCopper", "HasSendMailItem",
   -- Marcos e interfaz
   "CreateFrame", "UIParent", "GameTooltip", "DEFAULT_CHAT_FRAME", "BackdropTemplateMixin",
   "FauxScrollFrame_Update", "FauxScrollFrame_GetOffset", "FauxScrollFrame_SetOffset", "FauxScrollFrame_OnVerticalScroll",

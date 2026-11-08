@@ -189,6 +189,10 @@ end
 
 -- Ventanas de confirmación y de cantidad (usan las ventanas emergentes del juego).
 local function popupEditBox(popup)
+  if popup.GetEditBox then
+    local ok, edit = pcall(popup.GetEditBox, popup)
+    if ok and edit then return edit end
+  end
   return popup.editBox or popup.EditBox or (popup.GetName and popup:GetName() and _G[popup:GetName() .. "EditBox"])
 end
 
@@ -333,4 +337,37 @@ function W.ExtendRequest(r)
   W.Choose(string.format("¿Para cuándo tendrás %s?", ns.KeyLabel(r.k)),
     "Solo puedes pedir más tiempo una vez. A " .. ns.ShortName(r.a) .. " le llegará un aviso.",
     labels, function(i) ns.Sync.Extend(r.id, options[i].id) end)
+end
+
+---------------------------------------------------------------------------
+-- Mayús+clic en un objeto con una de nuestras cajas activa (las marcadas con hdfLink):
+-- pega el enlace en ella. El juego actual usa ChatFrameUtil.InsertLink; ChatEdit_InsertLink
+-- es solo un alias antiguo al que el juego ya no llama, así que nos enganchamos a los dos.
+---------------------------------------------------------------------------
+local function onInsertLink(link)
+  local focus = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
+  if focus and focus.hdfLink and type(link) == "string" and link:find("item:", 1, true) then
+    focus:SetText(link)
+  end
+end
+W.OnInsertLink = onInsertLink
+local hookedInsert = false
+if ChatFrameUtil and ChatFrameUtil.InsertLink then
+  hooksecurefunc(ChatFrameUtil, "InsertLink", onInsertLink)
+  hookedInsert = true
+end
+if ChatEdit_InsertLink and not (ChatFrameUtil and ChatEdit_InsertLink == ChatFrameUtil.InsertLink and hookedInsert) then
+  hooksecurefunc("ChatEdit_InsertLink", onInsertLink)
+  hookedInsert = true
+end
+W.LinkHooked = hookedInsert
+
+-- Abrir un susurro (función nueva del juego o la antigua).
+function ns.SendTell(name)
+  if not name then return end
+  if ChatFrameUtil and ChatFrameUtil.SendTell then
+    ChatFrameUtil.SendTell(name)
+  elseif ChatFrame_SendTell then
+    ChatFrame_SendTell(name)
+  end
 end

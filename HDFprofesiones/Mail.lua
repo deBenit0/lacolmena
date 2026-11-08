@@ -54,6 +54,67 @@ function Mail.OnSent()
   if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
 end
 
+---------------------------------------------------------------------------
+-- Contra reembolso seguro
+-- El buzón de Classic solo deja marcar "Contra reembolso" cuando ya hay objetos adjuntos;
+-- sin objetos vuelve a "Enviar dinero" (y la cantidad se REGALARÍA). Por eso el addon no pone
+-- la cantidad al preparar el correo: la recuerda y la pone cuando el juego actualiza el buzón
+-- con objetos dentro, siempre en modo reembolso. Si se quitan los objetos, la vuelve a quitar.
+---------------------------------------------------------------------------
+local cod -- { to = destinatario, amount = cobre }
+
+local function hasAttachments()
+  for i = 1, ATTACHMENTS_MAX_SEND or 12 do
+    if HasSendMailItem and HasSendMailItem(i) then return true end
+  end
+  return false
+end
+
+local function currentMoney()
+  return (MoneyInputFrame_GetCopper and SendMailMoney and MoneyInputFrame_GetCopper(SendMailMoney)) or 0
+end
+
+local function applyCOD()
+  if not cod or not SendMailCODButton or not SendMailMoney or not MoneyInputFrame_SetCopper then return end
+  -- Si ha cambiado el destinatario, ya no es nuestro correo.
+  local to = SendMailNameEditBox and SendMailNameEditBox:GetText() or ""
+  if to:lower() ~= ns.ShortName(cod.to):lower() and to:lower() ~= cod.to:lower() then
+    cod = nil
+    return
+  end
+  if hasAttachments() and SendMailCODButton:IsEnabled() then
+    if not SendMailCODButton:GetChecked() and SendMailRadioButton_OnClick then SendMailRadioButton_OnClick(2) end
+    if SendMailCODButton:GetChecked() and currentMoney() ~= cod.amount then
+      MoneyInputFrame_SetCopper(SendMailMoney, cod.amount)
+    end
+  elseif currentMoney() == cod.amount then
+    -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad.
+    MoneyInputFrame_SetCopper(SendMailMoney, 0)
+  end
+end
+Mail.ApplyCOD = applyCOD
+
+function Mail.SetPendingCOD(to, amount)
+  if not amount or amount <= 0 then
+    cod = nil
+    return
+  end
+  cod = { to = to, amount = amount }
+  ns.Print("pon los objetos en el correo: se marcará \"Contra reembolso\" de %s y se le cobrará al recogerlo.",
+    ns.FormatMoney(amount))
+  applyCOD()
+end
+
+function Mail.PendingCOD() return cod end
+
+if SendMailFrame_Update then
+  hooksecurefunc("SendMailFrame_Update", function() ns.SafeCall(applyCOD) end)
+end
+-- Al adjuntar o quitar objetos el juego avisa con este evento (y actualiza el buzón).
+ns.On("MAIL_SEND_INFO_UPDATE", function() ns.After(0, applyCOD) end)
+ns.On("MAIL_SEND_SUCCESS", function() cod = nil end)
+ns.On("MAIL_CLOSED", function() cod = nil end)
+
 -- Abre la pestaña de enviar del buzón con el destinatario y el asunto puestos.
 function Mail.CanPrepare()
   return MailFrame ~= nil and MailFrame:IsShown() and SendMailNameEditBox ~= nil
@@ -67,16 +128,7 @@ function Mail.Prepare(r, amount)
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName(r.k)))
   end
   -- Si la petición ofrece oro, el correo va contra reembolso: se le cobra al recogerlo.
-  local cod = r.g and math.floor(r.g * amount / r.q) or 0
-  if cod > 0 then
-    if SendMailCODButton and SendMailMoney and MoneyInputFrame_SetCopper then
-      SendMailCODButton:Click()
-      MoneyInputFrame_SetCopper(SendMailMoney, cod)
-    elseif SetSendMailCOD then
-      SetSendMailCOD(cod)
-    end
-    ns.Print("correo contra reembolso de %s: se le cobrará al recogerlo.", ns.FormatMoney(cod))
-  end
+  Mail.SetPendingCOD(r.a, r.g and math.floor(r.g * amount / r.q) or 0)
   return true
 end
 
@@ -92,16 +144,7 @@ function Mail.PrepareOffer(who, id, amount, price)
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName("i" .. id)))
   end
-  local cod = (price or 0) * amount
-  if cod > 0 then
-    if SendMailCODButton and SendMailMoney and MoneyInputFrame_SetCopper then
-      SendMailCODButton:Click()
-      MoneyInputFrame_SetCopper(SendMailMoney, cod)
-    elseif SetSendMailCOD then
-      SetSendMailCOD(cod)
-    end
-    ns.Print("correo contra reembolso de %s: se le cobrará al recogerlo.", ns.FormatMoney(cod))
-  end
+  Mail.SetPendingCOD(who, (price or 0) * amount)
   ns.Print("pon %dx %s en el correo y envíalo: se apuntará solo.", amount, ns.KeyLabel("i" .. id))
   return true
 end

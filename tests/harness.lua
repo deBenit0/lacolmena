@@ -266,14 +266,23 @@ local function makeEnv(client)
         print("  ERROR LUA en " .. client.name .. ": " .. tostring(err))
       end
     end,
-    hooksecurefunc = function(name, fn)
-      local orig = env[name]
-      env[name] = function(...)
+    -- Como en el juego: hooksecurefunc("Nombre", fn) o hooksecurefunc(tabla, "Nombre", fn).
+    hooksecurefunc = function(a, b, c)
+      local tbl, name, fn = env, a, b
+      if type(a) == "table" then tbl, name, fn = a, b, c end
+      local orig = tbl[name]
+      tbl[name] = function(...)
         local r = { orig(...) }
         fn(...)
         return unpack(r)
       end
     end,
+    -- El chat del juego actual: el mayús+clic llama a ChatFrameUtil.InsertLink (sin chat abierto
+    -- no inserta nada y devuelve false).
+    ChatFrameUtil = {
+      InsertLink = function() return false end,
+      SendTell = function(name) client.tells = client.tells or {}; client.tells[#client.tells + 1] = name end,
+    },
     -- tiempo
     GetTime = function() return H.time end,
     GetServerTime = function() return math.floor(H.SERVER_START + H.time) end,

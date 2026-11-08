@@ -36,8 +36,10 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
 5. **B** pulsa **Más tiempo** y elige *Lo hago hoy*.
    → A recibe "B necesita más tiempo...". El botón queda gris (solo una vez).
 6. **B** abre el buzón y pulsa **Preparar correo** en su encargo.
-   → Se ponen destinatario, asunto y **contra reembolso** de 50 plata.
-7. **B** pone los objetos en el correo y lo envía.
+   → Se ponen destinatario y asunto. La cantidad **todavía no** (el juego no deja contra
+   reembolso sin objetos).
+7. **B** pone los objetos en el correo. → Se marca solo **Contra reembolso** con 50 plata.
+   **Comprueba que NO está en "Enviar dinero"** antes de enviar. Lo envía.
    → El pedido se **completa solo**. A recibe "B te ha enviado...". Karma: B +1, A −1
    (se ve junto a los nombres).
 8. **A** recoge el correo. → El juego le cobra los 50 plata.

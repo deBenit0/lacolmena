@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.21.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.21.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -89,7 +89,9 @@ demás está en **Más opciones** (al lado se ve lo elegido: "sin prisa, sin pro
 - **Ofrecer propina (opcional)**: botones *Nada*, *50 plata*, *1 oro*, *2 oro*, *5 oro*, o la que
   escribas.
 - Si hay propina, al **Preparar correo** el envío va **contra reembolso**: el juego le cobra la
-  propina al que pidió cuando recoge el objeto.
+  propina al que pidió cuando recoge el objeto. El buzón solo deja marcarlo cuando ya hay objetos
+  adjuntos, así que el addon lo marca y pone la cantidad **en cuanto metes los objetos** (y la
+  quita si los sacas: nunca la deja como "Enviar dinero").
 - El pedido va **siempre a toda la hermandad**: no se puede pedir a una persona concreta.
 - Ya no se usan precios de subasta (ni Auctionator).
 

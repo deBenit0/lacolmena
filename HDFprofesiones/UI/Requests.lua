@@ -273,7 +273,7 @@ ns.UI.RegisterPage("requests", function(page)
         end)
       else
         setButton(detail.b3, "Susurrar", true, function()
-          if ChatFrame_SendTell then ChatFrame_SendTell(r.a) end
+          ns.SendTell(r.a)
         end)
       end
     end
