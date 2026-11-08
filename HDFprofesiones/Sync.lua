@@ -22,6 +22,7 @@ local want = { e = {}, r = {}, m = {} } -- lo que pediremos con un W
 local wantScheduled = false
 local infoAsked = {}
 Sync.peers = {}               -- [personaje] = versión del addon
+Sync.oldWarned = {}           -- [personaje] = true si ya avisé de que tiene una versión antigua
 
 ---------------------------------------------------------------------------
 -- Nombres compactos: "Nombre-Reino" se envía como "Nombre" si es del reino del remitente
@@ -246,7 +247,25 @@ function Sync.NotePeerVersion(sender, av)
     Sync.newest = av
     if first then ns.Print("hay una versión nueva del addon (%s); tú tienes la %s.", av, ns.VERSION) end
     ns.Fire("NEW_VERSION", av)
+    if first and ns.Alerts then
+      ns.Alerts.Push({ page = "home", text = string.format(
+        "Hay una versión nueva del addon (%s). Cierra el juego y actualízalo: con versiones distintas no se ven los pedidos.", av) })
+    end
+  elseif versionNumber(av) < versionNumber(ns.VERSION) and not Sync.oldWarned[sender] then
+    Sync.oldWarned[sender] = true
+    ns.Print("%s tiene una versión antigua del addon (%s; la tuya es la %s): puede que no vea tus pedidos. Dile que lo actualice.",
+      ns.ShortName(sender), av, ns.VERSION)
   end
+end
+
+-- Compañeros vistos con otra versión: { "Nombre (0.25.0)", ... }.
+function Sync.OtherVersions()
+  local out = {}
+  for name, av in pairs(Sync.peers) do
+    if av ~= ns.VERSION then out[#out + 1] = string.format("%s (%s)", ns.ShortName(name), av) end
+  end
+  table.sort(out)
+  return out
 end
 
 ---------------------------------------------------------------------------
