@@ -56,6 +56,11 @@ local CHECKS = {
     if n > 0 then return true, n .. " vistos" end
     return nil, "aún no has visto a nadie más con el addon"
   end },
+  { "Puesta al día con los demás", function()
+    local t = ns.Sync.lastHello
+    if not t then return nil, "aún no ha llegado el resumen de nadie (se repite cada 5 minutos)" end
+    return true, "último resumen recibido hace " .. ns.FormatDuration(math.max(0, ns.Now() - t))
+  end },
   { "Misma versión que los demás", function()
     local other = ns.Sync.OtherVersions()
     if next(ns.Sync.peers) == nil then return nil, "no hay nadie más conectado con el addon" end

@@ -188,7 +188,7 @@ end
 
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
-  panel.title:SetText(ns.TITLE
+  panel.title:SetText(ns.TITLE .. "  |cff999999v" .. ns.VERSION .. "|r"
     .. (ns.db and ns.db.settings.demo and "  |cffff8040(MODO DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
   local home = UI.current == "home"

@@ -513,6 +513,14 @@ ns.UI.RegisterPage("board", function(page)
         if not can then row.accept.tip = "Abre el buzón para preparar el correo." end
         row.accept:SetScript("OnClick", function() ns.Mail.Prepare(r, item.pending) end)
       end
+    elseif item.mine then
+      -- Mi pedido: borrarlo desde aquí (el autor no puede aceptar su propio pedido).
+      row.accept:SetText("Borrar pedido")
+      row.accept.tip = nil
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function()
+        W.Confirm("¿Borrar este pedido? Desaparecerá del Tablón de todos.", function() ns.Sync.Close(r.id) end)
+      end)
     else
       row.accept:SetText("Aceptar encargo")
       row.accept:SetEnabled(item.acceptable)
