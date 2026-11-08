@@ -5,8 +5,8 @@ local W, Data, Guild = ns.W, ns.Data, ns.Guild
 local FILTERS = {
   { id = "active", label = "Ver: activas" },
   { id = "craft", label = "Ver: puedo hacerlas" },
-  { id = "mine", label = "Ver: mías" },
-  { id = "involved", label = "Ver: aceptadas por mí" },
+  { id = "mine", label = "Ver: mis pedidos" },
+  { id = "involved", label = "Ver: mis encargos" },
   { id = "ended", label = "Ver: terminadas" },
 }
 
@@ -44,7 +44,7 @@ local function matchesFilter(filter, r, info, me)
   if filter == "craft" then
     return Data.CanServe(r, ns.Now())
   end
-  if filter == "mine" then return r.a == me end
+  if filter == "mine" then return active and r.a == me end -- solo los activos (los viejos, en terminadas)
   if filter == "involved" then
     return active and (myCommit and Data.CommitActive(myCommit, ns.Now(), r)) or false
   end

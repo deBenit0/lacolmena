@@ -1,4 +1,4 @@
--- Página "Mis cosas": mis profesiones publicadas, ajustes y estado de la sincronización.
+-- Página "Opciones" (antes "Mis cosas"; se entra desde Inicio): mis profesiones publicadas, ajustes y estado de la sincronización.
 local _, ns = ...
 local W, Data, Guild = ns.W, ns.Data, ns.Guild
 
@@ -69,12 +69,18 @@ ns.UI.RegisterPage("mine", function(page)
   page.demo:SetPoint("TOPLEFT", 4, -340)
 
   -- Para la prueba en el juego: autocomprobación e informe de errores.
+  page.minimap = W.Check(page, "Icono en el minimapa", function(checked)
+    ns.MinimapButton.SetShown(checked)
+  end)
+  page.minimap:SetPoint("TOPLEFT", 4, -366)
+
   page.check = W.Button(page, "Comprobar el addon", 140, 22, function() ns.Diag.Show() end)
-  page.check:SetPoint("TOPLEFT", 8, -370)
+  page.check:SetPoint("TOPLEFT", 8, -392)
   page.report = W.Button(page, "Copiar informe", 130, 22, function() ns.Diag.Show() end)
   page.report:SetPoint("LEFT", page.check, "RIGHT", 6, 0)
   page.errors = W.Text(page, "GameFontHighlightSmall")
-  page.errors:SetPoint("TOPLEFT", 10, -398)
+  page.errors:SetPoint("LEFT", page.report, "RIGHT", 8, 0)
+  page.errors:SetWidth(150)
 
   page.statsTitle = W.Text(page, "GameFontNormal")
   page.statsTitle:SetPoint("TOPLEFT", 320, -6)
@@ -119,6 +125,7 @@ ns.UI.RegisterPage("mine", function(page)
       page.quiet:SetText("No molestar: no")
     end
     page.demo:SetChecked(ns.db.settings.demo and true or false)
+    page.minimap:SetChecked(ns.MinimapButton.IsShown())
     local main = ns.Social.MyMain()
     page.mainButton:SetText(ns.ShortName(main))
     local nChars = #ns.Social.MyChars()

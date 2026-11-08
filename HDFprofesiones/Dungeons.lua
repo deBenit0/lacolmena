@@ -270,8 +270,20 @@ end
 -- Elige el grupo: 1 tanque, 1 sanador y 3 DPS. Prueba todas las combinaciones de tanque y
 -- sanador (alguien puede valer para varios roles) y se queda con la que llena más huecos;
 -- si empatan, con la de los mejor colocados (en línea, con nivel, los primeros en apuntarse).
-function Dungeons.Pick(r)
+-- prefer = { [nombre] = 1 (delante de todos) o 3 (detrás de todos) } (para "Rehacer grupo").
+function Dungeons.Pick(r, prefer)
   local list = Dungeons.SignUps(r)
+  if prefer and next(prefer) then
+    local groups = { {}, {}, {} }
+    for _, su in ipairs(list) do
+      local gi = prefer[su.name] or 2
+      groups[gi][#groups[gi] + 1] = su
+    end
+    list = {}
+    for _, grp in ipairs(groups) do
+      for _, su in ipairs(grp) do list[#list + 1] = su end
+    end
+  end
   local tanks, heals = { false }, { false }
   for i, su in ipairs(list) do
     su.rank = i
@@ -396,13 +408,61 @@ function Dungeons.Leave(id, now)
   return r
 end
 
+-- Nombres cortos (en minúsculas) de los que ya están en mi grupo del juego.
+local function partyNames()
+  local set = {}
+  for i = 1, 4 do
+    local name = UnitName and UnitName("party" .. i)
+    if name then set[ns.ShortName(name):lower()] = true end
+  end
+  return set
+end
+
+-- Los cinco del grupo hecho, en orden: tanque, sanador y los DPS.
+function Dungeons.Members(gp)
+  local names = {}
+  if not gp then return names end
+  if gp.t then names[#names + 1] = gp.t end
+  if gp.h then names[#names + 1] = gp.h end
+  for _, name in ipairs(gp.d or {}) do names[#names + 1] = name end
+  return names
+end
+
+-- Hacer el grupo. Si ya estaba hecho ("Rehacer grupo"): los apuntados que ya están en tu grupo
+-- del juego van primero (se quedan) y los elegidos que NO han entrado pasan detrás de todos:
+-- así entran los suplentes en su sitio.
+-- (Antes salía siempre el mismo grupo, porque la elección no cambia si no cambian los apuntados,
+-- y parecía que el botón no hacía nada.)
 function Dungeons.MakeGroup(id, now)
   local r, me = getRun(id), ns.Me()
   if not r then return nil, "La quedada ya no existe." end
   if r.a ~= me then return nil, "Solo quien la propuso puede hacer el grupo." end
   if Dungeons.State(r, now) ~= "open" then return nil, "La quedada ya no está abierta." end
-  local gp = Dungeons.Pick(r)
+  local prefer
+  if r.gp then
+    prefer = {}
+    local party = partyNames()
+    for _, name in ipairs(Dungeons.Members(r.gp)) do
+      if name ~= me and not party[ns.ShortName(name):lower()] then prefer[name] = 3 end
+    end
+    for name in pairs(r.s or {}) do
+      if name == me or party[ns.ShortName(name):lower()] then prefer[name] = 1 end
+    end
+  end
+  local gp = Dungeons.Pick(r, prefer)
   if not gp.t and not gp.h and not gp.d then return nil, "Aún no se ha apuntado nadie." end
+  local function same(a, b)
+    local function norm(x) -- mismo grupo aunque los DPS o suplentes salgan en otro orden
+      local gp = Dungeons.Sanitize({ id = r.id, a = r.a, d = r.d, gp = x }).gp
+      if gp.d then table.sort(gp.d) end
+      if gp.b then table.sort(gp.b) end
+      return Codec.Serialize(gp)
+    end
+    return norm(a) == norm(b)
+  end
+  if r.gp and same(gp, r.gp) then
+    return nil, "No hay más gente apuntada con esos roles: el grupo sale igual."
+  end
   r.gp = gp
   r.av = bump(r.av, now)
   return r
@@ -417,29 +477,96 @@ function Dungeons.Cancel(id, now)
   return r
 end
 
--- Invita a los elegidos (lo hace quien la propuso, al pulsar el botón).
-local function inviteName(full)
+-- "HECHO": el grupo ya fue; la quedada se cierra para todos (como cancelada, que las versiones
+-- anteriores del addon ya entienden: así no hace falta cambiar lo que se envía).
+function Dungeons.Finish(id, now)
+  local r, me = getRun(id), ns.Me()
+  if not r then return nil, "La quedada ya no existe." end
+  if r.a ~= me then return nil, "Solo quien la propuso puede cerrarla." end
+  if not r.gp then return nil, "Primero haz el grupo." end
+  return Dungeons.Cancel(id, now)
+end
+
+---------------------------------------------------------------------------
+-- Invitar
+---------------------------------------------------------------------------
+-- El fallo de la 0.28 ("No se encuentra al jugador 'Xepe CAMWOWEU4Realm4PvP'"): en WoW Forever
+-- cada uno guarda su nombre con el reino que le da su juego (GetNormalizedRealmName), que es un
+-- reino interno distinto para cada uno ("CAMWOWEU4Realm4PvP", "CAMWOWEU5Realm2PvP"...). Como
+-- no coincidía con el mío, se invitaba con "Nombre-ReinoInterno" y el servidor no lo encuentra.
+-- Ahora se prueba primero solo con el nombre y, si el juego dice que no lo encuentra, con el
+-- nombre tal como sale en la lista de la hermandad y por último con "Nombre-Reino".
+local function inviteCandidates(full)
+  local short = ns.ShortName(full)
+  local list, seen = {}, {}
+  local function add(n)
+    if n and n ~= "" and not seen[n] then
+      seen[n] = true
+      list[#list + 1] = n
+    end
+  end
+  add(short)
+  local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(full)
+  if info and info.raw then add(info.raw) end
   local realm = full:match("%-(.+)$")
-  if realm and realm ~= ns.Realm() then return full end
-  return ns.ShortName(full)
+  if realm and realm ~= ns.Realm() then add(short .. "-" .. realm) end
+  return list
+end
+
+local pending = {} -- ["nombre corto en minúsculas"] = { list, i, t }
+
+local function sendInvite(name)
+  local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+  if invite then pcall(invite, name) end
 end
 
 function Dungeons.Invite(r)
   if not r or not r.gp then return 0 end
-  local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  if not invite then return 0 end
+  if not ((C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit) then return 0 end
   local me, n = ns.Me(), 0
-  local names = { r.gp.t, r.gp.h }
-  for _, name in ipairs(r.gp.d or {}) do names[#names + 1] = name end
-  for i = 1, 5 do
-    local name = names[i]
-    if name and name ~= me and not (ns.Demo and ns.Demo.IsDemo(name)) then
-      pcall(invite, inviteName(name))
+  local party = partyNames()
+  for _, name in ipairs(Dungeons.Members(r.gp)) do
+    local short = ns.ShortName(name)
+    if name ~= me and not party[short:lower()] and not (ns.Demo and ns.Demo.IsDemo(name)) then
+      local list = inviteCandidates(name)
+      pending[short:lower()] = { list = list, i = 1, t = GetTime and GetTime() or 0 }
+      sendInvite(list[1])
       n = n + 1
     end
   end
   return n
 end
+
+-- "No se encuentra al jugador '%s'." del juego, convertido en patrón para leer el nombre.
+local notFoundPattern
+do
+  local text = ERR_BAD_PLAYER_NAME_S
+  if type(text) == "string" and text:find("%s", 1, true) then
+    notFoundPattern = "^" .. text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"):gsub("%%%%s", "(.+)") .. "$"
+  end
+end
+
+ns.On("CHAT_MSG_SYSTEM", function(msg)
+  if not next(pending) or type(msg) ~= "string" then return end
+  local who = notFoundPattern and msg:match(notFoundPattern)
+  if not who and (msg:find("encuentra", 1, true) or msg:lower():find("not found", 1, true)) then
+    who = msg:match("'([^']+)'")
+  end
+  if not who then return end
+  local short = (who:match("^([^%s%-]+)") or who):lower()
+  local p = pending[short]
+  if not p then return end
+  local now = GetTime and GetTime() or 0
+  if now - p.t > 20 or p.i >= #p.list then
+    pending[short] = nil
+    if p.i >= #p.list then
+      ns.Print("no he podido invitar a %s. Invítalo a mano (clic derecho en su nombre).", p.list[1])
+    end
+    return
+  end
+  p.i, p.t = p.i + 1, now
+  sendInvite(p.list[p.i])
+end)
 
 -- Borra las quedadas viejas.
 function Dungeons.Purge(now)

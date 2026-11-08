@@ -606,6 +606,12 @@ function Sync.CancelRun(id)
   return afterRunAction(ns.Dungeons.Cancel(id, ns.Now()))
 end
 
+function Sync.FinishRun(id)
+  local r = afterRunAction(ns.Dungeons.Finish(id, ns.Now()))
+  if r then ns.Print("quedada cerrada. ¡Buena mazmorra!") end
+  return r
+end
+
 function Sync.SetUnavailable(value)
   local c = ns.MyChar()
   if not c then return end

@@ -31,6 +31,120 @@ local function roleCounts(r)
 end
 
 ---------------------------------------------------------------------------
+-- Tarjeta del grupo hecho (como la de grupos del juego): corona y nombre de quien lo lleva,
+-- la mazmorra, el estado y 5 huecos redondos (tanque, sanador y 3 DPS) que se llenan con el
+-- icono de la clase de cada uno.
+---------------------------------------------------------------------------
+local CLASS_ICONS = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+local SLOT_ROLES = { "Tanque", "Sanador", "DPS", "DPS", "DPS" }
+
+local function makeSlot(card, i)
+  local slot = CreateFrame("Button", nil, card)
+  slot:SetSize(31, 31)
+  slot:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12 - (5 - i) * 33, -14)
+  slot.bg = slot:CreateTexture(nil, "BACKGROUND")
+  slot.bg:SetSize(20, 20)
+  slot.bg:SetPoint("TOPLEFT", 7, -5)
+  slot.bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+  slot.icon = slot:CreateTexture(nil, "ARTWORK")
+  slot.icon:SetSize(20, 20)
+  slot.icon:SetPoint("TOPLEFT", 7, -5)
+  if slot.CreateMaskTexture then
+    local mask = slot:CreateMaskTexture()
+    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(slot.icon)
+    slot.icon:AddMaskTexture(mask)
+  end
+  slot.ring = slot:CreateTexture(nil, "OVERLAY")
+  slot.ring:SetSize(53, 53)
+  slot.ring:SetPoint("TOPLEFT")
+  slot.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  slot:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    if self.name then
+      GameTooltip:SetText(ns.ShortName(self.name), ns.ClassColor(self.class))
+      local c = self.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.class]
+      GameTooltip:AddLine(SLOT_ROLES[i] .. (c and (" · " .. c) or ""), 1, 1, 1)
+      if self.inParty then GameTooltip:AddLine("Ya está en tu grupo", 0.25, 1, 0.25) end
+    else
+      GameTooltip:SetText(SLOT_ROLES[i])
+      GameTooltip:AddLine("Hueco libre", 0.7, 0.7, 0.7)
+    end
+    GameTooltip:Show()
+  end)
+  slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return slot
+end
+
+local function groupCard(parent)
+  local card = W.Box(parent, 334, 64)
+  if card.SetBackdropColor then
+    card:SetBackdropColor(0.12, 0.09, 0.05, 0.95)
+    card:SetBackdropBorderColor(0.75, 0.6, 0.25, 1)
+  end
+  card.crown = card:CreateTexture(nil, "ARTWORK")
+  card.crown:SetSize(16, 16)
+  card.crown:SetPoint("TOPLEFT", 8, -8)
+  card.crown:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+  card.leader = W.Text(card, "GameFontNormalLarge")
+  card.leader:SetPoint("LEFT", card.crown, "RIGHT", 4, 0)
+  card.leader:SetWidth(150)
+  card.leader:SetWordWrap(false)
+  card.leader:SetTextColor(0.3, 0.75, 1)
+  card.dungeon = W.Text(card, "GameFontHighlightSmall")
+  card.dungeon:SetPoint("TOPLEFT", 28, -28)
+  card.dungeon:SetWidth(150)
+  card.dungeon:SetWordWrap(false)
+  card.dungeon:SetTextColor(0.55, 0.8, 1)
+  card.status = W.Text(card, "GameFontHighlightSmall")
+  card.status:SetPoint("TOPLEFT", 28, -42)
+  card.status:SetWidth(150)
+  card.status:SetWordWrap(false)
+  card.slots = {}
+  for i = 1, 5 do card.slots[i] = makeSlot(card, i) end
+
+  function card:Set(r)
+    local D = ns.Dungeons
+    local gp = r.gp or {}
+    self.leader:SetText(ns.ShortName(r.a))
+    self.dungeon:SetText(D.Dungeon(r.d).name)
+    local missing = D.Missing(gp)
+    if #missing == 0 then
+      self.status:SetText("|cff40ff40Grupo completo|r")
+    else
+      self.status:SetText("|cffffd100Falta: " .. table.concat(missing, ", ") .. "|r")
+    end
+    local party = {}
+    for p = 1, 4 do
+      local name = UnitName and UnitName("party" .. p)
+      if name then party[ns.ShortName(name):lower()] = true end
+    end
+    local names = { gp.t or false, gp.h or false }
+    for k = 1, D.GROUP_SIZE.dps do names[#names + 1] = gp.d and gp.d[k] or false end
+    for i, slot in ipairs(self.slots) do
+      local name = names[i] or nil
+      local su = name and r.s and r.s[name]
+      slot.name = name
+      slot.class = su and su.c
+      slot.inParty = name and (name == ns.Me() or party[ns.ShortName(name):lower()]) or false
+      local coords = slot.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[slot.class]
+      if name and coords then
+        slot.icon:SetTexture(CLASS_ICONS)
+        slot.icon:SetTexCoord(unpack(coords))
+      elseif name then
+        slot.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        slot.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+      else
+        slot.icon:SetTexture(nil)
+      end
+      slot.icon:SetShown(name ~= nil)
+      slot.icon:SetDesaturated(name ~= nil and not slot.inParty and not (ns.Guild and ns.Guild.IsOnline(name)))
+    end
+  end
+  return card
+end
+
+---------------------------------------------------------------------------
 -- Ventana "Proponer mazmorra"
 ---------------------------------------------------------------------------
 local dialog
@@ -246,6 +360,18 @@ ns.UI.RegisterPage("dungeons", function(page)
   detail.group:SetWidth(326)
   detail.group:SetJustifyV("TOP")
   detail.group:SetSpacing(2)
+  detail.card = groupCard(detail)
+  detail.card:SetPoint("TOPLEFT", 8, -162)
+
+  detail.done = W.Button(detail, "HECHO", 84, 22)
+  detail.done:SetPoint("TOPRIGHT", -10, -304)
+  detail.done:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("HECHO")
+    GameTooltip:AddLine("Ya habéis ido: cierra la quedada para todos.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  detail.done:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   local rolesLabel = W.Text(detail, "GameFontNormalSmall")
   rolesLabel:SetPoint("TOPLEFT", 12, -262)
@@ -282,6 +408,8 @@ ns.UI.RegisterPage("dungeons", function(page)
       detail.leave, detail.make, detail.invite, detail.cancel }
     for _, region in ipairs(regions) do region:SetShown(r ~= nil) end
     for _, c in ipairs(detail.checks) do c:SetShown(r ~= nil) end
+    detail.card:SetShown(r ~= nil and r.gp ~= nil)
+    detail.done:SetShown(r ~= nil and r.gp ~= nil and r.a == ns.Me())
     detail.empty:SetShown(r == nil)
     if not r then
       detail.empty:SetText(#list.items > 0 and "Elige una quedada de la lista."
@@ -314,21 +442,12 @@ ns.UI.RegisterPage("dungeons", function(page)
     end
     detail.people:SetText(table.concat(lines, "\n"))
 
-    -- Grupo hecho.
+    -- Grupo hecho: la tarjeta con los 5 huecos y, debajo, suplentes y mi sitio.
+    detail.group:ClearAllPoints()
     if r.gp then
-      local function who(name)
-        if not name then return "|cffff4040falta|r" end
-        local su = r.s and r.s[name]
-        return ns.ColoredName(name, su and su.c)
-      end
-      local dps = {}
-      for i = 1, D.GROUP_SIZE.dps do dps[i] = who(r.gp.d and r.gp.d[i]) end
-      local g = {
-        "|cff40ff40Grupo:|r",
-        "  Tanque: " .. who(r.gp.t),
-        "  Sanador: " .. who(r.gp.h),
-        "  DPS: " .. table.concat(dps, ", "),
-      }
+      detail.card:Set(r)
+      detail.group:SetPoint("TOPLEFT", 12, -230)
+      local g = {}
       local bench = {}
       for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.ShortName(name) end
       if #bench > 0 then g[#g + 1] = "|cffbbbbbbSuplentes: " .. table.concat(bench, ", ") .. "|r" end
@@ -336,6 +455,7 @@ ns.UI.RegisterPage("dungeons", function(page)
       if place then g[#g + 1] = "|cff66ccffTú vas de " .. place .. ".|r" end
       detail.group:SetText(table.concat(g, "\n"))
     else
+      detail.group:SetPoint("TOPLEFT", 12, -170)
       detail.group:SetText(open and "|cffbbbbbbAún no se ha hecho el grupo.|r" or "")
     end
 
@@ -361,6 +481,12 @@ ns.UI.RegisterPage("dungeons", function(page)
     detail.make:SetShown(author)
     detail.invite:SetShown(author)
     detail.cancel:SetShown(author)
+    detail.done:SetEnabled(open)
+    detail.done:SetScript("OnClick", function()
+      W.Confirm("¿Ya habéis hecho la mazmorra? La quedada se cierra para todos.", function()
+        ns.Sync.FinishRun(r.id)
+      end)
+    end)
     detail.make:SetEnabled(open and #signups > 0)
     detail.make:SetText(r.gp and "Rehacer grupo" or "Hacer grupo")
     detail.make:SetScript("OnClick", function() ns.Sync.MakeGroup(r.id) end)
