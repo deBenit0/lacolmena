@@ -49,6 +49,14 @@ ns.UI.RegisterPage("mine", function(page)
     ns.db.settings.sound = checked
   end)
   page.sound:SetPoint("TOPLEFT", 4, -288)
+  -- No molestar (1 h, 3 h, hasta mañana): los avisos se guardan y salen después juntos.
+  page.quiet = W.Button(page, "", 140, 20, function()
+    local opts = ns.Alerts.QUIET_OPTIONS
+    local current = ns.Alerts.IsQuiet() and (ns.db.settings.dndOption or 1) or 1
+    ns.Alerts.SetQuiet(current % #opts + 1, ns.Now())
+    page:Refresh()
+  end)
+  page.quiet:SetPoint("TOPLEFT", 170, -290)
 
   page.demo = W.Check(page, "Modo demostración (jugadores de ejemplo, solo los ves tú)", function(checked)
     ns.Demo.Set(checked)
@@ -99,6 +107,11 @@ ns.UI.RegisterPage("mine", function(page)
     page.unavailable:SetChecked(c.u and true or false)
     page.alerts:SetChecked(ns.db.settings.alerts and true or false)
     page.sound:SetChecked(ns.db.settings.sound and true or false)
+    if ns.Alerts.IsQuiet() then
+      page.quiet:SetText("No molestar: " .. ns.FormatDuration(ns.Alerts.QuietUntil() - ns.Now()))
+    else
+      page.quiet:SetText("No molestar: no")
+    end
     page.demo:SetChecked(ns.db.settings.demo and true or false)
     local main = ns.Social.MyMain()
     page.mainButton:SetText(ns.ShortName(main))

@@ -54,12 +54,52 @@ local function createPanel()
   panel:SetClampedToScreen(true)
   panel:SetMovable(true)
   panel:RegisterForDrag("LeftButton")
-  panel:SetScript("OnDragStart", function(self)
-    if not self.host then self:StartMoving() end
+  -- Se puede arrastrar a cualquier sitio: se recuerda dónde la dejaste.
+  panel:SetScript("OnDragStart", function(self) self:StartMoving() end)
+  panel:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    UI.SavePosition()
   end)
-  panel:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
   panel:Hide()
   tinsert(UISpecialFrames, "HDFProfPanel")
+  panel:SetScale(UI.SavedScale())
+
+  -- Asa para cambiar el tamaño (escala) arrastrando la esquina. Clic derecho: por defecto.
+  local grip = CreateFrame("Button", nil, panel)
+  grip:SetSize(16, 16)
+  grip:SetPoint("BOTTOMRIGHT", -4, 4)
+  grip:SetFrameLevel(panel:GetFrameLevel() + 20)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  grip:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" or not GetCursorPosition then return end
+    local x = GetCursorPosition()
+    self.startX, self.startScale = x / UIParent:GetEffectiveScale(), panel:GetScale()
+  end)
+  grip:SetScript("OnUpdate", function(self)
+    if not self.startX or not GetCursorPosition then return end
+    local x = GetCursorPosition() / UIParent:GetEffectiveScale()
+    UI.SetScale(self.startScale * (1 + (x - self.startX) / (640 * self.startScale)))
+  end)
+  grip:SetScript("OnMouseUp", function(self, button)
+    if button == "RightButton" then
+      UI.ResetWindow()
+    elseif self.startX then
+      self.startX = nil
+      ns.db.settings.panelScale = panel:GetScale()
+    end
+  end)
+  grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Tamaño de la ventana")
+    GameTooltip:AddLine("Arrastra para hacerla más grande o más pequeña.", 1, 1, 1, true)
+    GameTooltip:AddLine("Clic derecho: tamaño y posición por defecto.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  panel.grip = grip
 
   panel.title = W.Text(panel, "GameFontNormal")
   panel.title:SetPoint("TOPLEFT", 22, -18)
@@ -186,7 +226,12 @@ function UI.Open(pageId, selectId, host)
   if not panel then createPanel() end
   host = host or visibleHost()
   panel:ClearAllPoints()
-  if host and host:IsVisible() then
+  local pos = ns.db and ns.db.settings.panelPos
+  if pos then
+    -- donde la dejó la última vez (sigue cerrándose con la ventana de hermandad)
+    panel.host = host and host:IsVisible() and host or nil
+    panel:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+  elseif host and host:IsVisible() then
     panel.host = host
     panel:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 50, 0)
   else
@@ -198,6 +243,37 @@ function UI.Open(pageId, selectId, host)
   if selectId then
     local f = panel.pageFrames[UI.current]
     if f and f.SelectById then f:SelectById(selectId) end
+  end
+end
+
+-- Tamaño y posición de la ventana (se recuerdan).
+UI.MIN_SCALE, UI.MAX_SCALE = 0.7, 1.6
+
+function UI.SavedScale()
+  local s = ns.db and tonumber(ns.db.settings.panelScale) or 1
+  return math.max(UI.MIN_SCALE, math.min(UI.MAX_SCALE, s))
+end
+
+function UI.SetScale(scale)
+  if not panel then return end
+  scale = math.max(UI.MIN_SCALE, math.min(UI.MAX_SCALE, scale or 1))
+  panel:SetScale(scale)
+  if ns.db then ns.db.settings.panelScale = scale end
+end
+
+function UI.SavePosition()
+  if not panel or not ns.db then return end
+  local point, _, relPoint, x, y = panel:GetPoint(1)
+  if point then ns.db.settings.panelPos = { point, relPoint or point, x or 0, y or 0 } end
+end
+
+function UI.ResetWindow()
+  if not ns.db then return end
+  ns.db.settings.panelPos = nil
+  ns.db.settings.panelScale = nil
+  if panel then
+    panel:SetScale(1)
+    if panel:IsShown() then UI.Open(UI.current, nil, panel.host) end
   end
 end
 

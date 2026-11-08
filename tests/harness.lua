@@ -169,6 +169,19 @@ function Frame:Disable() self._enabled = false end
 function Frame:SetEnabled(v) self._enabled = v and true or false end
 function Frame:IsEnabled() return self._enabled end
 function Frame:GetFrameLevel() return 1 end
+-- Escala y anclajes (para la ventana que se puede mover y agrandar).
+function Frame:SetScale(v) self._scale = v end
+function Frame:GetScale() return rawget(self, "_scale") or 1 end
+function Frame:ClearAllPoints() self._points = {} end
+function Frame:SetPoint(point, rel, relPoint, x, y)
+  self._points = rawget(self, "_points") or {}
+  if type(rel) == "number" then rel, relPoint, x, y = nil, point, rel, relPoint end
+  self._points[#self._points + 1] = { point, rel, relPoint or point, x or 0, y or 0 }
+end
+function Frame:GetPoint(i)
+  local p = (rawget(self, "_points") or {})[i or 1]
+  if p then return p[1], p[2], p[3], p[4], p[5] end
+end
 function Frame:SetID(id) self._id = id end
 function Frame:GetID() return rawget(self, "_id") or 0 end
 function Frame:IsMouseOver() return false end
@@ -239,7 +252,7 @@ end
 -- Clientes
 ---------------------------------------------------------------------------
 local ADDON_FILES = {
-  "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Offers.lua", "Social.lua", "Missing.lua", "Dungeons.lua", "Demo.lua", "Preload.lua", "Alerts.lua",
+  "Core.lua", "Codec.lua", "RecipeDB.lua", "Comm.lua", "Data.lua", "Guild.lua", "Scan.lua", "Sync.lua", "Mail.lua", "Offers.lua", "Social.lua", "Orders.lua", "Missing.lua", "Dungeons.lua", "Demo.lua", "Preload.lua", "Alerts.lua",
   "UI/Widgets.lua", "UI/Main.lua", "UI/Home.lua", "UI/Board.lua", "UI/Catalog.lua", "UI/Requests.lua", "UI/Mine.lua", "UI/Dialog.lua", "UI/Dungeons.lua", "UI/Guild.lua", "UI/Diag.lua", "QoL.lua",
 }
 

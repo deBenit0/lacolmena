@@ -130,6 +130,7 @@ function Data.SanitizeEntry(e)
   end
   if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
   if ns.Social then ns.Social.SanitizeInto(out, e) end -- alts, oficiales, necesidades, ayudas
+  if ns.Orders then ns.Orders.SanitizeInto(out, e) end -- pedidos de fabricación de hermandad
   return out
 end
 
@@ -203,6 +204,7 @@ function Data.BuildMyEntry(now)
   e.p = anyProf and profs or nil
   if ns.Offers then ns.Offers.BuildInto(e, now) end
   if ns.Social then ns.Social.BuildInto(e, now) end
+  if ns.Orders then ns.Orders.BuildInto(e, now) end
   return e
 end
 

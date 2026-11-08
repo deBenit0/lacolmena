@@ -10,7 +10,38 @@ local frame, showing, hideToken
 local SHOW_SECONDS = 15
 local MAX_AGE = 86400 -- no avisar de peticiones de hace más de un día
 
+-- "No molestar": hasta esta hora (del addon) los avisos se guardan sin mostrarse.
+function Alerts.QuietUntil()
+  return ns.db and ns.db.settings.dndUntil or 0
+end
+
+function Alerts.IsQuiet()
+  return ns.Now() < Alerts.QuietUntil()
+end
+
+-- Opciones de "No molestar": nil (no), 1 h, 3 h y hasta mañana a las 9:00.
+Alerts.QUIET_OPTIONS = { { label = "no" }, { label = "1 hora", secs = 3600 }, { label = "3 horas", secs = 3 * 3600 },
+  { label = "hasta mañana", tomorrow = true } }
+
+function Alerts.SetQuiet(option, now)
+  local o = Alerts.QUIET_OPTIONS[option]
+  local untilT
+  if o and o.secs then
+    untilT = now + o.secs
+  elseif o and o.tomorrow then
+    -- mañana a las 9:00 (hora del ordenador); si no se puede saber, 12 horas
+    local left = 12 * 3600
+    local t = date and date("*t")
+    if type(t) == "table" and t.hour then left = (24 - t.hour + 9) * 3600 - (t.min or 0) * 60 end
+    untilT = now + left
+  end
+  ns.db.settings.dndUntil = untilT
+  ns.db.settings.dndOption = untilT and option or 1
+  if not untilT then ns.After(1, Alerts.Flush) end
+end
+
 local function canShowNow()
+  if Alerts.IsQuiet() then return false end
   if InCombatLockdown and InCombatLockdown() then return false end
   if UnitAffectingCombat and UnitAffectingCombat("player") then return false end
   local inInstance = IsInInstance and IsInInstance()
@@ -107,10 +138,20 @@ function Alerts.Flush()
   show(table.remove(queue, 1))
 end
 
+-- El mismo aviso no se repite en 10 minutos.
+Alerts.DEDUP_SECONDS = 600
+local recent = {}
+
 function Alerts.Push(alert)
   if not ns.db or not ns.db.settings.alerts then return end
   local c = ns.MyChar()
   if c and c.u then return end -- "no disponible": sin avisos
+  local now, key = GetTime(), alert.text or ""
+  if recent[key] and now - recent[key] < Alerts.DEDUP_SECONDS then return end
+  recent[key] = now
+  for k, t in pairs(recent) do
+    if now - t > Alerts.DEDUP_SECONDS then recent[k] = nil end
+  end
   queue[#queue + 1] = alert
   Alerts.Flush()
 end
@@ -277,6 +318,7 @@ end
 C_Timer.NewTicker(60, function()
   ns.SafeCall(Alerts.CheckDeadlines)
   ns.SafeCall(Alerts.CheckRuns)
+  ns.SafeCall(Alerts.Flush) -- lo guardado durante "No molestar" o el combate
   if ns.UI and ns.UI.IsShown() then ns.UI.Refresh() end -- para que corran los plazos en pantalla
 end)
 ns.On("PLAYER_REGEN_ENABLED", function() ns.After(1, Alerts.Flush) end)

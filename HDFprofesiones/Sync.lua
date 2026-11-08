@@ -146,12 +146,14 @@ local function schedule(kind, id, delay, ver)
     local p = pending[key]
     if not p or p.token ~= token then return end
     pending[key] = nil
+    -- Lo importante primero: pedidos y quedadas salen con prioridad alta; las fichas
+    -- (recetas, ofertas...) con la normal, detrás.
     if kind == "P" then
       Sync.PushEntry(id, nil, since)
     elseif kind == "Q" then
-      Sync.PushRequest(id, nil, since)
+      Sync.PushRequest(id, "high", since)
     elseif kind == "M" then
-      Sync.PushRun(id, nil, since)
+      Sync.PushRun(id, "high", since)
     elseif kind == "I" then
       Sync.PushInfo(id, since)
     end
@@ -273,7 +275,8 @@ Comm.Register("H", function(sender, payload)
   for name, ent in pairs(g.entries) do
     local v = theirE[name]
     if (not v or v < ent.v) and Guild.Accepts(name) then
-      schedule("P", name, name == me and rand(0.2, 1) or rand(2, 8), ent.v)
+      -- Las fichas de otros, un poco después: así no tapan a los pedidos.
+      schedule("P", name, name == me and rand(0.2, 1) or rand(4, 10), ent.v)
     end
   end
   for id, req in pairs(g.requests) do

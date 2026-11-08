@@ -128,6 +128,18 @@ local function collect(seenAt)
     if item.new then stats.new = stats.new + 1 end
     items[#items + 1] = item
   end
+  -- Pedidos de fabricación de hermandad hechos en la mesa de Blizzard (los cogen allí).
+  for _, o in ipairs(ns.Orders.List(now)) do
+    local mine = o.owner == me
+    local item = {
+      kind = "co", id = "co:" .. o.id, k = o.key, author = o.owner, t = o.t, order = o,
+      me = me, now = now, mine = mine, pending = 0, karma = Data.KarmaFor(o.owner),
+      canServe = not mine and ns.Orders.CanMake(o), new = not mine and o.t > (seenAt or 0),
+    }
+    if item.canServe then stats.servable = stats.servable + 1 end
+    if item.new then stats.new = stats.new + 1 end
+    items[#items + 1] = item
+  end
   -- Pedidos de la hermandad (los ponen los oficiales; aportan varios).
   for _, n in ipairs(ns.Social.Needs(now)) do
     if n.left > 0 then
@@ -505,6 +517,25 @@ ns.UI.RegisterPage("board", function(page)
     end
   end
 
+  -- Pedido de fabricación de Blizzard: se coge en la ventana de profesión, no aquí.
+  local function updateOrderRow(row, item)
+    local o = item.order
+    local tags = "|cff40c0ff[Pedido de Blizzard]|r "
+    if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
+    if item.mine then tags = tags .. "|cff999999[Tuyo]|r " end
+    local title = tags .. ns.KeyLabel(item.k)
+    if item.canServe then title = title .. "  |cff40ff40(puedes hacerlo)|r" end
+    row.title:SetText(title)
+    row.sub:SetText(string.format("Lo pide %s en los pedidos de fabricación de la hermandad  |cff666666·|r  hace %s",
+      ns.Social.Who(o.owner), ns.FormatDuration(item.now - o.t)))
+    row.mats:SetText(item.mine and "|cff999999Lo verán quienes saben hacerlo.|r"
+      or "|cffbbbbbbCógelo en tu profesión: pestaña Pedidos → Hermandad (puede que ya esté hecho).|r")
+    row.view:Hide()
+    row.accept:SetText("Ocultar")
+    row.accept:SetEnabled(true)
+    row.accept:SetScript("OnClick", function() ns.Orders.Dismiss(o.id) end)
+  end
+
   -- Pedido de la hermandad: aportan varios, cada uno lo que pueda.
   local function updateNeedRow(row, item)
     local n = item.need
@@ -635,6 +666,8 @@ ns.UI.RegisterPage("board", function(page)
         updateOfferRow(row, item)
       elseif item.kind == "need" then
         updateNeedRow(row, item)
+      elseif item.kind == "co" then
+        updateOrderRow(row, item)
       else
         updateRequestRow(row, item)
       end

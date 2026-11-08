@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.23.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.24.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -163,6 +163,16 @@ los materiales que te faltan (contando bolsas y banco):
 - **Bienvenida a nuevos**: cuando alguien entra en la hermandad, a los oficiales les salta un
   aviso y uno de ellos (solo uno) le susurra una bienvenida con el recordatorio de instalar el
   addon. Se puede desactivar en *Hermandad* (casilla para oficiales).
+- **Pedidos de fabricación de Blizzard** (Forever): si publicas en la mesa de pedidos un pedido
+  para la **hermandad**, el addon avisa a quien sabe fabricarlo y lo pone en su Tablón como
+  *[Pedido de Blizzard]* (se coge en la profesión → Pedidos → Hermandad). Se puede ocultar.
+- **Avisos tranquilos**: el mismo aviso no se repite en 10 minutos, varios seguidos se agrupan, y
+  en *Mis cosas* hay **No molestar** (1 hora, 3 horas o hasta mañana): los avisos se guardan y
+  salen después.
+- **Ventana a tu gusto**: se puede arrastrar a cualquier sitio y agrandar o achicar con el asa de
+  la esquina inferior derecha (clic derecho en el asa: como estaba). Se recuerda.
+- **Al entrar, lo importante primero**: los pedidos y quedadas se envían antes que las fichas de
+  recetas, para que lleguen antes cuando se conectan muchos a la vez.
 - **Resumen al entrar**: al conectarte, una ventanita con lo que ha pasado mientras no estabas
   (pedidos tuyos aceptados o entregados, pedidos nuevos que puedes hacer, ofertas tuyas pedidas,
   pedidos de hermandad, quedadas y el anuncio).

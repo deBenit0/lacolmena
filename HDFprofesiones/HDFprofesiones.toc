@@ -2,7 +2,7 @@
 ## Title: Los hijos del Fundillo
 ## Notes: Profesiones de Los hijos del Fundillo: qué fabrica cada uno y qué necesita la hermandad.
 ## Author: Los hijos del Fundillo
-## Version: 0.23.1
+## Version: 0.24.0
 ## IconTexture: Interface\Icons\Trade_Engineering
 ## SavedVariables: HDFProfesionesDB
 
@@ -17,6 +17,7 @@ Sync.lua
 Mail.lua
 Offers.lua
 Social.lua
+Orders.lua
 Missing.lua
 Dungeons.lua
 Demo.lua
