@@ -19,6 +19,8 @@ permissions:
 jobs:
   publicar:
     runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -65,3 +67,35 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Los hijos del Fundillo $TAG" \
             --notes-file notas.md
+
+      # CurseForge (opcional): solo si el repositorio tiene el secreto CF_API_KEY y la variable
+      # CF_PROJECT_ID (Settings → Secrets and variables → Actions). Sube el mismo ZIP marcado
+      # para WoW Forever. Si la versión ya está subida, CurseForge la rechaza y no pasa nada.
+      - name: Subir a CurseForge
+        if: ${{ env.CF_API_KEY != '' && vars.CF_PROJECT_ID != '' }}
+        continue-on-error: true
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          API=https://wow.curseforge.com/api
+          ZIP="HDFprofesiones-$TAG-forever.zip"
+          [ -f "$ZIP" ] || zip -r -q "$ZIP" HDFprofesiones
+          # Tipo de versión de juego de WoW Forever y su versión más reciente.
+          curl -sf -H "X-Api-Token: $CF_API_KEY" "$API/game/version-types" > types.json
+          curl -sf -H "X-Api-Token: $CF_API_KEY" "$API/game/versions" > versions.json
+          GV=$(python3 - <<'PY'
+          import json
+          types = json.load(open("types.json"))
+          ids = [t["id"] for t in types if "forever" in (t.get("slug","") + t.get("name","")).lower()]
+          vers = [v for v in json.load(open("versions.json")) if v.get("gameVersionTypeID") in ids]
+          vers.sort(key=lambda v: v["id"])
+          print(vers[-1]["id"] if vers else "")
+          PY
+          )
+          if [ -z "$GV" ]; then echo "No encuentro la versión de juego de WoW Forever en CurseForge"; exit 1; fi
+          META=$(printf '{"changelog":"Versión %s","changelogType":"text","displayName":"%s","releaseType":"release","gameVersions":[%s]}' "$TAG" "$TAG" "$GV")
+          curl -sf -H "X-Api-Token: $CF_API_KEY" -F "metadata=$META" -F "file=@$ZIP" \
+            "$API/projects/$CF_PROJECT_ID/upload-file"
+          echo "Subido a CurseForge."
