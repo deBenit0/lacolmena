@@ -19,10 +19,29 @@ local PANEL = {
   insets = { left = 11, right = 12, top = 12, bottom = 11 },
 }
 
+-- Ventana opaca, como las del juego: el fondo de diálogo de Blizzard es medio transparente,
+-- así que debajo va un color sólido oscuro (el backdrop solo pone el borde).
+local PANEL_EDGE = {
+  edgeFile = PANEL.edgeFile, tile = true, tileSize = 32, edgeSize = 32,
+  insets = PANEL.insets,
+}
+
 function W.Panel(name, parent, width, height)
   local f = CreateFrame("Frame", name, parent or UIParent, BACKDROP_TEMPLATE)
   f:SetSize(width, height)
-  if f.SetBackdrop then f:SetBackdrop(PANEL) end
+  local solid = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+  solid:SetColorTexture(0.05, 0.045, 0.04, 1)
+  solid:SetPoint("TOPLEFT", 11, -12)
+  solid:SetPoint("BOTTOMRIGHT", -12, 11)
+  local tex = f:CreateTexture(nil, "BACKGROUND", nil, -7)
+  tex:SetTexture(PANEL.bgFile, "REPEAT", "REPEAT")
+  if tex.SetHorizTile then
+    tex:SetHorizTile(true)
+    tex:SetVertTile(true)
+  end
+  tex:SetAllPoints(solid)
+  f.bgSolid, f.bgTex = solid, tex
+  if f.SetBackdrop then f:SetBackdrop(PANEL_EDGE) end
   f:EnableMouse(true)
   return f
 end

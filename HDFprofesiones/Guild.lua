@@ -63,6 +63,26 @@ function Guild.Accepts(name)
   return false
 end
 
+-- Busca a alguien en la lista aunque su nombre lleve otro reino: primero el nombre exacto, luego
+-- el comparable y por último el nombre corto (si solo hay uno así).
+function Guild.Find(name)
+  if type(name) ~= "string" then return nil end
+  if roster[name] then return roster[name], name end
+  local want = loose(name)
+  for n, r in pairs(roster) do
+    if loose(n) == want then return r, n end
+  end
+  local short = ns.ShortName(name):lower()
+  local found, foundName
+  for n, r in pairs(roster) do
+    if ns.ShortName(n):lower() == short then
+      if found then return nil end -- hay dos con ese nombre: no adivinar
+      found, foundName = r, n
+    end
+  end
+  return found, foundName
+end
+
 function Guild.RequestRoster()
   if not (IsInGuild and IsInGuild()) then return end
   if C_GuildInfo and C_GuildInfo.GuildRoster then
@@ -116,6 +136,7 @@ function Guild.Refresh()
   for i = 1, total do
     local name, _, rankIndex, level, _, _, _, _, online, _, classFile = GetGuildRosterInfo(i)
     if name then
+      local raw = name -- tal como lo da el juego (para invitar)
       name = ns.FullName(name)
       count = count + 1
       local seen
@@ -127,7 +148,8 @@ function Guild.Refresh()
           seen = now - ((((years or 0) * 365 + (months or 0) * 30 + (days or 0)) * 24 + (hours or 0)) * 3600)
         end
       end
-      fresh[name] = { online = online and true or false, rank = rankIndex, level = level, class = classFile, seen = seen }
+      fresh[name] = { online = online and true or false, rank = rankIndex, level = level, class = classFile, seen = seen,
+        raw = raw }
     end
   end
   wipe(roster)

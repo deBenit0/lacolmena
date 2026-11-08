@@ -24,7 +24,7 @@ local PAGES = {
   { id = "equipment", section = "orders", label = "Pedir equipo", tab = "equipment" },
   { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
   { id = "guild", section = "orders", label = "Hermandad", tab = "guild" },
-  { id = "mine", section = "orders", label = "Mis cosas", tab = "mine" },
+  { id = "mine", section = "home" }, -- "Opciones": se entra desde Inicio
   { id = "dungeons", section = "dungeons" },
 }
 local PAGE_BY_ID = {}
@@ -127,7 +127,7 @@ local function createPanel()
       end)
       b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     elseif s.id == "orders" then
-      b:SetScript("OnClick", function() UI.ShowPage(UI.lastOrders or "board") end)
+      b:SetScript("OnClick", function() UI.ShowPage("board") end) -- siempre al Tablón
     else
       b:SetScript("OnClick", function() UI.ShowPage(s.id) end)
     end
@@ -283,11 +283,12 @@ function UI.ResetWindow()
   end
 end
 
+-- Abrir (desde la pestaña o el minimapa) siempre lleva a Inicio.
 function UI.Toggle(host)
-  if panel and panel:IsShown() and panel.host == host then
+  if panel and panel:IsShown() and (panel.host == host or not host) then
     panel:Hide()
   else
-    UI.Open(nil, nil, host)
+    UI.Open("home", nil, host)
   end
 end
 
@@ -413,7 +414,7 @@ function UI.AttachHost(host)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(ns.TITLE)
     GameTooltip:AddLine(ns.MOTTO, 1, 0.45, 0.1)
-    GameTooltip:AddLine("Pedidos de la hermandad (pronto: mazmorras y eventos)", 1, 1, 1)
+    GameTooltip:AddLine("Pedidos y mazmorras de la hermandad", 1, 1, 1)
     GameTooltip:Show()
   end)
   tab:SetScript("OnLeave", function() GameTooltip:Hide() end)

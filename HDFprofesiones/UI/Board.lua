@@ -542,9 +542,19 @@ ns.UI.RegisterPage("board", function(page)
     row.mats:SetText(item.mine and "|cff999999Lo verán quienes saben hacerlo.|r"
       or "|cffbbbbbbCógelo en tu profesión: pestaña Pedidos → Hermandad (puede que ya esté hecho).|r")
     row.view:Hide()
-    row.accept:SetText("Ocultar")
-    row.accept:SetEnabled(true)
-    row.accept:SetScript("OnClick", function() ns.Orders.Dismiss(o.id) end)
+    if item.mine then
+      -- Mío: borrarlo para todos (en la mesa de Blizzard se cancela aparte).
+      row.accept:SetText("Borrar pedido")
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function()
+        W.Confirm("¿Borrar este aviso de pedido? Dejará de salir a los demás.\n(En la mesa de pedidos del juego "
+          .. "cancélalo tú allí.)", function() ns.Orders.Remove(o.id) end)
+      end)
+    else
+      row.accept:SetText("Ocultar")
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function() ns.Orders.Dismiss(o.id) end)
+    end
   end
 
   -- Pedido de la hermandad: aportan varios, cada uno lo que pueda.
@@ -756,7 +766,7 @@ ns.UI.RegisterPage("board", function(page)
     if none then
       local filtered = #all > 0
       page.empty:SetText(filtered and "No hay nada con estos filtros."
-        or "No hay pedidos ni ofertas ahora mismo.\n|cff999999(Para ver ejemplos, activa el modo demostración en Mis cosas.)|r")
+        or "No hay pedidos ni ofertas ahora mismo.\n|cff999999(Para ver ejemplos, activa el modo demostración en Inicio → Opciones.)|r")
     end
   end
 
