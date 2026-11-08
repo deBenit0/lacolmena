@@ -101,6 +101,95 @@ function Scan.TradeSkill()
 end
 
 ---------------------------------------------------------------------------
+-- Ventana de profesiones moderna (WoW Forever): C_TradeSkillUI. En Forever no existen las
+-- funciones clásicas (GetNumTradeSkills...); la ventana es ProfessionsFrame.
+---------------------------------------------------------------------------
+local function modernAPI()
+  local T = C_TradeSkillUI
+  if T and T.GetBaseProfessionInfo and T.GetRecipeInfo and T.GetRecipeSchematic then return T end
+end
+Scan.ModernAPI = modernAPI
+
+-- ¿Estoy viendo mis propias recetas? (no las de otro jugador, la hermandad o un PNJ)
+local function viewingOwn(T)
+  for _, fn in ipairs({ "IsTradeSkillLinked", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsNPCCrafting" }) do
+    if T[fn] and T[fn]() then return false end
+  end
+  return true
+end
+
+-- Profesión abierta: clave (línea de habilidad), nivel y máximo.
+function Scan.ModernProfession()
+  local T = modernAPI()
+  if not T or not viewingOwn(T) then return nil end
+  local base = T.GetBaseProfessionInfo()
+  if type(base) ~= "table" or not base.professionID or base.professionID == 0 then return nil end
+  local pk
+  if ns.PROFESSIONS[base.professionID] then
+    pk = base.professionID
+  elseif base.parentProfessionID and ns.PROFESSIONS[base.parentProfessionID] then
+    pk = base.parentProfessionID
+  else
+    pk = ns.ProfessionKey(base.professionName or "") or ns.ProfessionKey(base.parentProfessionName or "")
+  end
+  local child = T.GetChildProfessionInfo and T.GetChildProfessionInfo()
+  local lvl = (type(child) == "table" and (child.skillLevel or 0) > 0) and child or base
+  return pk, lvl.skillLevel, lvl.maxSkillLevel
+end
+
+-- Materiales básicos de una receta: { [objeto] = n }, o nil si aún no se sabe alguno.
+function Scan.ModernReagents(schematic)
+  if type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then return nil end
+  local basic = Enum and Enum.CraftingReagentType and Enum.CraftingReagentType.Basic
+  local reagents, any = {}, false
+  for _, slot in ipairs(schematic.reagentSlotSchematics) do
+    local isBasic = basic == nil or slot.reagentType == basic
+    local first = slot.reagents and slot.reagents[1]
+    if isBasic and slot.required ~= false and first and first.itemID then
+      reagents[first.itemID] = (reagents[first.itemID] or 0) + (slot.quantityRequired or 1)
+      any = true
+    end
+  end
+  return any and reagents or nil
+end
+
+-- Objeto que fabrica una receta (nil si es un encantamiento u otra cosa sin objeto).
+function Scan.ModernOutput(recipeID, schematic)
+  local T = modernAPI()
+  local id = schematic and schematic.outputItemID
+  if (not id or id == 0) and T and T.GetRecipeOutputItemData then
+    local ok, out = pcall(T.GetRecipeOutputItemData, recipeID)
+    id = ok and type(out) == "table" and out.itemID or nil
+  end
+  return (id and id > 0) and id or nil
+end
+
+function Scan.ModernRow(recipeID)
+  local T = modernAPI()
+  local info = T and T.GetRecipeInfo(recipeID)
+  if type(info) ~= "table" or not info.learned then return nil end
+  local schematic = T.GetRecipeSchematic(recipeID, false)
+  local itemID = Scan.ModernOutput(recipeID, schematic)
+  local row = { key = itemID and ("i" .. itemID) or ("e" .. recipeID),
+    made = (type(schematic) == "table" and schematic.quantityMin and schematic.quantityMin > 0) and schematic.quantityMin or 1 }
+  row.reagents = Scan.ModernReagents(schematic)
+  if T.GetRecipeCooldown then
+    local ok, cd = pcall(T.GetRecipeCooldown, recipeID)
+    if ok and type(cd) == "number" then row.cooldown = cd end
+  end
+  return row
+end
+
+function Scan.Modern()
+  local T = modernAPI()
+  if not T then return end
+  local pk, rank, maxRank = Scan.ModernProfession()
+  if not pk then return end
+  local ids = (T.GetAllRecipeIDs and T.GetAllRecipeIDs()) or (T.GetFilteredRecipeIDs and T.GetFilteredRecipeIDs()) or {}
+  scanRows(pk, rank, maxRank, #ids, function(i) return Scan.ModernRow(ids[i]) end)
+end
+
+---------------------------------------------------------------------------
 -- Ventana de encantamiento (en Classic usa otra interfaz)
 ---------------------------------------------------------------------------
 local function craftRow(i)
@@ -234,7 +323,12 @@ end
 ---------------------------------------------------------------------------
 -- Eventos
 ---------------------------------------------------------------------------
-ns.On("TRADE_SKILL_SHOW", function() ns.After(0.5, Scan.TradeSkill) end)
+ns.On("TRADE_SKILL_SHOW", function()
+  ns.After(0.5, Scan.TradeSkill)
+  ns.After(1, Scan.Modern)
+end)
+-- Ventana moderna (Forever): la lista llega (o cambia) con este evento.
+ns.On("TRADE_SKILL_LIST_UPDATE", function() ns.Coalesce("scanModern", 1, Scan.Modern) end)
 ns.On("TRADE_SKILL_UPDATE", function() ns.Coalesce("scanTrade", 1, Scan.TradeSkill) end)
 ns.On("CRAFT_SHOW", function() ns.After(0.5, Scan.Craft) end)
 ns.On("CRAFT_UPDATE", function() ns.Coalesce("scanCraft", 1, Scan.Craft) end)

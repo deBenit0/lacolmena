@@ -86,7 +86,16 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
 5. Si alguno tiene un **alt**: entra con él una vez. → Sale como "Alt (Principal)" y su karma es
    el mismo que el del principal.
 
-## 5. Al terminar (los dos)
+## 5. Calidad de vida
+
+1. Pasa el ratón por un objeto que fabrique el otro (en tus bolsas o en el chat).
+   → En el tooltip sale "Los hijos del Fundillo: lo dan ..." con su nombre.
+2. Repite un pedido del paso 1 pero entrégalo **comerciando en mano** en vez de por correo.
+   → Al completarse el comercio, el pedido se marca como entregado solo.
+3. Sal del juego, que el otro haga algo (aceptar un pedido tuyo, publicar un anuncio) y vuelve.
+   → Al minuto de entrar sale la ventanita **"Mientras no estabas"**.
+
+## 6. Al terminar (los dos)
 
 1. Salid del juego y volved a entrar. → Siguen los pedidos, ofertas, quedadas y el karma.
 2. Pulsa **Comprobar el addon** otra vez y, si hay errores guardados, **Copiar informe** y

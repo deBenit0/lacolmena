@@ -15,3 +15,9 @@
   Si faltan: `apt-get install -y lua5.1 lua-check`.
 - Las pruebas simulan WoW (`tests/harness.lua`) con varios jugadores conectados por una red falsa.
 - Sin comando de barra ni botón de minimapa: el addon se abre desde la ventana de hermandad (decisión del usuario).
+- **WoW Forever usa el cliente moderno** (tipo de juego interno "camelot", versión 1.60.x), NO la interfaz de
+  Classic Era: profesiones con `ProfessionsFrame` + `C_TradeSkillUI` (no existen `GetNumTradeSkills`,
+  `TradeSkillReagent1`...), hermandad con Comunidades, chat con `ChatFrameUtil`. Antes de usar cualquier
+  función o ventana del juego, verificarla contra la rama **`forever`** de `Gethe/wow-ui-source`
+  (`git clone --depth 1 --branch forever --filter=blob:none https://github.com/Gethe/wow-ui-source`).
+  El addon mantiene también el camino clásico por compatibilidad.

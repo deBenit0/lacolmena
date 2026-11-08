@@ -34,19 +34,43 @@ local CHECKS = {
     return nil, "aún no has visto a nadie más con el addon"
   end },
   { "Ventana de profesión", function()
+    if ProfessionsFrame then
+      local form = ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
+      local ok = form ~= nil and form.reagentSlotPool ~= nil and C_TradeSkillUI ~= nil
+      return ok, ok and "ventana moderna (Forever) encontrada" or "no encuentro el formulario de la receta"
+    end
     if not TradeSkillFrame then return nil, "abre una profesión y vuelve a comprobar" end
     local ok = TradeSkillReagent1 ~= nil and TradeSkillCreateButton ~= nil and GetTradeSkillReagentItemLink ~= nil
     return ok, ok and "materiales y botón Crear encontrados" or "no encuentro las casillas de materiales"
   end },
   { "Botón \"Pedir\" en los materiales", function()
+    if ProfessionsFrame then
+      local form = ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
+      local ok = form and form.hdfHooked
+      return ok and true or false, ok and "enganchado (ventana moderna)" or "no se ha podido enganchar"
+    end
     if not TradeSkillFrame then return nil, "abre una profesión y vuelve a comprobar" end
     local ok = TradeSkillReagent1 and TradeSkillReagent1.hdfHooked
     return ok and true or false, ok and "enganchado" or "no se ha podido enganchar"
   end },
   { "Botón \"Ofrecer\" en lo que fabricas", function()
+    if ProfessionsFrame then
+      local form = ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
+      local ok = form and form.hdfOffer ~= nil
+      return ok and true or false, ok and "listo (ventana moderna)" or "elige una receta y vuelve a comprobar"
+    end
     if not TradeSkillFrame then return nil, "abre una profesión y vuelve a comprobar" end
     local ok = TradeSkillSkillIcon and TradeSkillSkillIcon.hdfOffer
     return ok and true or false, ok and "enganchado" or "no encuentro el icono del objeto"
+  end },
+  { "Recetas leídas (Forever)", function()
+    if not ns.Scan.ModernAPI() then return nil, "este cliente usa la ventana clásica" end
+    local c, n = ns.MyChar(), 0
+    for _, prof in pairs(c and c.profs or {}) do
+      for _ in pairs(prof.recipes or {}) do n = n + 1 end
+    end
+    if n > 0 then return true, n .. " recetas guardadas" end
+    return nil, "abre tus profesiones y vuelve a comprobar"
   end },
   { "Ventana de encantamiento", function()
     if not CraftFrame then return nil, "si eres encantador, abre Encantamiento y vuelve a comprobar" end

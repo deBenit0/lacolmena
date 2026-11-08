@@ -28,30 +28,38 @@ function Mail.OnSendMail(recipient)
   if next(items) then pending = { to = ns.FullName(recipient), items = items } end
 end
 
+-- Apunta una entrega a "to" de los objetos "items" ({ [id] = cantidad }), por correo o en mano:
+-- primero en los pedidos suyos que acepté, luego en mis ofertas y por último como aportación a
+-- un pedido de la hermandad. "how" es el texto para el chat ("por correo" o "en mano").
+function Mail.RegisterDelivery(to, items, how)
+  if not to or not ns.G() then return 0 end
+  local now = ns.Now()
+  local changed = Data.RegisterMail(to, items, now)
+  for _, r in ipairs(changed) do
+    local cm = r.c[ns.Me()]
+    ns.Print("apuntado en la petición de %s: %d de %d %s entregadas %s.",
+      ns.ShortName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
+    ns.Sync.PushRequest(r.id, "high")
+  end
+  local offered = 0
+  for _, d in ipairs(ns.Offers.RegisterMail(to, items, now)) do
+    offered = offered + 1
+    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who), how)
+  end
+  local donated = ns.Social.RegisterMail(to, items, now)
+  for _, d in ipairs(donated) do
+    ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
+  end
+  local total = #changed + offered + #donated
+  ns.Social.AddHelp(total)
+  if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
+  return total
+end
+
 function Mail.OnSent()
   local mail = pending
   pending = nil
-  if not mail or not ns.G() then return end
-  local changed = Data.RegisterMail(mail.to, mail.items, ns.Now())
-  for _, r in ipairs(changed) do
-    local cm = r.c[ns.Me()]
-    ns.Print("apuntado en la petición de %s: %d de %d %s enviadas por correo.",
-      ns.ShortName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k))
-    ns.Sync.PushRequest(r.id, "high")
-  end
-  -- Lo que queda puede ser de mis ofertas.
-  local offered = 0
-  for _, d in ipairs(ns.Offers.RegisterMail(mail.to, mail.items, ns.Now())) do
-    offered = offered + 1
-    ns.Print("apuntado en tu oferta: %dx %s enviadas a %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who))
-  end
-  -- Y lo que quede, donaciones a lo que necesita la hermandad.
-  local donated = ns.Social.RegisterMail(mail.to, mail.items, ns.Now())
-  for _, d in ipairs(donated) do
-    ns.Print("donación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
-  end
-  ns.Social.AddHelp(#changed + offered + #donated)
-  if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
+  if mail then Mail.RegisterDelivery(mail.to, mail.items, "por correo") end
 end
 
 ---------------------------------------------------------------------------

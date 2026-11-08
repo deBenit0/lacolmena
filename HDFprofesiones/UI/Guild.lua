@@ -108,8 +108,12 @@ ns.UI.RegisterPage("guild", function(page)
     if not ok then ns.Print(err) else ns.Print("anuncio publicado en el Inicio de todos.") end
   end)
   page.publish:SetPoint("LEFT", page.announce, "RIGHT", 4, 0)
+  page.welcome = W.Check(page, "Bienvenida automática a los nuevos (susurro)", function(checked)
+    ns.QoL.WelcomeSettings().on = checked
+  end)
+  page.welcome:SetPoint("TOPLEFT", x, -194)
   page.inactive = W.Text(page, "GameFontHighlightSmall")
-  page.inactive:SetPoint("TOPLEFT", x, -198)
+  page.inactive:SetPoint("TOPLEFT", x, -222)
   page.inactive:SetWidth(292)
   page.inactive:SetJustifyV("TOP")
   page.inactive:SetSpacing(2)
@@ -148,6 +152,8 @@ ns.UI.RegisterPage("guild", function(page)
     page.announce:SetShown(officer)
     page.publish:SetShown(officer)
     page.inactive:SetShown(officer)
+    page.welcome:SetShown(officer)
+    if officer then page.welcome:SetChecked(ns.QoL.WelcomeSettings().on and true or false) end
     page.notOfficer:SetShown(not officer)
     if officer then
       local c = ns.MyChar()

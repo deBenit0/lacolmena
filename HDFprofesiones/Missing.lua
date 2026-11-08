@@ -9,8 +9,27 @@ local function itemIdFromLink(link)
   return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
 end
 
+-- Ventana de profesiones moderna (WoW Forever): el formulario de la receta elegida.
+local function modernForm()
+  local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+  return page and page.SchematicForm, page
+end
+Missing.ModernForm = modernForm
+
 -- Materiales de la receta elegida: lista de { id, need } o nil si no hay ninguna elegida.
 local function selectedReagents()
+  local form, page = modernForm()
+  if form and ProfessionsFrame:IsShown() and form.GetRecipeInfo and C_TradeSkillUI then
+    local info = form:GetRecipeInfo()
+    if type(info) ~= "table" or not info.recipeID then return nil end
+    local reagents = ns.Scan.ModernReagents(C_TradeSkillUI.GetRecipeSchematic(info.recipeID, false)) or {}
+    local list = {}
+    for id, n in pairs(reagents) do list[#list + 1] = { id = id, need = n } end
+    table.sort(list, function(x, y) return x.id < y.id end)
+    local box = page.CreateMultipleInputBox
+    local times = box and box.GetValue and tonumber(box:GetValue()) or 1
+    return list, math.max(1, times or 1), info.name
+  end
   if CraftFrame and CraftFrame:IsShown() and GetCraftSelectionIndex then
     local i = GetCraftSelectionIndex()
     if not i or i == 0 then return nil end
@@ -451,6 +470,100 @@ local function hookProduct(icon, isCraft)
   icon:HookScript("OnClick", function(self) ns.SafeCall(showOffer, self, isCraft) end)
 end
 
+---------------------------------------------------------------------------
+-- Ventana de profesiones moderna (WoW Forever)
+-- Las casillas de materiales se crean y reciclan sobre la marcha y Blizzard les cambia
+-- OnEnter/OnLeave al elegir otra receta, así que no nos enganchamos a ellas: ponemos
+-- botones propios junto a cada material y junto al objeto, y los recolocamos cada vez
+-- que el formulario monta una receta (Init).
+---------------------------------------------------------------------------
+local function modernSlotItem(slot)
+  local schematic = slot.GetReagentSlotSchematic and slot:GetReagentSlotSchematic()
+  local basic = Enum and Enum.CraftingReagentType and Enum.CraftingReagentType.Basic
+  if type(schematic) ~= "table" or (basic and schematic.reagentType ~= basic) then return nil end
+  local first = schematic.reagents and schematic.reagents[1]
+  return first and first.itemID, schematic.quantityRequired or 1
+end
+
+function Missing.AskModernReagent(id, need)
+  if not ns.G() then
+    ns.Print("no estás en ninguna hermandad.")
+    return
+  end
+  local _, page = modernForm()
+  local box = page and page.CreateMultipleInputBox
+  local times = math.max(1, box and box.GetValue and tonumber(box:GetValue()) or 1)
+  local key = "i" .. id
+  ns.UI.OpenRequestDialog({ k = key, pk = Data.SingleProfession(key), q = math.max(1, need * times - ns.Scan.Have(id)) })
+end
+
+local function smallButton(parent, text, width)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(width, 18)
+  b:SetText(text)
+  local fs = b.GetFontString and b:GetFontString()
+  if fs and fs.SetFontObject then fs:SetFontObject("GameFontHighlightSmall") end
+  return b
+end
+
+function Missing.LayoutModern(form)
+  if not form or not form.reagentSlotPool then return end
+  -- "Pedir" en cada material básico.
+  for slot in form.reagentSlotPool:EnumerateActive() do
+    local id, need = modernSlotItem(slot)
+    if not slot.hdfAsk then
+      slot.hdfAsk = smallButton(slot, "Pedir", 44)
+      slot.hdfAsk:SetPoint("RIGHT", slot, "RIGHT", 0, 0)
+      slot.hdfAsk:SetFrameLevel(slot:GetFrameLevel() + 10)
+    end
+    slot.hdfAsk:SetShown(id ~= nil)
+    slot.hdfAsk:SetScript("OnClick", function() ns.SafeCall(Missing.AskModernReagent, id, need) end)
+  end
+  -- "Ofrecer" junto al objeto que fabrica la receta.
+  if form.OutputIcon then
+    if not form.hdfOffer then
+      form.hdfOffer = smallButton(form, "Ofrecer", 64)
+      form.hdfOffer:SetPoint("TOP", form.OutputIcon, "BOTTOM", 0, -2)
+      form.hdfOffer:SetFrameLevel(form.OutputIcon:GetFrameLevel() + 10)
+    end
+    local info = form.GetRecipeInfo and form:GetRecipeInfo()
+    local itemID
+    if type(info) == "table" and info.recipeID and C_TradeSkillUI then
+      itemID = ns.Scan.ModernOutput(info.recipeID, C_TradeSkillUI.GetRecipeSchematic(info.recipeID, false))
+    end
+    form.hdfOffer:SetShown(itemID ~= nil and form.OutputIcon:IsShown())
+    form.hdfOffer:SetScript("OnClick", function()
+      if not ns.G() then return ns.Print("no estás en ninguna hermandad.") end
+      local have = ns.ItemCount(itemID)
+      ns.UI.OpenOfferDialog(itemID, have > 0 and have or 1)
+    end)
+  end
+end
+
+local function attachModern()
+  local form, page = modernForm()
+  if not form or form.hdfHooked then return end
+  form.hdfHooked = true
+  if form.Init then
+    hooksecurefunc(form, "Init", function(self) ns.SafeCall(Missing.LayoutModern, self) end)
+  end
+  -- "Pedir en la hermandad" (varios materiales a la vez), junto a la casilla de cantidad.
+  if not buttons[page] then
+    local b = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    b:SetSize(160, 22)
+    b:SetText("Pedir en la hermandad")
+    if page.CreateMultipleInputBox then
+      b:SetPoint("RIGHT", page.CreateMultipleInputBox, "LEFT", -30, 0)
+    else
+      b:SetPoint("BOTTOMLEFT", form, "BOTTOMLEFT", 8, 8)
+    end
+    b:SetScript("OnClick", function() ns.SafeCall(Missing.OnClick) end)
+    buttons[page] = b
+  end
+  ns.SafeCall(Missing.LayoutModern, form)
+end
+Missing.AttachModern = attachModern
+
 -- Engancha los botones en las ventanas de profesión. La interfaz de Blizzard las crea en
 -- el momento de abrirlas por primera vez (se cargan bajo demanda), así que se intenta en
 -- varios momentos: al cargarse esa parte de la interfaz, al abrirlas y un instante después.
@@ -470,15 +583,19 @@ end
 Missing.Attach = function()
   attachTrade()
   attachCraft()
+  attachModern()
 end
 
 ns.On("ADDON_LOADED", function(name)
+  if name == "Blizzard_Professions" then attachModern() end
   if name == "Blizzard_TradeSkillUI" then attachTrade() end
   if name == "Blizzard_CraftUI" then attachCraft() end
 end)
 ns.On("TRADE_SKILL_SHOW", function()
   attachTrade()
+  attachModern()
   ns.After(0.1, attachTrade)
+  ns.After(0.1, attachModern)
 end)
 ns.On("CRAFT_SHOW", function()
   attachCraft()

@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.22.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.23.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -20,6 +20,10 @@ Esta es la **fase 1** (versión 0.22.0). El diseño completo está en [`DISEÑO.
 3. En la pantalla de personajes, pulsa **AddOns** y comprueba que *Los hijos del Fundillo* está activado.
 
 Todos los miembros deben tenerlo: la información viaja entre los que están conectados.
+
+> **WoW Forever** usa la ventana de profesiones moderna (no la de Classic). El addon funciona con las
+> dos: en Forever pone botones propios **Pedir** junto a cada material, **Ofrecer** junto al objeto y
+> **Pedir en la hermandad** junto a la casilla de cantidad.
 
 ## Cómo se usa
 
@@ -149,6 +153,19 @@ los materiales que te faltan (contando bolsas y banco):
   de todos, y la lista de **inactivos** (más de 14 días sin entrar) y de **quién no tiene el
   addon**. En cada pedido pueden marcarlo como **Prioridad** (sale arriba en el Tablón de todos)
   o **cerrarlo** si es abusivo. Lo de oficial solo cuenta si de verdad tiene ese rango.
+
+### Calidad de vida
+- **Quién lo fabrica**: al pasar el ratón por cualquier objeto del juego (bolsas, subasta, chat,
+  enlaces...), el tooltip dice quién de la hermandad lo da (en verde los conectados).
+- **Comercio en mano**: si le das en mano a alguien lo de un pedido suyo que aceptaste (o de tu
+  oferta, o una aportación a un pedido de la hermandad), al completarse el comercio se apunta
+  solo, igual que por correo. Un comercio cancelado no cuenta.
+- **Bienvenida a nuevos**: cuando alguien entra en la hermandad, a los oficiales les salta un
+  aviso y uno de ellos (solo uno) le susurra una bienvenida con el recordatorio de instalar el
+  addon. Se puede desactivar en *Hermandad* (casilla para oficiales).
+- **Resumen al entrar**: al conectarte, una ventanita con lo que ha pasado mientras no estabas
+  (pedidos tuyos aceptados o entregados, pedidos nuevos que puedes hacer, ofertas tuyas pedidas,
+  pedidos de hermandad, quedadas y el anuncio).
 
 ### Personajes alternativos
 - Tus personajes se unen solos: el de **más nivel** es tu **principal** (lo puedes cambiar en
