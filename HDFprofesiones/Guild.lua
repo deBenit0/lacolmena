@@ -39,11 +39,28 @@ function Guild.LastSeen(name)
 end
 
 -- ¿Aceptamos datos de este personaje? Si vemos la lista completa, solo de miembros.
+-- Nombre comparable: sin mayúsculas, espacios, guiones ni apóstrofos en el reino.
+local function loose(name)
+  local who, realm = tostring(name or ""):match("^([^%-]+)%-?(.*)$")
+  if not who then return "" end
+  return (who .. "-" .. realm:gsub("[%s%-']", "")):lower()
+end
+Guild.Loose = loose
+
 function Guild.Accepts(name)
+  if type(name) ~= "string" then return false end
   if name == ns.Me() then return true end
   if ns.Demo and ns.Demo.IsDemo(name) then return false end -- nadie puede hacerse pasar por uno de ejemplo
   if not Guild.full then return true end
-  return roster[name] ~= nil
+  if roster[name] ~= nil then return true end
+  -- Si la lista escribe los nombres de otra forma (ni siquiera me encuentra a mí), no me fío de
+  -- ella para descartar: mejor aceptar que perder los pedidos de todos.
+  if not roster[ns.Me()] then return true end
+  local want = loose(name)
+  for n in pairs(roster) do
+    if loose(n) == want then return true end
+  end
+  return false
 end
 
 function Guild.RequestRoster()
