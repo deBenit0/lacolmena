@@ -534,7 +534,10 @@ local function afterRequestAction(r, err)
 end
 
 function Sync.CreateRequest(opts)
-  return afterRequestAction(Data.CreateRequest(opts, ns.Now()))
+  local r, err = afterRequestAction(Data.CreateRequest(opts, ns.Now()))
+  -- También en el chat de hermandad: queda en el historial para quien entre más tarde.
+  if r and ns.ChatLog then ns.SafeCall(ns.ChatLog.Post, r) end
+  return r, err
 end
 
 function Sync.Commit(id, when)
@@ -637,6 +640,8 @@ function Sync.Start()
     Sync.PublishMine()
   end
   ns.After(1, Sync.SendHello)
+  -- Pedidos publicados mientras no estaba (del historial del chat de hermandad).
+  ns.After(5, function() if started and ns.ChatLog then ns.SafeCall(ns.ChatLog.ReadHistory) end end)
   -- Resumen en el chat cuando ya se ha puesto al día.
   ns.After(45, function()
     local list = Data.ServableRequests(ns.Now())

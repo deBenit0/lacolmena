@@ -61,6 +61,12 @@ local CHECKS = {
     if not t then return nil, "aún no ha llegado el resumen de nadie (se repite cada 5 minutos)" end
     return true, "último resumen recibido hace " .. ns.FormatDuration(math.max(0, ns.Now() - t))
   end },
+  { "Historial del chat de hermandad", function()
+    local CL = ns.ChatLog
+    if not (C_Club and C_Club.GetGuildClubId) then return false, "el juego no da el historial" end
+    if not CL.read then return nil, "aún no se ha leído (se lee al entrar)" end
+    return true, string.format("%d líneas leídas, %d pedidos recuperados", CL.read, CL.found)
+  end },
   { "Misma versión que los demás", function()
     local other = ns.Sync.OtherVersions()
     if next(ns.Sync.peers) == nil then return nil, "no hay nadie más conectado con el addon" end

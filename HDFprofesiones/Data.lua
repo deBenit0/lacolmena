@@ -763,8 +763,14 @@ end
 function Data.Purge(now)
   local g = ns.G()
   if not g then return end
+  -- Los borrados se recuerdan un tiempo: así no vuelven desde el historial del chat.
+  g.gone = g.gone or {}
+  for id, t in pairs(g.gone) do
+    if now - t > Data.REQUEST_TTL + Data.KEEP_AFTER then g.gone[id] = nil end
+  end
   for id, r in pairs(g.requests) do
     if isGone(r, now) then
+      g.gone[id] = now
       g.requests[id] = nil
       g.alerted[id] = nil
       g.thanked[id] = nil
