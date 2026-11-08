@@ -451,13 +451,38 @@ local function hookProduct(icon, isCraft)
   icon:HookScript("OnClick", function(self) ns.SafeCall(showOffer, self, isCraft) end)
 end
 
-ns.On("TRADE_SKILL_SHOW", function()
+-- Engancha los botones en las ventanas de profesión. La interfaz de Blizzard las crea en
+-- el momento de abrirlas por primera vez (se cargan bajo demanda), así que se intenta en
+-- varios momentos: al cargarse esa parte de la interfaz, al abrirlas y un instante después.
+-- Es seguro repetirlo: lo ya enganchado no se vuelve a enganchar.
+local function attachTrade()
+  if not TradeSkillFrame then return end
   addButton(TradeSkillFrame, TradeSkillCreateButton)
   hookReagents("TradeSkillReagent", false)
   hookProduct(TradeSkillSkillIcon, false)
-end)
-ns.On("CRAFT_SHOW", function()
+end
+local function attachCraft()
+  if not CraftFrame then return end
   addButton(CraftFrame, CraftCreateButton)
   hookReagents("CraftReagent", true)
   hookProduct(CraftIcon, true)
+end
+Missing.Attach = function()
+  attachTrade()
+  attachCraft()
+end
+
+ns.On("ADDON_LOADED", function(name)
+  if name == "Blizzard_TradeSkillUI" then attachTrade() end
+  if name == "Blizzard_CraftUI" then attachCraft() end
 end)
+ns.On("TRADE_SKILL_SHOW", function()
+  attachTrade()
+  ns.After(0.1, attachTrade)
+end)
+ns.On("CRAFT_SHOW", function()
+  attachCraft()
+  ns.After(0.1, attachCraft)
+end)
+-- Por si esas ventanas ya estaban cargadas antes que el addon (otro addon las cargó antes).
+ns.Listen("LOGIN", Missing.Attach)
