@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.18.0"
+ns.VERSION = "0.19.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -17,8 +17,32 @@ local floor, format = math.floor, string.format
 ---------------------------------------------------------------------------
 -- Llamadas protegidas: un fallo en una parte no rompe las demás
 ---------------------------------------------------------------------------
+-- Registro de errores para el informe ("Copiar informe" en Mis cosas). Antes de cargar la
+-- base de datos se guardan en memoria; luego, en HDFProfesionesDB.errors (máximo 20).
+ns.errorLog = {}
+function ns.LogError(text, stack)
+  text = tostring(text)
+  local log = (ns.db and ns.db.errors) or ns.errorLog
+  for _, e in ipairs(log) do
+    if e.m == text then
+      e.n = (e.n or 1) + 1
+      e.t = time and time() or e.t
+      return
+    end
+  end
+  if #log >= 20 then table.remove(log, 1) end
+  log[#log + 1] = { m = text, s = stack, t = time and time() or 0, v = ns.VERSION, n = 1 }
+end
+
+local function stackText()
+  if not debugstack then return nil end
+  local ok, st = pcall(debugstack, 3, 6, 0)
+  return ok and st or nil
+end
+
 local shownErrors = {}
 local function errorHandler(err)
+  ns.LogError(err, stackText())
   -- Para la fase de pruebas: avisar en el chat aunque los errores de Lua estén desactivados.
   local text = tostring(err)
   if not shownErrors[text] and DEFAULT_CHAT_FRAME then
@@ -26,8 +50,23 @@ local function errorHandler(err)
     DEFAULT_CHAT_FRAME:AddMessage("|cffff5050" .. (ns.TITLE or "HDF") .. " (error, mándale una captura a quien lo programa):|r " .. text)
   end
   local handler = geterrorhandler and geterrorhandler()
-  if handler then return handler(err) end
+  if handler then
+    ns.inSafeError = true -- ya está apuntado: que el gestor general no lo cuente otra vez
+    local ok, res = pcall(handler, err)
+    ns.inSafeError = nil
+    if ok then return res end
+  end
   return err
+end
+
+-- Errores del addon que no pasan por SafeCall (p. ej. en un botón): también al informe.
+-- Se encadena con el gestor que hubiera (el del juego u otro addon).
+if geterrorhandler and seterrorhandler then
+  local previous = geterrorhandler()
+  seterrorhandler(function(msg, ...)
+    if not ns.inSafeError and tostring(msg):find("HDFprofesiones", 1, true) then ns.LogError(msg, stackText()) end
+    if previous then return previous(msg, ...) end
+  end)
 end
 
 function ns.SafeCall(fn, ...)
@@ -365,7 +404,10 @@ ns.On("ADDON_LOADED", function(name)
   db.chars = db.chars or {}   -- mis personajes: recetas escaneadas, banco...
   db.guilds = db.guilds or {} -- datos compartidos de cada hermandad
   db.info = db.info or {}     -- materiales de cada receta (datos fijos del juego)
+  db.errors = db.errors or {} -- errores del addon (para el informe)
   ns.db = db
+  for _, e in ipairs(ns.errorLog) do ns.LogError(e.m, e.s) end
+  wipe(ns.errorLog)
   ns.Fire("DB_READY")
 end)
 

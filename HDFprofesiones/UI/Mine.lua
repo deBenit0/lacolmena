@@ -38,6 +38,14 @@ ns.UI.RegisterPage("mine", function(page)
   end)
   page.demo:SetPoint("TOPLEFT", 4, -314)
 
+  -- Para la prueba en el juego: autocomprobación e informe de errores.
+  page.check = W.Button(page, "Comprobar el addon", 140, 22, function() ns.Diag.Show() end)
+  page.check:SetPoint("TOPLEFT", 8, -346)
+  page.report = W.Button(page, "Copiar informe", 130, 22, function() ns.Diag.Show() end)
+  page.report:SetPoint("LEFT", page.check, "RIGHT", 6, 0)
+  page.errors = W.Text(page, "GameFontHighlightSmall")
+  page.errors:SetPoint("TOPLEFT", 10, -374)
+
   page.statsTitle = W.Text(page, "GameFontNormal")
   page.statsTitle:SetPoint("TOPLEFT", 320, -6)
   page.statsTitle:SetText("Hermandad")
@@ -75,6 +83,9 @@ ns.UI.RegisterPage("mine", function(page)
     page.alerts:SetChecked(ns.db.settings.alerts and true or false)
     page.sound:SetChecked(ns.db.settings.sound and true or false)
     page.demo:SetChecked(ns.db.settings.demo and true or false)
+    local nErrors = #(ns.db.errors or {})
+    page.errors:SetText(nErrors > 0 and string.format("|cffff8040Hay %d error%s guardado%s: pulsa Copiar informe.|r",
+      nErrors, nErrors > 1 and "es" or "", nErrors > 1 and "s" or "") or "|cff999999Sin errores guardados.|r")
 
     local crafters, online = 0, 0
     for name in pairs(g.entries) do

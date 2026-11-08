@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos**: se ve pero aún no se puede abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.18.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.19.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -165,20 +165,19 @@ Al desmarcarlo desaparece todo lo de ejemplo.
 
 ### Mis cosas
 Tus profesiones publicadas, el **modo demostración**, el modo **No disponible** (sin avisos y apareces el último),
-los avisos y el sonido, un **diagnóstico** (dónde puso la pestaña, si lee tus profesiones, si
+los avisos y el sonido, **Comprobar el addon** y **Copiar informe**, un **diagnóstico** (dónde puso la pestaña, si lee tus profesiones, si
 encuentra el correo, versión del juego) y el estado del addon (versión, si hay una más nueva, mensajes por enviar).
 
-## Primera prueba en la hermandad: qué mirar
+## Primera prueba en la hermandad
 
-Activa los errores de Lua para verlos si salen: escribe `/console scriptErrors 1` en el chat.
+Sigue la guía paso a paso de [`PRUEBA.md`](PRUEBA.md) (2 personas: pedidos, ofertas y mazmorras,
+con lo que debería pasar en cada paso).
 
-1. ¿Aparece la pestaña del engranaje en la ventana de hermandad? ¿Está bien colocada?
-2. Abre tus profesiones: ¿salen en **Mis cosas** con su número de recetas?
-3. Con dos o más conectados: ¿veis las recetas de los demás en **Recetas**?
-4. Haz una petición: ¿le llega el aviso a quien sabe hacerlo? ¿Funcionan *Aceptar encargo* y *Recibido*?
-5. Sal y vuelve a entrar: ¿se mantiene todo? ¿Le llegan los datos a quien entra más tarde?
-
-Si algo falla, haz una captura del error (o de la ventana) y dile qué estabas haciendo.
+- **Comprobar el addon** (en *Mis cosas*): revisa todo lo que depende del juego (pestaña de
+  hermandad, ventana de profesión, contra reembolso, invitar, arrastrar objetos, logo...) y lo
+  marca en verde (bien), rojo (falla) o amarillo (abre esa ventana y vuelve a comprobar).
+- **Copiar informe**: junta la versión, la comprobación y los **errores guardados** del addon
+  (se guardan solos, hasta 20) en un texto para copiar con Ctrl+C y pasárselo a quien lo programa.
 
 ## Pendiente (fase 2)
 
