@@ -224,17 +224,39 @@ end
 ---------------------------------------------------------------------------
 -- Habilidades: nivel de cada profesión y profesiones abandonadas
 ---------------------------------------------------------------------------
+-- Una línea de habilidad: nombre, cabecera, desplegada, nivel, máximo e id (o nil).
+-- WoW Forever: C_SkillInfo.GetSkillLineInfo(i) devuelve una tabla. Classic: GetSkillLineInfo(i).
+local function skillLineCount()
+  if C_SkillInfo and C_SkillInfo.GetNumSkillLines then return C_SkillInfo.GetNumSkillLines() or 0 end
+  return (GetNumSkillLines and GetNumSkillLines()) or 0
+end
+
+local function skillLine(i)
+  if C_SkillInfo and C_SkillInfo.GetSkillLineInfo then
+    local info = C_SkillInfo.GetSkillLineInfo(i)
+    if type(info) ~= "table" then return nil end
+    return info.name, info.isHeader, not info.isCollapsed, info.rank, info.maxRank, info.skillID
+  end
+  if GetSkillLineInfo then
+    local name, isHeader, isExpanded, rank, _, _, maxRank = GetSkillLineInfo(i)
+    return name, isHeader, isExpanded, rank, maxRank, nil
+  end
+end
+Scan.SkillLine = skillLine
+
 function Scan.SkillLines()
   local c = ns.MyChar()
-  if not c or not GetNumSkillLines or not GetSkillLineInfo then return end
+  if not c then return end
+  if not (C_SkillInfo and C_SkillInfo.GetSkillLineInfo) and not GetSkillLineInfo then return end
   local present, allExpanded, changed, gather = {}, true, false, {}
-  local total = GetNumSkillLines() or 0
+  local total = skillLineCount()
   for i = 1, total do
-    local name, isHeader, isExpanded, rank, _, _, maxRank = GetSkillLineInfo(i)
+    local name, isHeader, isExpanded, rank, maxRank, skillID = skillLine(i)
     if isHeader then
       if not isExpanded then allExpanded = false end
     elseif name then
-      local pk = ns.ProfessionKey(name)
+      -- el id de la habilidad es más fiable que el nombre (que depende del idioma)
+      local pk = (skillID and ns.PROFESSIONS[skillID]) and skillID or ns.ProfessionKey(name)
       if ns.GATHER_SKILLS[pk] and rank then gather[pk] = rank end
       if ns.PROFESSIONS[pk] and not ns.PROFESSIONS[pk].gather then
         present[pk] = true
@@ -297,9 +319,19 @@ local bankOpen = false
 function Scan.Bank()
   local c = ns.MyChar()
   if not bankOpen or not c then return end
-  local bags = { BANK_CONTAINER or -1 }
-  local firstBag = (NUM_BAG_SLOTS or 4) + 1
-  for bag = firstBag, firstBag + (NUM_BANKBAGSLOTS or 6) - 1 do bags[#bags + 1] = bag end
+  local bags = {}
+  local B = Enum and Enum.BagIndex
+  if B and B.CharacterBankTab_1 then
+    -- WoW Forever (cliente moderno): el banco son pestañas (6 a 14). El -1 ahora es el llavero.
+    for i = 1, 9 do
+      local bag = B["CharacterBankTab_" .. i]
+      if bag then bags[#bags + 1] = bag end
+    end
+  else
+    bags[1] = BANK_CONTAINER or -1
+    local firstBag = (NUM_BAG_SLOTS or 4) + 1
+    for bag = firstBag, firstBag + (NUM_BANKBAGSLOTS or 6) - 1 do bags[#bags + 1] = bag end
+  end
   local counts = {}
   for _, bag in ipairs(bags) do
     for slot = 1, containerSlots(bag) do
@@ -317,6 +349,11 @@ function Scan.Have(itemID)
   local bags = ns.ItemCount(itemID)
   local c = ns.MyChar()
   local bank = (c and c.bank and c.bank[itemID]) or 0
+  -- Cliente moderno: el juego cuenta el banco aunque no esté abierto.
+  if C_Item and C_Item.GetItemCount then
+    local ok, total = pcall(C_Item.GetItemCount, itemID, true, false, true, false)
+    if ok and type(total) == "number" and total - bags > bank then bank = total - bags end
+  end
   return bags + bank, bags, bank
 end
 

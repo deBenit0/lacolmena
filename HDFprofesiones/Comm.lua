@@ -21,12 +21,17 @@ local inbox = {}
 local handlers = {}
 Comm.stats = { sent = 0, received = 0 }
 
-local THROTTLED = {}
+local THROTTLED, LOCKDOWN = {}, {}
 if Enum and Enum.SendAddonMessageResult then
   local result = Enum.SendAddonMessageResult
   if result.AddonMessageThrottle then THROTTLED[result.AddonMessageThrottle] = true end
   if result.ChannelThrottle then THROTTLED[result.ChannelThrottle] = true end
+  -- Cliente moderno (Forever): el juego bloquea un rato los mensajes de addons (p. ej. en
+  -- algunos combates). No es un fallo del mensaje: hay que esperar y volver a intentarlo.
+  if result.AddOnMessageLockdown then LOCKDOWN[result.AddOnMessageLockdown] = true end
 end
+Comm.LOCKDOWN_WAIT = 10
+local pausedUntil = 0
 
 if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
   C_ChatInfo.RegisterAddonMessagePrefix(ns.PREFIX)
@@ -110,6 +115,7 @@ end
 
 local function pump()
   local now = GetTime()
+  if now < pausedUntil then return end
   if lastPump then tokens = math.min(BUCKET_CAP, tokens + (now - lastPump) * BUCKET_RATE) end
   lastPump = now
   while tokens >= 1 do
@@ -131,6 +137,12 @@ local function pump()
       Comm.stats.skipped = (Comm.stats.skipped or 0) + 1
     else
       local ok, result = sendNow(item)
+      if ok and LOCKDOWN[result] then
+        -- bloqueo temporal del juego: no se pierde nada, se reintenta en unos segundos
+        pausedUntil = now + Comm.LOCKDOWN_WAIT
+        Comm.stats.lockdowns = (Comm.stats.lockdowns or 0) + 1
+        return
+      end
       if ok and (result == false or THROTTLED[result]) then
         -- el servidor nos frena: reintentar más tarde
         item.tries = (item.tries or 0) + 1

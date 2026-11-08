@@ -15,6 +15,20 @@ local CHECKS = {
     if ns.G() then return true, ns.guildName or "" end
     return false, "el addon solo funciona dentro de una hermandad"
   end },
+  { "Lista de la hermandad", function()
+    if not (GetNumGuildMembers and GetGuildRosterInfo) then return false, "el juego no da la lista de miembros" end
+    local n = ns.Guild.count or 0
+    if n > 0 then return true, n .. " miembros leídos" .. (ns.Guild.full and "" or " (solo conectados)") end
+    return nil, "abre la ventana de hermandad y vuelve a comprobar"
+  end },
+  { "Habilidades (recolección)", function()
+    local modern = C_SkillInfo and C_SkillInfo.GetSkillLineInfo
+    if not modern and not GetSkillLineInfo then return false, "no se pueden leer las habilidades" end
+    local c = ns.MyChar()
+    local n = 0
+    for _ in pairs(c and c.gather or {}) do n = n + 1 end
+    return true, (modern and "C_SkillInfo" or "clásico") .. (n > 0 and (", " .. n .. " de recolección") or "")
+  end },
   { "Pestaña en la ventana de hermandad", function()
     local hosts = ns.UI.HostNames()
     if #hosts > 0 then return true, table.concat(hosts, ", ") end

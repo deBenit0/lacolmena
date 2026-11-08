@@ -10,11 +10,13 @@ local pending -- correo enviado que espera la confirmación del servidor
 local function attachedItems()
   local items = {}
   for i = 1, ATTACHMENTS_MAX_SEND or 12 do
+    -- Forever (cliente moderno): nombre, id del objeto, icono, cantidad, calidad.
+    -- Clientes antiguos: nombre, icono, cantidad...; ahí el id sale del enlace.
+    local name, b, c, d = GetSendMailItem(i)
     local link = GetSendMailItemLink and GetSendMailItemLink(i)
-    local id = type(link) == "string" and tonumber(link:match("item:(%d+)"))
+    local id = type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
+    if not id and name and type(b) == "number" then id = b end
     if id then
-      -- Según la versión: nombre, id, icono, cantidad...  o  nombre, icono, cantidad...
-      local _, b, c, d = GetSendMailItem(i)
       local count = (b == id) and d or c
       items[id] = (items[id] or 0) + (tonumber(count) or 1)
     end

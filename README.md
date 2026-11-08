@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.23.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.23.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 

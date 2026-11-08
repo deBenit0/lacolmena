@@ -110,4 +110,46 @@ H.eq(byLabel["Ventana de profesión"].status, true, "comprobación: ventana mode
 H.eq(byLabel["Botón \"Pedir\" en los materiales"].status, true, "comprobación: Pedir enganchado")
 H.eq(byLabel["Recetas leídas (Forever)"].status, true, "comprobación: recetas leídas")
 
+-- 4) Habilidades con C_SkillInfo (tablas, con el id de la habilidad).
+env.GetSkillLineInfo = nil
+env.C_SkillInfo = {
+  GetNumSkillLines = function() return 3 end,
+  GetSkillLineInfo = function(i)
+    return ({
+      { name = "Profesiones", isHeader = true, isCollapsed = false },
+      { name = "Skinning", skillID = 393, rank = 200, maxRank = 300 },  -- nombre en otro idioma: vale el id
+      { name = "Herrería", skillID = 164, rank = 130, maxRank = 150 },
+    })[i]
+  end,
+}
+ns.Scan.SkillLines()
+H.eq(ns.MyChar().gather and ns.MyChar().gather[393], 200, "recolección leída con C_SkillInfo (por id)")
+H.eq(ns.MyChar().profs[164].r, 130, "nivel de la profesión con C_SkillInfo")
+
+-- 5) Correo moderno: GetSendMailItem da el id del objeto (sin GetSendMailItemLink).
+H.AddMember("Bea")
+local bea = H.Login("Bea")
+H.Advance(20)
+local req = bea.ns.Sync.CreateRequest({ k = "i2862", q = 2 })
+H.Advance(10)
+ns.Sync.Commit(req.id, 1)
+H.Advance(10)
+env.GetSendMailItemLink = nil
+env.GetSendMailItem = function(i)
+  local a = ana.mailAttach and ana.mailAttach[i]
+  if a then return "Barra", a[1], 135, a[2], 1 end -- nombre, id, icono, cantidad, calidad
+end
+H.SendMail(ana, "Bea", { { 2862, 2 } })
+H.Advance(15)
+H.eq(bea.ns.Data.RequestInfo(bea.ns.G().requests[req.id], bea.ns.Now()).state, "done",
+  "el correo se apunta solo con GetSendMailItem moderno")
+
+-- 6) Banco moderno: el juego cuenta el banco aunque no esté abierto.
+local oldCount = env.C_Item and env.C_Item.GetItemCount
+env.C_Item = env.C_Item or {}
+env.C_Item.GetItemCount = function(_, includeBank) return includeBank and 15 or 5 end
+local total, bags, bank = ns.Scan.Have(2835)
+H.ok(total == 15 and bags == 5 and bank == 10, "tienes: 5 en bolsas y 10 en el banco")
+env.C_Item.GetItemCount = oldCount
+
 H.eq(#H.errors, 0, "sin errores de Lua")
