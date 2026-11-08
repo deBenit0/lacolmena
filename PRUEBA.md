@@ -75,10 +75,12 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
 
 1. **El oficial** va a **Pedidos → Hermandad**, escribe un anuncio y pulsa **Publicar**.
    → El otro lo ve arriba en el **Inicio**.
-2. **El oficial** pulsa **Añadir**, elige un objeto (por ejemplo una poción) y pone 5.
-   → El otro lo ve en *Lo que necesita la hermandad*.
+2. **El oficial** va a *Pedir materiales* (o pasa el ratón por un material en su profesión),
+   pulsa **Pedir**, pone 5 y marca **Para la hermandad (entre varios)**.
+   → El otro lo ve arriba en su **Tablón** como *[Hermandad]*.
 3. **El otro** pulsa **Aportar**, abre el buzón y manda 2 al oficial.
-   → Sale "Aportado: 2 de 5" con su nombre. Sube en *Esta semana*.
+   → Sale "aportado 2 de 5" con su nombre. Sube en *Esta semana*. Si hay un tercero, que aporte
+   también: se suman.
 4. **El oficial** abre un pedido del otro en el Tablón (**Ver pedido**) y pulsa **Prioridad**.
    → En el Tablón del otro sale con *[Prioridad]*.
 5. Si alguno tiene un **alt**: entra con él una vez. → Sale como "Alt (Principal)" y su karma es

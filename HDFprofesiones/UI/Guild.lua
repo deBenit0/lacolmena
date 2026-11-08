@@ -3,12 +3,31 @@
 local _, ns = ...
 local W, S = ns.W, ns.Social
 
+-- "Aportar" a un pedido de la hermandad: cuántos y se manda por correo al oficial (se apunta solo).
+function ns.UI.ContributeNeed(item)
+  local have = ns.ItemCount(item.id)
+  W.AskAmount(string.format("¿Cuántos aportas? (faltan %d, tienes %d)", item.left, have),
+    math.max(1, math.min(item.left, have)), function(n)
+      if ns.Mail.CanPrepare() then
+        ns.Mail.PrepareNeed(item.owner, item.id, n)
+      else
+        ns.Print("mándale %dx %s por correo a %s: la aportación se apunta sola al enviarlo.",
+          n, ns.KeyLabel("i" .. item.id), ns.ShortName(item.owner))
+      end
+    end)
+end
+
 ns.UI.RegisterPage("guild", function(page)
   -- Columna izquierda: necesidades.
   page.needsTitle = W.Text(page, "GameFontNormal")
   page.needsTitle:SetPoint("TOPLEFT", 6, -6)
-  page.needsTitle:SetText("Lo que necesita la hermandad")
-  page.addNeed = W.Button(page, "Añadir", 70, 20, function() ns.UI.OpenOfferDialog(nil, nil, "need") end)
+  page.needsTitle:SetText("Pedidos de la hermandad")
+  -- Los oficiales crean pedidos de hermandad con "Pedir" (en la profesión o en Pedir materiales)
+  -- marcando "Para la hermandad"; este botón lleva directo a la lista de materiales.
+  page.addNeed = W.Button(page, "Añadir", 70, 20, function()
+    ns.UI.ShowPage("materials")
+    ns.Print("elige el material, pulsa Pedir y marca \"Para la hermandad\".")
+  end)
   page.addNeed:SetPoint("TOPLEFT", 226, -2)
 
   local list = W.List(page, 300, 362, {
@@ -55,18 +74,7 @@ ns.UI.RegisterPage("guild", function(page)
       else
         row.button:SetText("Aportar")
         row.button:SetEnabled(not done)
-        row.button:SetScript("OnClick", function()
-          local have = ns.ItemCount(item.id)
-          W.AskAmount(string.format("¿Cuántos aportas? (faltan %d, tienes %d)", item.left, have),
-            math.max(1, math.min(item.left, have)), function(n)
-              if ns.Mail.CanPrepare() then
-                ns.Mail.PrepareNeed(item.owner, item.id, n)
-              else
-                ns.Print("mándale %dx %s por correo a %s: la donación se apunta sola al enviarlo.",
-                  n, ns.KeyLabel("i" .. item.id), ns.ShortName(item.owner))
-              end
-            end)
-        end)
+        row.button:SetScript("OnClick", function() ns.UI.ContributeNeed(item) end)
       end
     end,
   })
@@ -118,7 +126,7 @@ ns.UI.RegisterPage("guild", function(page)
     list:SetItems(needs)
     page.addNeed:SetShown(officer)
     page.emptyNeeds:SetShown(#needs == 0)
-    page.emptyNeeds:SetText(officer and "No hay necesidades. Pulsa Añadir para pedir algo para la hermandad "
+    page.emptyNeeds:SetText(officer and "No hay pedidos de la hermandad. Pulsa Añadir (o Pedir en tu profesión) y marca \"Para la hermandad\" "
       .. "(frascos para la banda, materiales...)." or "Ahora mismo la hermandad no necesita nada.")
 
     local lines = {}

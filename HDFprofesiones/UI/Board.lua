@@ -92,7 +92,7 @@ end
 local function collect(seenAt)
   local g, me, now = ns.G(), ns.Me(), ns.Now()
   local items = {}
-  local stats = { open = 0, servable = 0, new = 0, toSend = 0, offers = 0 }
+  local stats = { open = 0, servable = 0, new = 0, toSend = 0, offers = 0, guild = 0 }
   if not g then return items, stats end
   for _, r in pairs(g.requests) do
     local info = Data.RequestInfo(r, now)
@@ -128,6 +128,20 @@ local function collect(seenAt)
     if item.new then stats.new = stats.new + 1 end
     items[#items + 1] = item
   end
+  -- Pedidos de la hermandad (los ponen los oficiales; aportan varios).
+  for _, n in ipairs(ns.Social.Needs(now)) do
+    if n.left > 0 then
+      local mine = n.owner == me
+      local item = {
+        kind = "need", id = "n:" .. n.key, k = "i" .. n.id, author = n.owner, t = n.t or 0,
+        need = n, me = me, now = now, mine = mine, pending = 0, karma = Data.KarmaFor(n.owner),
+        new = not mine and (n.t or 0) > (seenAt or 0),
+      }
+      stats.guild = stats.guild + 1
+      if item.new then stats.new = stats.new + 1 end
+      items[#items + 1] = item
+    end
+  end
   return items, stats
 end
 
@@ -140,6 +154,7 @@ end
 local function rank(x)
   if x.pending > 0 then return 0 end -- lo que tengo que enviar (encargos y ofertas pedidas)
   if x.claimed then return 1 end     -- ofertas que he pedido
+  if x.kind == "need" then return 1.2 end -- pedidos de la hermandad
   if x.mine then return 5 end
   if x.priority then return 1.5 end  -- marcadas por un oficial
   if x.canServe then return 2 end
@@ -381,11 +396,9 @@ end
 ns.UI.RegisterPage("board", function(page)
   local state = { onlyMine = false, search = "" }
 
-  -- Fila 1: ofrecer, buscar y filtros.
-  page.offer = W.Button(page, "Ofrecer objeto", 112, 22, function() ns.UI.OpenOfferDialog() end)
-  page.offer:SetPoint("TOPLEFT", 4, -2)
-  page.search = W.Input(page, 150)
-  page.search:SetPoint("LEFT", page.offer, "RIGHT", 12, 0)
+  -- Fila 1: buscar y filtros. (Para ofrecer: desde tu ventana de profesión.)
+  page.search = W.Input(page, 200)
+  page.search:SetPoint("TOPLEFT", 10, -2)
   W.Placeholder(page.search, "Buscar...")
   page.search:HookScript("OnTextChanged", function(self)
     state.search = (self:GetText() or ""):lower()
@@ -492,6 +505,35 @@ ns.UI.RegisterPage("board", function(page)
     end
   end
 
+  -- Pedido de la hermandad: aportan varios, cada uno lo que pueda.
+  local function updateNeedRow(row, item)
+    local n = item.need
+    local tags = "|cffff9933[Hermandad]|r "
+    if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
+    row.title:SetText(tags .. string.format("%dx %s", n.q, ns.KeyLabel(item.k)))
+    row.sub:SetText(string.format("Lo pide %s para la hermandad  |cff666666·|r  aportado |cffffffff%d|r de %d"
+      .. "  |cff666666·|r  faltan %d", ns.ShortName(n.owner), n.given, n.q, n.left))
+    local donors = {}
+    for i = 1, math.min(3, #n.donors) do
+      donors[#donors + 1] = ns.Social.Who(n.donors[i].name) .. " " .. n.donors[i].n
+    end
+    local have = ns.ItemCount(n.id)
+    row.mats:SetText((#donors > 0 and ("|cffbbbbbbAportan: " .. table.concat(donors, ", ") .. "|r  ") or "")
+      .. (have > 0 and not item.mine and string.format("|cff40ff40Tienes %d.|r", have) or ""))
+    row.view:Hide()
+    if item.mine then
+      row.accept:SetText("Quitar")
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function()
+        W.Confirm("¿Quitar este pedido de la hermandad?", function() ns.Social.RemoveNeed(n.id) end)
+      end)
+    else
+      row.accept:SetText("Aportar")
+      row.accept:SetEnabled(true)
+      row.accept:SetScript("OnClick", function() ns.UI.ContributeNeed(n) end)
+    end
+  end
+
   local function updateOfferRow(row, item)
     local o = item.o
     local tags = "|cff40c0ff[Oferta]|r "
@@ -589,10 +631,17 @@ ns.UI.RegisterPage("board", function(page)
       local _, icon = ns.KeyInfo(item.k)
       row.icon:SetTexture(icon)
       row.accept.tip = nil
-      if item.kind == "offer" then updateOfferRow(row, item) else updateRequestRow(row, item) end
+      if item.kind == "offer" then
+        updateOfferRow(row, item)
+      elseif item.kind == "need" then
+        updateNeedRow(row, item)
+      else
+        updateRequestRow(row, item)
+      end
     end,
     onSelect = function(item)
       if item.kind == "req" then ns.UI.Open("requests", item.r.id) end
+      if item.kind == "need" then ns.UI.ShowPage("guild") end
     end,
   })
   list:SetPoint("TOPLEFT", 0, -54)
@@ -609,7 +658,7 @@ ns.UI.RegisterPage("board", function(page)
   -- ¿Pasa los filtros? (tipo, categoría, búsqueda y "solo lo que puedo hacer")
   local function passes(item, f)
     local show = SHOW[f.show].id
-    if show == "requests" and item.kind ~= "req" then return false end
+    if show == "requests" and item.kind == "offer" then return false end
     if show == "offers" and item.kind ~= "offer" then return false end
     local cat = CATEGORIES[f.cat].id
     if cat and category(item.k) ~= cat then return false end
@@ -643,8 +692,8 @@ ns.UI.RegisterPage("board", function(page)
       return a.id < b.id
     end)
     list:SetItems(items)
-    local text = string.format("Pedidos: |cffffffff%d|r  Ofertas: |cff40c0ff%d|r  Puedes: |cff40ff40%d|r",
-      stats.open, stats.offers, stats.servable)
+    local text = string.format("Pedidos: |cffffffff%d|r  Hermandad: |cffff9933%d|r  Ofertas: |cff40c0ff%d|r  Puedes: |cff40ff40%d|r",
+      stats.open, stats.guild, stats.offers, stats.servable)
     if stats.new > 0 then text = text .. string.format("  Nuevos: |cffffd100%d|r", stats.new) end
     page.summary:SetText(text)
     local none = #items == 0

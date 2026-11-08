@@ -10,7 +10,7 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
 - **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.21.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.22.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -53,8 +53,8 @@ La antigua pestaña "Peticiones" está ahora dentro del tablón.
   objeto que fabrica (o púlsalo). Sale el botón **Ofrecer**: se abre una ventanita con el objeto
   ya puesto y la cantidad que llevas. Pulsa **Ofrecer** y listo: **gratis** por defecto.
 - El precio por unidad (*50 plata*, *1 oro*, *5 oro* u otro) está en **Más opciones**.
-- También con **Ofrecer objeto** en el tablón, para cosas que no fabricas: arrastras el objeto o
-  haces mayús+clic en él. Máximo 20 ofertas; duran 14 días.
+- Se ofrece **solo desde la ventana de profesión** (lo que fabricas: bolsas, equipo, pociones...).
+  Máximo 20 ofertas; duran 14 días.
 - En el tablón salen como **[Oferta]**. Los demás pulsan **Lo quiero** y dicen cuántos (no se
   puede pedir más de lo que queda libre). Pueden echarse atrás con **Ya no lo quiero**.
 - Al que ofrece le llega un aviso ("Bea quiere 3x Bolsa de lana"). En su oferta ve quién la
@@ -137,10 +137,12 @@ los materiales que te faltan (contando bolsas y banco):
   **más karma salen antes** en las listas.
 
 ### Hermandad (pestaña dentro de Pedidos)
-- **Lo que necesita la hermandad**: los oficiales añaden lo que hace falta (frascos para la
-  banda, materiales...) con su cantidad. Todos lo ven y pulsan **Aportar**: se lo mandas por
-  correo al oficial y la **donación se apunta sola** al enviarlo. Se ve cuánto se ha aportado y
-  quién ha donado más.
+- **Pedidos de la hermandad**: un oficial pide algo para la hermandad (frascos para la banda,
+  materiales...) con la ventana normal de **Pedir** (en su profesión o en *Pedir materiales*)
+  marcando **Para la hermandad (entre varios)**. Sale en el **Tablón** de todos como
+  *[Hermandad]* (arriba del todo) y en esta pestaña. **Lo abastecen entre varios**: cada uno
+  pulsa **Aportar**, dice cuántos y se lo manda por correo al oficial; se **apunta solo** al
+  enviarlo. Se ve cuánto falta y quién ha aportado más.
 - **Miembro de la semana**: quien más ha ayudado la semana pasada (pedidos enviados, ofertas y
   donaciones), y la clasificación de esta semana. También sale en el Inicio.
 - **Para oficiales** (rango 0 y 1 de la hermandad): el **anuncio** que sale arriba en el Inicio

@@ -52,7 +52,10 @@ H.ok(mineReq and mineReq.k == "i12405" and mineReq.pr == 1, "petición de ejempl
 H.ok(ns.Data.CanServe(mineReq, ns.Now()), "puedo atenderla")
 ns.UI.Open("board")
 local board = penv.HDFProfPanel.pageFrames.board
-H.eq(board.list.items[1].r.id, mineReq.id, "en el tablón, arriba la que es para mí")
+local firstReq
+for _, it in ipairs(board.list.items) do if it.kind == "req" and not firstReq then firstReq = it end end
+H.eq(firstReq.r.id, mineReq.id, "en el tablón, el primer pedido es el que corre prisa y puedo hacer")
+H.eq(board.list.items[1].kind, "need", "y antes, los pedidos de la hermandad")
 H.ok(#board.list.items >= 10, "el tablón muestra los pedidos de ejemplo: " .. #board.list.items)
 local anyNew = false
 for _, it in ipairs(board.list.items) do if it.new then anyNew = true end end

@@ -11,7 +11,8 @@ local HELP = table.concat({
     .. "pulsa |cffffffffLo quiero|r en una oferta. Al enviarlo por correo |cff40ff40se completa solo|r.",
   "· |cffffffffEn tu profesión|r: ratón sobre un material → |cffffffffPedir|r; sobre lo que fabricas → "
     .. "|cffffffffOfrecer|r. También en |cffffffffPedir materiales|r.",
-  "· |cffffffffHermandad|r: lo que necesita la hermandad (aporta por correo) y el miembro de la semana.",
+  "· |cffffffffPedidos de la hermandad|r |cffff9933[Hermandad]|r: los ponen los oficiales y se abastecen entre "
+    .. "varios con |cffffffffAportar|r. En la pestaña Hermandad, además, el miembro de la semana.",
   "· |cffffffffMis cosas|r: tus profesiones, tu personaje principal, avisos y |cffff8040modo demostración|r.",
   " ",
   "|cffffd100Karma|r: +1 por cada pedido u oferta que das y -1 por cada uno que recibes (tus alts suman contigo).",

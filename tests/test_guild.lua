@@ -121,12 +121,33 @@ local apage = aenv.HDFProfPanel.pageFrames.guild
 H.ok(apage.addNeed:IsShown() and apage.publish:IsShown() and apage.inactive:IsShown(), "Ana ve las herramientas de oficial")
 H.ok(apage.inactive:GetText():find("Sin el addon", 1, true), "lista de quien no tiene el addon")
 apage.addNeed:Click()
-local d = aenv.HDFProfOfferDialog
-H.ok(d:IsShown() and d.title:GetText():find("necesita", 1, true), "ventana de añadir necesidad")
-d.link:SetText(H.itemLink(13443))
-d.link:GetScript("OnTextChanged")(d.link, true)
-H.eq(d.qty:GetText(), "20", "cantidad por defecto: 20")
-d:Hide()
+H.ok(aenv.HDFProfPanel.pageFrames.materials:IsShown(), "Añadir lleva a Pedir materiales")
+-- Un oficial crea un pedido de hermandad desde la ventana normal de pedir.
+ana.ns.UI.OpenRequestDialog({ k = "i13446", q = 1 })
+local rd = aenv.HDFProfRequestDialog
+H.ok(rd.guild:IsShown(), "el oficial ve la casilla Para la hermandad")
+rd.qty:SetText("30")
+rd.guild:SetChecked(true)
+rd:Publish()
+H.Advance(15)
+local found
+for _, n in ipairs(cris.ns.Social.Needs(cris.ns.Now())) do if n.id == 13446 then found = n end end
+H.ok(found and found.q == 30 and found.owner == "Ana-Reino", "pedido de hermandad creado (30)")
+-- Cris (no oficial) no ve la casilla.
+cris.ns.UI.OpenRequestDialog({ k = "i13446", q = 1 })
+H.ok(not env.HDFProfRequestDialog.guild:IsShown(), "los demás no ven la casilla")
+env.HDFProfRequestDialog:Hide()
+-- En el tablón de Cris sale como [Hermandad] con Aportar, y aportan varios.
+cris.ns.UI.ShowPage("board")
+local cboard = env.HDFProfPanel.pageFrames.board
+cboard:Refresh()
+local needRow
+for _, row in ipairs(cboard.list.rows) do
+  if row.item and row.item.kind == "need" and row.item.need.id == 13446 then needRow = row end
+end
+H.ok(needRow and needRow.title:GetText():find("[Hermandad]", 1, true), "sale en el Tablón como [Hermandad]")
+H.eq(needRow.accept:GetText(), "Aportar", "con el botón Aportar")
+H.eq(cboard.offer, nil, "en el Tablón ya no hay Ofrecer objeto (se ofrece desde la profesión)")
 
 -- Modo demostración: Gerda hace de oficial con anuncio y necesidades.
 cris.ns.Demo.Set(true)

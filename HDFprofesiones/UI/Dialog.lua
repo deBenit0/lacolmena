@@ -84,6 +84,10 @@ local function create()
   end)
   dialog.plus:SetPoint("LEFT", dialog.qty, "RIGHT", 4, 0)
 
+  -- Solo oficiales: pedido de la hermandad (lo abastecen entre varios, cada uno lo que pueda).
+  dialog.guild = W.Check(dialog, "Para la hermandad (entre varios)")
+  dialog.guild:SetPoint("LEFT", dialog.plus, "RIGHT", 14, 0)
+
   -- Más opciones (materiales, prisa y propina): ocultas para que pedir sea directo.
   dialog.moreButton = W.Button(dialog, "Más opciones", 110, 20)
   dialog.moreButton:SetPoint("TOPLEFT", 24, -124)
@@ -208,6 +212,18 @@ local function create()
   function dialog:Publish()
     if not self.key then return end
     local q = tonumber(self.qty:GetText()) or 1
+    if self.guild:IsShown() and self.guild:GetChecked() then
+      local kind, id = ns.ParseKey(self.key)
+      local ok, err = ns.Social.AddNeed(kind == "i" and id or nil, q, ns.Now())
+      if not ok then
+        ns.Print(err)
+        return
+      end
+      self:Hide()
+      ns.Print("pedido de la hermandad publicado: %dx %s. Todos pueden aportar.", q, ns.KeyLabel(self.key))
+      ns.UI.Open("board")
+      return
+    end
     local copper = self:Tip()
     local r = ns.Sync.CreateRequest({
       k = self.key, pk = self.pk, q = q, m = self.mats:GetChecked() and true or false,
@@ -235,6 +251,8 @@ function ns.UI.OpenRequestDialog(opts)
   dialog:SetRush(nil)
   dialog:SetTip(0)
   dialog:SetExpanded(false)
+  dialog.guild:SetShown(ns.Social.AmOfficer())
+  dialog.guild:SetChecked(false)
   local open = Data.CountOpenBy(ns.Me(), ns.Now())
   dialog.info:SetText(string.format("Va a toda la hermandad (%d/%d abiertas).", open, Data.MAX_OPEN))
   dialog:Show()
