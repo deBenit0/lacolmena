@@ -1,0 +1,57 @@
+# Publica una versión del addon para la hermandad.
+# Se pone en marcha al subir una etiqueta "vX.Y.Z" (la misma versión que el .toc):
+# pasa las pruebas, empaqueta SOLO la carpeta HDFprofesiones en un ZIP y crea la release
+# en GitHub con ese ZIP, listo para descomprimir dentro de Interface\AddOns.
+name: Publicar versión
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que la etiqueta coincide con la versión del addon
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if ! grep -q "^## Version: $v$" HDFprofesiones/HDFprofesiones.toc; then
+            echo "La etiqueta $GITHUB_REF_NAME no coincide con la versión del .toc:"
+            grep "^## Version" HDFprofesiones/HDFprofesiones.toc
+            exit 1
+          fi
+
+      - name: Pasar las pruebas
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q lua5.1 lua-check
+          luacheck HDFprofesiones
+          lua5.1 tests/run.lua
+
+      - name: Empaquetar solo el addon
+        run: zip -r -q "HDFprofesiones-${GITHUB_REF_NAME}.zip" HDFprofesiones
+
+      - name: Crear la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notas.md <<'NOTAS'
+          ## Cómo instalarlo
+
+          1. Descarga **HDFprofesiones-*.zip** (abajo, en *Assets*).
+          2. Descomprímelo dentro de `World of Warcraft\_forever_\Interface\AddOns`.
+             Debe quedar `AddOns\HDFprofesiones\HDFprofesiones.toc`.
+          3. Si tenías una versión anterior, borra antes la carpeta `HDFprofesiones` vieja.
+          4. En el juego: ventana de hermandad (J) → pestaña del engranaje.
+
+          Todos los de la hermandad deben tener la misma versión.
+          NOTAS
+          gh release create "$GITHUB_REF_NAME" "HDFprofesiones-${GITHUB_REF_NAME}.zip" \
+            --title "Los hijos del Fundillo ${GITHUB_REF_NAME}" \
+            --notes-file notas.md

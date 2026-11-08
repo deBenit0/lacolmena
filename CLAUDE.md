@@ -10,6 +10,12 @@
 - Idioma de trabajo: español.
 
 ## Desarrollo
+- **Ramas:** el proyecto completo (addon, pruebas, documentación, estas instrucciones) está en la rama
+  **`desarrollo`**. La rama **`main`** es pública para la hermandad y solo lleva la carpeta
+  `HDFprofesiones` y un README corto: al publicar, se copia ahí solo el addon (nada más).
+- **Releases:** al subir una etiqueta `vX.Y.Z` (igual que `## Version` del .toc) sobre un commit de
+  `desarrollo`, la Action `.github/workflows/publicar.yml` pasa las pruebas y publica en Releases un
+  ZIP que solo contiene `HDFprofesiones`.
 - El addon está en `HDFprofesiones/` (cliente Classic moderno, interfaz 16001, Lua 5.1).
 - Antes de subir cambios: `luacheck HDFprofesiones` y `lua5.1 tests/run.lua` (deben pasar sin fallos).
   Si faltan: `apt-get install -y lua5.1 lua-check`.

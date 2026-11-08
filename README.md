@@ -14,7 +14,9 @@ Esta es la **fase 1** (versión 0.26.0). El diseño completo está en [`DISEÑO.
 
 ## Instalación
 
-1. Descarga el repositorio (botón **Code → Download ZIP** en GitHub) o el ZIP del addon.
+1. Descarga el ZIP del addon en **Releases** (columna derecha de la página del repositorio en
+   GitHub): `HDFprofesiones-vX.Y.Z.zip`. Solo trae el addon. (También vale **Code → Download ZIP**,
+   pero trae todo el proyecto: de ahí solo se copia la carpeta `HDFprofesiones`.)
 2. Copia la carpeta **`HDFprofesiones`** dentro de `World of Warcraft\_forever_\Interface\AddOns`.
    Debe quedar `AddOns\HDFprofesiones\HDFprofesiones.toc` (sin carpetas de más en medio).
 3. En la pantalla de personajes, pulsa **AddOns** y comprueba que *Los hijos del Fundillo* está activado.
