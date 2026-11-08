@@ -708,8 +708,9 @@ ns.UI.RegisterPage("board", function(page)
       local text = (ns.KeyName(item.k) .. " " .. ns.ShortName(item.author)):lower()
       if not text:find(state.search, 1, true) then return false end
     end
-    -- "Solo lo que puedo hacer": pedidos que puedo hacer y lo que tengo que enviar.
-    if state.onlyMine and not item.canServe and item.pending == 0 then return false end
+    -- "Solo mis profesiones": lo que puedo hacer, lo que tengo que enviar y lo mío (mis propios
+    -- pedidos y ofertas no se esconden nunca: si no, al publicar uno "desaparecía").
+    if state.onlyMine and not item.canServe and item.pending == 0 and not item.mine then return false end
     return true
   end
 
@@ -721,10 +722,11 @@ ns.UI.RegisterPage("board", function(page)
     page.showButton:SetText(SHOW[f.show].label)
     page.catButton:SetText(CATEGORIES[f.cat].label)
     local all, stats = collect(page.seenAt)
-    local items = {}
+    local items, hidden = {}, 0
     for _, item in ipairs(all) do
-      if passes(item, f) then items[#items + 1] = item end
+      if passes(item, f) then items[#items + 1] = item else hidden = hidden + 1 end
     end
+    page.hidden = hidden
     table.sort(items, function(a, b)
       local ra, rb = rank(a), rank(b)
       if ra ~= rb then return ra < rb end
@@ -738,6 +740,7 @@ ns.UI.RegisterPage("board", function(page)
     local text = string.format("Pedidos: |cffffffff%d|r  Hermandad: |cffff9933%d|r  Ofertas: |cff40c0ff%d|r  Puedes: |cff40ff40%d|r",
       stats.open, stats.guild, stats.offers, stats.servable)
     if stats.new > 0 then text = text .. string.format("  Nuevos: |cffffd100%d|r", stats.new) end
+    if hidden > 0 then text = text .. string.format("  |cff999999(%d ocultos por filtros)|r", hidden) end
     page.summary:SetText(text)
     local none = #items == 0
     page.empty:SetShown(none)
