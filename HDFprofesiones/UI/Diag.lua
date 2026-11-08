@@ -56,6 +56,12 @@ local CHECKS = {
     if n > 0 then return true, n .. " vistos" end
     return nil, "aún no has visto a nadie más con el addon"
   end },
+  { "Misma versión que los demás", function()
+    local other = ns.Sync.OtherVersions()
+    if next(ns.Sync.peers) == nil then return nil, "no hay nadie más conectado con el addon" end
+    if #other == 0 then return true, "todos con la " .. ns.VERSION end
+    return false, "con otra versión: " .. table.concat(other, ", ") .. " (con versiones distintas no se ven los pedidos)"
+  end },
   { "Ventana de profesión", function()
     if ProfessionsFrame then
       local form = ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
