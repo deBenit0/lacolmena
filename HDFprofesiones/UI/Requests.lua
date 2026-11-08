@@ -198,6 +198,11 @@ ns.UI.RegisterPage("requests", function(page)
   detail.b2:SetPoint("LEFT", detail.b1, "RIGHT", 4, 0)
   detail.b3 = W.Button(detail, "", 98, 22)
   detail.b3:SetPoint("LEFT", detail.b2, "RIGHT", 4, 0)
+  -- Solo oficiales: marcar como prioridad de la hermandad o cerrar un pedido de otro.
+  detail.pri = W.Button(detail, "Prioridad", 98, 20)
+  detail.pri:SetPoint("BOTTOMLEFT", detail.b1, "TOPLEFT", 0, 4)
+  detail.mod = W.Button(detail, "Cerrar (oficial)", 120, 20)
+  detail.mod:SetPoint("LEFT", detail.pri, "RIGHT", 4, 0)
 
   detail.empty = W.Text(detail, "GameFontNormal", "CENTER")
   detail.empty:SetTextColor(0.6, 0.6, 0.6)
@@ -278,6 +283,19 @@ ns.UI.RegisterPage("requests", function(page)
     local r = current()
     local regions = { detail.icon, detail.title, detail.sub, detail.info, detail.commitsLabel, commits, detail.b1, detail.b2, detail.b3 }
     for _, region in ipairs(regions) do region:SetShown(r ~= nil) end
+    local officer = r ~= nil and ns.Social.AmOfficer() and Data.IsActiveState(Data.RequestInfo(r, ns.Now()).state)
+    detail.pri:SetShown(officer)
+    detail.mod:SetShown(officer and r.a ~= ns.Me())
+    if officer then
+      local isPri = ns.Social.IsPriority(r.id)
+      detail.pri:SetText(isPri and "Quitar prioridad" or "Prioridad")
+      detail.pri:SetScript("OnClick", function() ns.Social.SetPriority(r.id, not isPri, ns.Now()) end)
+      detail.mod:SetScript("OnClick", function()
+        W.Confirm("¿Cerrar este pedido de " .. ns.ShortName(r.a) .. " como oficial?", function()
+          ns.Social.ModClose(r.id, ns.Now())
+        end)
+      end)
+    end
     detail.empty:SetShown(r == nil)
     if not r then
       detail.empty:SetText(#list.items > 0 and "Elige una petición de la lista." or "No hay peticiones en esta vista.")
@@ -289,12 +307,16 @@ ns.UI.RegisterPage("requests", function(page)
     detail.iconTex:SetTexture(icon)
     detail.title:SetText(string.format("%dx %s", r.q, link or name or ns.KeyName(r.k)))
     local authorEntry = ns.G().entries[r.a]
+    local main = ns.Social.MainOf(r.a)
     detail.sub:SetText("Pide " .. ns.ColoredName(r.a, authorEntry and authorEntry.c or (Guild.Info(r.a) or {}).class)
+      .. (main ~= r.a and (" (" .. ns.ShortName(main) .. ")") or "")
       .. " (karma " .. Data.KarmaText(r.a) .. ")"
       .. " |cffbbbbbbhace " .. ns.FormatDuration(now - (r.t or now)) .. "|r")
 
     local lines = {}
     lines[#lines + 1] = "Estado: " .. stateText(r, info)
+    if info.moderated then lines[#lines + 1] = "|cffff8040Lo ha cerrado un oficial.|r" end
+    if ns.Social.IsPriority(r.id) then lines[#lines + 1] = "|cffff80ffPrioridad de la hermandad (lo ha marcado un oficial).|r" end
     if Data.IsActiveState(info.state) then
       lines[#lines + 1] = string.format("Entregadas: %d de %d", info.delivered, r.q)
       lines[#lines + 1] = "Caduca en " .. ns.FormatDuration(info.expires - now)

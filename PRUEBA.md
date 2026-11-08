@@ -69,7 +69,20 @@ B debe tener una profesión que fabrique algo que A necesite (o que pueda recole
    → Los dos reciben el recordatorio "... empieza en ...".
 6. **A** pulsa **Cancelar**. → Los dos la ven cancelada.
 
-## 4. Al terminar (los dos)
+## 4. Hermandad (necesita un oficial: rango 0 o 1)
+
+1. **El oficial** va a **Pedidos → Hermandad**, escribe un anuncio y pulsa **Publicar**.
+   → El otro lo ve arriba en el **Inicio**.
+2. **El oficial** pulsa **Añadir**, elige un objeto (por ejemplo una poción) y pone 5.
+   → El otro lo ve en *Lo que necesita la hermandad*.
+3. **El otro** pulsa **Aportar**, abre el buzón y manda 2 al oficial.
+   → Sale "Aportado: 2 de 5" con su nombre. Sube en *Esta semana*.
+4. **El oficial** abre un pedido del otro en el Tablón (**Ver pedido**) y pulsa **Prioridad**.
+   → En el Tablón del otro sale con *[Prioridad]*.
+5. Si alguno tiene un **alt**: entra con él una vez. → Sale como "Alt (Principal)" y su karma es
+   el mismo que el del principal.
+
+## 5. Al terminar (los dos)
 
 1. Salid del juego y volved a entrar. → Siguen los pedidos, ofertas, quedadas y el karma.
 2. Pulsa **Comprobar el addon** otra vez y, si hay errores guardados, **Copiar informe** y

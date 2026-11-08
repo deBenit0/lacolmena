@@ -6,29 +6,20 @@ local W = ns.W
 local LOGO = "Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay"
 
 local HELP = table.concat({
-  "|cffffd100Pedidos|r: pide lo que necesitas a quien sabe fabricarlo o recolectarlo, y acepta los "
-    .. "encargos de los demás.",
-  "   |cffffffff· Tablón|r: los pedidos de la gente en este momento. Los pedidos van a toda la "
-    .. "hermandad y |cffffffffse lo queda el primero que lo acepta|r, diciendo cuándo lo tendrá (ya, antes "
-    .. "de 2 horas u hoy; puede pedir más tiempo una vez). Si no lo entrega a tiempo, vuelve al tablón. "
-    .. "Mándalo por correo y el pedido "
-    .. "|cff40ff40se completa solo|r al enviarlo.",
-  "   |cffffffff· Ofrecer|r: en tu profesión, pasa el ratón por lo que fabricas y pulsa |cffffffffOfrecer|r "
-    .. "(o usa Ofrecer objeto en el tablón). Gratis o con precio. "
-    .. "Quien lo quiera pulsa |cffffffffLo quiero|r y se lo mandas por correo. En el tablón puedes buscar "
-    .. "y filtrar por pedidos, ofertas y categoría.",
-  "   |cffffffff· Pedir materiales|r: busca el material, elige cuántos, qué prisa tienes y si das "
-    .. "propina. También desde tu ventana de profesión: pasa el ratón por un material y pulsa |cffffffffPedir|r.",
-  "   |cffffffff· Mis cosas|r: tus profesiones, los avisos y el |cffff8040modo demostración|r "
-    .. "(pedidos de ejemplo para probar).",
-  "|cffffd100Karma|r: +1 por cada pedido que entregas y -1 por cada uno que recibes. "
-    .. "A quien más ayuda le atienden antes.",
-  "|cffffd100Mazmorras|r: propón una mazmorra (ahora o a una hora) y los demás se apuntan con los "
-    .. "roles que pueden hacer. Quien la propone pulsa |cffffffffHacer grupo|r: el addon elige 1 tanque, "
-    .. "1 sanador y 3 DPS, y con |cffffffffInvitar al grupo|r los invita.",
-  "|cffffd100Eventos|r: próximamente.",
+  "|cffffd100Pedidos|r",
+  "· |cffffffffTablón|r: lo que pide y ofrece la gente. Acepta un encargo (diciendo cuándo lo tendrás) o "
+    .. "pulsa |cffffffffLo quiero|r en una oferta. Al enviarlo por correo |cff40ff40se completa solo|r.",
+  "· |cffffffffEn tu profesión|r: ratón sobre un material → |cffffffffPedir|r; sobre lo que fabricas → "
+    .. "|cffffffffOfrecer|r. También en |cffffffffPedir materiales|r.",
+  "· |cffffffffHermandad|r: lo que necesita la hermandad (aporta por correo) y el miembro de la semana.",
+  "· |cffffffffMis cosas|r: tus profesiones, tu personaje principal, avisos y |cffff8040modo demostración|r.",
+  " ",
+  "|cffffd100Karma|r: +1 por cada pedido u oferta que das y -1 por cada uno que recibes (tus alts suman contigo).",
+  "|cffffd100Mazmorras|r: propón una y la gente se apunta por rol; |cffffffffHacer grupo|r elige 1 tanque, "
+    .. "1 sanador y 3 DPS.",
+  "|cffffd100Eventos|r y |cffffd100Raids|r: próximamente.",
   "|cff999999Para que tus recetas salgan a los demás, abre una vez la ventana de cada profesión.|r",
-}, "\n\n")
+}, "\n")
 
 ns.UI.RegisterPage("home", function(page)
   page.motto = W.Text(page, "GameFontNormalHuge", "CENTER")
@@ -39,8 +30,14 @@ ns.UI.RegisterPage("home", function(page)
   page.welcome = W.Text(page, "GameFontHighlight", "CENTER")
   page.welcome:SetPoint("TOP", page.motto, "BOTTOM", 0, -6)
 
+  -- Anuncio de los oficiales (el más reciente).
+  page.announce = W.Text(page, "GameFontHighlight")
+  page.announce:SetPoint("TOPLEFT", 14, -62)
+  page.announce:SetWidth(452)
+  page.announce:SetJustifyH("LEFT")
+
   page.help = W.Text(page, "GameFontHighlightSmall")
-  page.help:SetPoint("TOPLEFT", 14, -66)
+  page.help:SetPoint("TOPLEFT", 14, -100)
   page.help:SetWidth(452)
   page.help:SetJustifyV("TOP")
   page.help:SetSpacing(2)
@@ -67,6 +64,8 @@ ns.UI.RegisterPage("home", function(page)
     page.welcome:SetText("Bienvenido, " .. (me and ns.ShortName(me) or "fundillero") .. ", al addon de "
       .. ns.TITLE .. ".")
     local inGuild = ns.G() ~= nil
+    local an = inGuild and ns.Social.Announcement()
+    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.ShortName(an.name), an.x) or "")
     page.goBoard:SetEnabled(inGuild)
     page.goAsk:SetEnabled(inGuild)
     if not inGuild then
@@ -78,6 +77,10 @@ ns.UI.RegisterPage("home", function(page)
     if s.new > 0 then parts[#parts + 1] = string.format("|cffffd100%d nuevos|r", s.new) end
     if s.servable > 0 then parts[#parts + 1] = string.format("|cff40ff40%d puedes hacerlos|r", s.servable) end
     if s.toSend > 0 then parts[#parts + 1] = string.format("|cff66ccfftienes %d encargos por enviar|r", s.toSend) end
+    local best = ns.Social.MemberOfTheWeek(ns.Now())
+    if best then
+      parts[#parts + 1] = string.format("|cffffd100miembro de la semana: %s|r", ns.Social.Who(best.name))
+    end
     local runs = 0
     for _, r in pairs(ns.Dungeons.Runs() or {}) do
       if ns.Dungeons.State(r, ns.Now()) == "open" then runs = runs + 1 end

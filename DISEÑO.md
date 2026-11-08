@@ -64,6 +64,16 @@ Coordinar las profesiones de la hermandad **Los hijos del Fundillo**:
 - Tablón: pedidos y ofertas juntos; buscador, Ver (todo/pedidos/ofertas) y categoría
   (materiales, pociones y comida, bolsas, armas y armaduras, otros).
 
+## Hermandad
+- Alts: cada personaje publica su principal (mn); por defecto el de más nivel de los míos en
+  esta hermandad, se cambia en Mis cosas. Karma y ayudas se suman por persona.
+- Oficiales = rango 0 y 1. Publican en su ficha anuncio (an), pedidos cerrados por moderación
+  (mc), prioridad (mp) y necesidades (nd). Solo cuenta si quien lo publica es oficial en la lista
+  de la hermandad.
+- Necesidades: se dona por correo al oficial y se apunta solo (dn en la ficha del que dona).
+- Miembro de la semana: ayudas (envíos de pedidos, ofertas y donaciones) por semana (wk).
+- Pestañas Eventos y Raids visibles pero desactivadas.
+
 ## Mazmorras (quedadas)
 - Proponer: mazmorra de la lista (Classic + 9 nuevas de WoW Forever, con id fijo), hora (ahora o
   en tramos de 15 min) y roles de quien propone.

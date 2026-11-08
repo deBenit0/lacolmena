@@ -104,7 +104,7 @@ local function collect(seenAt)
         kind = "req", id = r.id, k = r.k, author = r.a, t = r.t or 0,
         r = r, info = info, me = me, now = now, mine = mine, pending = pending,
         canServe = Data.CanServe(r, now), acceptable = canAccept(r, info, me),
-        karma = Data.KarmaFor(r.a),
+        karma = Data.KarmaFor(r.a), priority = ns.Social.IsPriority(r.id),
         new = not mine and pending == 0 and (r.t or 0) > (seenAt or 0),
       }
       if pending > 0 then stats.toSend = stats.toSend + 1 end
@@ -141,6 +141,7 @@ local function rank(x)
   if x.pending > 0 then return 0 end -- lo que tengo que enviar (encargos y ofertas pedidas)
   if x.claimed then return 1 end     -- ofertas que he pedido
   if x.mine then return 5 end
+  if x.priority then return 1.5 end  -- marcadas por un oficial
   if x.canServe then return 2 end
   if x.new then return 3 end
   return 4
@@ -184,9 +185,9 @@ local function createOfferDialog()
   d:SetPoint("CENTER", 0, 60)
   d:Hide()
   tinsert(UISpecialFrames, "HDFProfOfferDialog")
-  local title = W.Text(d, "GameFontNormal")
-  title:SetPoint("TOP", 0, -18)
-  title:SetText("Ofrecer a la hermandad")
+  d.title = W.Text(d, "GameFontNormal")
+  d.title:SetPoint("TOP", 0, -18)
+  d.title:SetText("Ofrecer a la hermandad")
   local close = CreateFrame("Button", nil, d, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
@@ -308,7 +309,9 @@ local function createOfferDialog()
     self.link:Hide()
     local have = ns.ItemCount(id)
     self.have:SetText(string.format("|cffbbbbbbtienes %d|r", have))
-    if (tonumber(self.qty:GetText()) or 0) < 1 then self.qty:SetText(tostring(math.max(1, have))) end
+    if (tonumber(self.qty:GetText()) or 0) < 1 then
+      self.qty:SetText(tostring(self.mode == "need" and 20 or math.max(1, have)))
+    end
   end
 
   d.info = W.Text(d, "GameFontHighlightSmall")
@@ -316,23 +319,34 @@ local function createOfferDialog()
   d.info:SetTextColor(0.7, 0.7, 0.7)
   d.info:SetText("Quien lo quiera te lo pide; se lo mandas por correo.")
   local publish = W.Button(d, "Ofrecer", 96, 22, function() d:Publish() end)
+  d.publishButton = publish
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(d, "Cancelar", 86, 22, function() d:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
 
   function d:Publish()
-    local ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
+    local ok, err
+    if self.mode == "need" then
+      ok, err = ns.Social.AddNeed(self.id, tonumber(self.qty:GetText()), ns.Now())
+    else
+      ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
+    end
     if not ok then
       ns.Print(err)
       return
     end
     self:Hide()
-    ns.Print("ofrecido en el Tablón: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
+    if self.mode == "need" then
+      ns.Print("añadido a lo que necesita la hermandad: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
+    else
+      ns.Print("ofrecido en el Tablón: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
+    end
   end
 end
 
 -- Abre la ventana de ofrecer. Con "id", el objeto ya viene elegido (desde la profesión).
-function ns.UI.OpenOfferDialog(id, qty)
+-- mode = "need": la misma ventana para que un oficial añada lo que necesita la hermandad.
+function ns.UI.OpenOfferDialog(id, qty, mode)
   if not ns.G() then
     ns.Print("no estás en ninguna hermandad.")
     return
@@ -348,7 +362,16 @@ function ns.UI.OpenOfferDialog(id, qty)
   d.iconTex:SetTexture(ns.QUESTION_ICON)
   d:SetPrice(0)
   d:SetExpanded(false)
+  d.mode = mode
+  local need = mode == "need"
+  d.title:SetText(need and "Lo que necesita la hermandad" or "Ofrecer a la hermandad")
+  d.publishButton:SetText(need and "Añadir" or "Ofrecer")
+  d.moreButton:SetShown(not need)
+  d.summary:SetShown(not need)
+  d.info:SetText(need and "Todos lo verán en Hermandad y podrán aportar por correo."
+    or "Quien lo quiera te lo pide; se lo mandas por correo.")
   if id then d:SetItem(id) end
+  if need and not id then d.qty:SetText("") end
   d:Show()
 end
 
@@ -403,6 +426,7 @@ ns.UI.RegisterPage("board", function(page)
   local function updateRequestRow(row, item)
     local r, info = item.r, item.info
     local tags = ""
+    if item.priority then tags = tags .. "|cffff80ff[Prioridad]|r " end
     if item.pending > 0 then tags = tags .. "|cff66ccff[Tu encargo]|r " end
     if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
     if item.mine then tags = tags .. "|cff999999[Tuyo]|r " end
@@ -410,7 +434,7 @@ ns.UI.RegisterPage("board", function(page)
     if item.canServe and item.pending == 0 then title = title .. "  |cff40ff40(puedes hacerlo)|r" end
     row.title:SetText(title)
 
-    local parts = { "Pide " .. ns.ShortName(r.a) .. " (" .. Data.KarmaText(r.a) .. ")" }
+    local parts = { "Pide " .. ns.Social.Who(r.a) .. " (" .. Data.KarmaText(r.a) .. ")" }
     parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (r.t or item.now))
     if item.pending > 0 then
       local by = r.c[item.me].by
@@ -420,7 +444,7 @@ ns.UI.RegisterPage("board", function(page)
         or "se acaba") .. "|r") or "por enviar"
     elseif item.mine and info.owner then
       local cm = r.c[info.owner]
-      parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
+      parts[#parts + 1] = "lo hace " .. ns.Social.Who(info.owner)
         .. (cm.by and (" (plazo " .. ns.FormatDuration(math.max(0, cm.by - item.now)) .. ")") or "")
     else
       parts[#parts + 1] = "nadie lo ha cogido"
@@ -474,7 +498,7 @@ ns.UI.RegisterPage("board", function(page)
     if item.new then tags = tags .. "|cffffd100¡Nuevo!|r " end
     if item.mine then tags = tags .. "|cff999999[Tuya]|r " end
     row.title:SetText(tags .. string.format("%dx %s", o.q, ns.KeyLabel(item.k)) .. "  (" .. priceText(o.g) .. ")")
-    local parts = { "Ofrece " .. ns.ShortName(o.owner) .. " (" .. Data.KarmaText(o.owner) .. ")" }
+    local parts = { "Ofrece " .. ns.Social.Who(o.owner) .. " (" .. Data.KarmaText(o.owner) .. ")" }
     parts[#parts + 1] = "hace " .. ns.FormatDuration(item.now - (o.t or item.now))
     parts[#parts + 1] = o.free > 0 and string.format("quedan %d libres", o.free) or "|cffff9933todo pedido|r"
     row.sub:SetText(table.concat(parts, "  |cff666666·|r  "))

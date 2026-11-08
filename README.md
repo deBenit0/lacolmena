@@ -8,9 +8,9 @@ por enviar), y el **logo de NorrisPlay**. Desde ahí vas a cada sección:
 - **Pedidos** (la que está hecha): cada miembro pide lo que necesita a quien sabe fabricarlo o
   recolectarlo, pagando si quiere.
 - **Mazmorras**: proponer una mazmorra y que la gente se apunte por rol; el addon hace el grupo.
-- **Eventos**: se ve pero aún no se puede abrir (próximamente).
+- **Eventos** y **Raids**: se ven pero aún no se pueden abrir (próximamente).
 
-Esta es la **fase 1** (versión 0.20.1). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
+Esta es la **fase 1** (versión 0.21.0). El diseño completo está en [`DISEÑO.md`](DISEÑO.md).
 
 ## Instalación
 
@@ -134,6 +134,24 @@ los materiales que te faltan (contando bolsas y banco):
 - Se ve junto a cada nombre, hay una clasificación en Mis cosas y las peticiones de quien tiene
   **más karma salen antes** en las listas.
 
+### Hermandad (pestaña dentro de Pedidos)
+- **Lo que necesita la hermandad**: los oficiales añaden lo que hace falta (frascos para la
+  banda, materiales...) con su cantidad. Todos lo ven y pulsan **Aportar**: se lo mandas por
+  correo al oficial y la **donación se apunta sola** al enviarlo. Se ve cuánto se ha aportado y
+  quién ha donado más.
+- **Miembro de la semana**: quien más ha ayudado la semana pasada (pedidos enviados, ofertas y
+  donaciones), y la clasificación de esta semana. También sale en el Inicio.
+- **Para oficiales** (rango 0 y 1 de la hermandad): el **anuncio** que sale arriba en el Inicio
+  de todos, y la lista de **inactivos** (más de 14 días sin entrar) y de **quién no tiene el
+  addon**. En cada pedido pueden marcarlo como **Prioridad** (sale arriba en el Tablón de todos)
+  o **cerrarlo** si es abusivo. Lo de oficial solo cuenta si de verdad tiene ese rango.
+
+### Personajes alternativos
+- Tus personajes se unen solos: el de **más nivel** es tu **principal** (lo puedes cambiar en
+  *Mis cosas*). Los demás salen como "Beita (Bea)".
+- El **karma** y las ayudas de la semana son **por persona**: lo que haga un alt suma al principal.
+- Cada personaje tiene que entrar una vez con el addon para que se sepa que es tuyo.
+
 ### Mazmorras
 - **Proponer mazmorra**: eliges la mazmorra de la lista (las de Classic y las **9 nuevas de WoW
   Forever**, marcadas como *nueva*, con su rango de niveles), la hora (**Ahora** o una hora
@@ -164,7 +182,8 @@ aviso con **Lo hago yo**). Para probar todo el proceso:
    se completa.
 3. A los pocos segundos el de ejemplo lo "recibe", te da las gracias y **sube tu karma**.
 
-También salen **ofertas de ejemplo** (bolsas, pociones, comida): pide una con **Lo quiero** y a
+Gerda hace de **oficial de ejemplo** (anuncio y necesidades), Olaf es un **alt** de Bruno y hay
+ayudas de la semana. También salen **ofertas de ejemplo** (bolsas, pociones, comida): pide una con **Lo quiero** y a
 los pocos segundos te la "mandan". Y dos quedadas de mazmorra: una **tuya** con 8 apuntados para probar **Hacer
 grupo**, y otra de un jugador de ejemplo para probar a apuntarte.
 

@@ -11,12 +11,29 @@ ns.UI.RegisterPage("mine", function(page)
   page.profText:SetSize(290, 150)
   page.profText:SetJustifyV("TOP")
 
+  -- Personaje principal: los alts suman karma y ayudas con él. Por defecto, el de más nivel.
+  local mainLabel = W.Text(page, "GameFontNormalSmall")
+  mainLabel:SetPoint("TOPLEFT", 8, -190)
+  mainLabel:SetText("Personaje principal:")
+  page.mainButton = W.Button(page, "", 150, 22, function()
+    local chars = ns.Social.MyChars()
+    if #chars < 2 then
+      ns.Print("solo conozco este personaje tuyo. Entra con tus alts (con el addon) y podrás elegir.")
+      return
+    end
+    local current = ns.Social.MyMain()
+    local nextIdx = 1
+    for i, ch in ipairs(chars) do
+      if ch.name == current then nextIdx = i % #chars + 1 end
+    end
+    ns.Social.SetMyMain(chars[nextIdx].name)
+    page:Refresh()
+  end)
+  page.mainButton:SetPoint("LEFT", mainLabel, "RIGHT", 8, 0)
   page.hint = W.Text(page, "GameFontHighlightSmall")
-  page.hint:SetPoint("TOPLEFT", 8, -186)
+  page.hint:SetPoint("TOPLEFT", 8, -214)
   page.hint:SetWidth(290)
   page.hint:SetTextColor(0.7, 0.7, 0.7)
-  page.hint:SetText("Abre la ventana de cada profesión (sin filtros) para publicar tus recetas. "
-    .. "Los cooldowns se actualizan cada vez que la abres.")
 
   page.unavailable = W.Check(page, "No disponible (sin avisos; apareces el último)", function(checked)
     ns.Sync.SetUnavailable(checked)
@@ -83,6 +100,12 @@ ns.UI.RegisterPage("mine", function(page)
     page.alerts:SetChecked(ns.db.settings.alerts and true or false)
     page.sound:SetChecked(ns.db.settings.sound and true or false)
     page.demo:SetChecked(ns.db.settings.demo and true or false)
+    local main = ns.Social.MyMain()
+    page.mainButton:SetText(ns.ShortName(main))
+    local nChars = #ns.Social.MyChars()
+    page.hint:SetText(main == me and (nChars > 1 and "Tus alts suman karma y ayudas contigo (pulsa para cambiar)."
+      or "Tus alts suman karma y ayudas con tu principal.")
+      or ("Este es un alt de " .. ns.ShortName(main) .. "."))
     local nErrors = #(ns.db.errors or {})
     page.errors:SetText(nErrors > 0 and string.format("|cffff8040Hay %d error%s guardado%s: pulsa Copiar informe.|r",
       nErrors, nErrors > 1 and "es" or "", nErrors > 1 and "s" or "") or "|cff999999Sin errores guardados.|r")
@@ -115,8 +138,14 @@ ns.UI.RegisterPage("mine", function(page)
     end
     stats[#stats + 1] = string.format("Compañeros con el addon vistos hoy: %d", peers)
     -- Clasificación de karma (los 5 primeros).
-    local ranking = {}
-    for name in pairs(g.entries) do ranking[#ranking + 1] = { name = name, k = Data.KarmaFor(name) } end
+    local ranking, people = {}, {}
+    for name in pairs(g.entries) do
+      local person = ns.Social.MainOf(name)
+      if not people[person] then
+        people[person] = true
+        ranking[#ranking + 1] = { name = person, k = Data.KarmaFor(person) }
+      end
+    end
     table.sort(ranking, function(a, b)
       if a.k ~= b.k then return a.k > b.k end
       return a.name < b.name

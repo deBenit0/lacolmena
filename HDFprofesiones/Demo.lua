@@ -173,6 +173,34 @@ local function say(author, text)
   ns.Print("|cffff8040[ejemplo]|r " .. ns.ShortName(author) .. ": " .. text)
 end
 
+-- Hermandad de ejemplo: anuncio y necesidades de Gerda (oficial), donaciones, un alt
+-- (Olaf es alt de Bruno) y ayudas de la semana.
+function Demo.AddGuild(g, now)
+  local S = ns.Social
+  local gerda = g.entries[full("Gerda")]
+  if gerda then
+    gerda.an = { x = "Este sábado a las 21:00 vamos a Onyxia. ¡Traed frascos y resistencia al fuego!", t = now - 3600 }
+    gerda.nd = { [13443] = { q = 40, t = now - 86400 }, [12360] = { q = 10, t = now - 86400 } }
+  end
+  local donors = { { "Ivette", 13443, 15 }, { "Mortis", 13443, 10 }, { "Chispa", 12360, 3 } }
+  for _, d in ipairs(donors) do
+    local e = g.entries[full(d[1])]
+    if e then
+      e.dn = e.dn or {}
+      e.dn[full("Gerda") .. ":" .. d[2]] = { n = d[3], t = now - 3600 }
+    end
+  end
+  local olaf = g.entries[full("Olaf")]
+  if olaf then olaf.mn = full("Bruno") end
+  local week = S.Week(now)
+  local helps = { Bruno = { 4, 9 }, Olaf = { 2, 3 }, Ivette = { 6, 5 }, Tula = { 3, 11 }, Kael = { 1, 2 } }
+  for name, h in pairs(helps) do
+    local e = g.entries[full(name)]
+    if e then e.wk = { w = week, n = h[1], pn = h[2] } end
+  end
+  S.Invalidate()
+end
+
 -- Has pedido algo de una oferta de ejemplo: te lo "manda" a los pocos segundos.
 function Demo.OnClaim(owner, id, q)
   local me = ns.Me()
@@ -230,6 +258,11 @@ end
 
 function Demo.IsDemo(name)
   return type(name) == "string" and name:sub(-#REALM - 1) == "-" .. REALM
+end
+
+-- En el modo demostración, Gerda hace de oficial (anuncio y necesidades de ejemplo).
+function Demo.IsOfficer(name)
+  return name == full("Gerda")
 end
 
 function Demo.IsOnline(name)
@@ -316,6 +349,7 @@ function Demo.Enable()
   Demo.mine = addMyRequests(g, now)
   Demo.AddRuns(g, now)
   Demo.AddOffers(g, now)
+  Demo.AddGuild(g, now)
   Data.indexDirty = true
   ns.Fire("DATA_CHANGED", "demo")
 end

@@ -129,6 +129,7 @@ function Data.SanitizeEntry(e)
     out.p = any and profs or nil
   end
   if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
+  if ns.Social then ns.Social.SanitizeInto(out, e) end -- alts, oficiales, necesidades, ayudas
   return out
 end
 
@@ -201,6 +202,7 @@ function Data.BuildMyEntry(now)
   end
   e.p = anyProf and profs or nil
   if ns.Offers then ns.Offers.BuildInto(e, now) end
+  if ns.Social then ns.Social.BuildInto(e, now) end
   return e
 end
 
@@ -337,15 +339,19 @@ end
 
 -- Karma de un personaje, en puntos (1 punto por pedido): los pedidos que le reconocen los
 -- demás por entregar, menos los que ha recibido él.
+-- Se suma por persona: el principal y todos sus alts.
 function Data.KarmaFor(name)
   local g = ns.G()
   if not g then return 0 end
+  local mainOf = ns.Social and ns.Social.MainOf or function(n) return n end
+  local person = mainOf(name)
   local copper = 0
-  for _, e in pairs(g.entries) do
-    if e.kc and e.kc[name] then copper = copper + e.kc[name] end
+  for ename, e in pairs(g.entries) do
+    for who, v in pairs(e.kc or {}) do
+      if who == person or mainOf(who) == person then copper = copper + v end
+    end
+    if e.kd and (ename == person or mainOf(ename) == person) then copper = copper - e.kd end
   end
-  local own = g.entries[name]
-  if own and own.kd then copper = copper - own.kd end
   if copper >= 0 then return math.floor(copper / 10000) end
   return -math.floor(-copper / 10000)
 end
@@ -658,8 +664,11 @@ function Data.RequestInfo(r, now)
   table.sort(info.commits, function(x, y) return x.name < y.name end)
   info.expires = max(r.t or 0, r.rn or 0) + Data.REQUEST_TTL
   info.remaining = max(0, r.q - info.delivered - info.pending)
+  local modClosed = ns.Social and ns.Social.IsModClosed(r.id)
   if r.x then
     info.state, info.ended = "closed", r.x
+  elseif modClosed and info.delivered < r.q then
+    info.state, info.ended, info.moderated = "closed", modClosed, true
   elseif info.delivered >= r.q then
     local last = 0
     for _, cm in pairs(r.c or {}) do last = max(last, cm.dv or 0, cm.sv or 0) end

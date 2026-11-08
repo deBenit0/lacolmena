@@ -12,6 +12,7 @@ local SECTIONS = {
   { id = "orders", label = "Pedidos" },
   { id = "dungeons", label = "Mazmorras" },
   { id = "events", label = "Eventos", soon = true },
+  { id = "raids", label = "Raids", soon = true },
 }
 ns.MOTTO = "Mi vida por el fundillo"
 
@@ -22,6 +23,7 @@ local PAGES = {
   { id = "materials", section = "orders", label = "Pedir materiales", tab = "materials" },
   -- { id = "equipment", label = "Pedir equipo" }, -- pendiente de rehacer: la lista era demasiado grande
   { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
+  { id = "guild", section = "orders", label = "Hermandad", tab = "guild" },
   { id = "mine", section = "orders", label = "Mis cosas", tab = "mine" },
   { id = "dungeons", section = "dungeons" },
 }
@@ -72,8 +74,8 @@ local function createPanel()
   -- Secciones (Inicio, Pedidos, Mazmorras, Eventos).
   panel.sections = {}
   for i, s in ipairs(SECTIONS) do
-    local b = W.Button(panel, s.label, 130, 24)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 134, -40)
+    local b = W.Button(panel, s.label, 116, 24)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 120, -40)
     if s.soon then
       b:Disable()
       if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end

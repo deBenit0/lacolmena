@@ -40,9 +40,17 @@ function Mail.OnSent()
     ns.Sync.PushRequest(r.id, "high")
   end
   -- Lo que queda puede ser de mis ofertas.
+  local offered = 0
   for _, d in ipairs(ns.Offers.RegisterMail(mail.to, mail.items, ns.Now())) do
+    offered = offered + 1
     ns.Print("apuntado en tu oferta: %dx %s enviadas a %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who))
   end
+  -- Y lo que quede, donaciones a lo que necesita la hermandad.
+  local donated = ns.Social.RegisterMail(mail.to, mail.items, ns.Now())
+  for _, d in ipairs(donated) do
+    ns.Print("donación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
+  end
+  ns.Social.AddHelp(#changed + offered + #donated)
   if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
 end
 
@@ -95,5 +103,17 @@ function Mail.PrepareOffer(who, id, amount, price)
     ns.Print("correo contra reembolso de %s: se le cobrará al recogerlo.", ns.FormatMoney(cod))
   end
   ns.Print("pon %dx %s en el correo y envíalo: se apuntará solo.", amount, ns.KeyLabel("i" .. id))
+  return true
+end
+
+-- Donar a una necesidad de la hermandad: destinatario (el oficial) y asunto.
+function Mail.PrepareNeed(owner, id, amount)
+  if not Mail.CanPrepare() then return false end
+  if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
+  SendMailNameEditBox:SetText(ns.ShortName(owner))
+  if SendMailSubjectEditBox then
+    SendMailSubjectEditBox:SetText(string.format("Para la hermandad: %dx %s", amount, ns.KeyName("i" .. id)))
+  end
+  ns.Print("pon %dx %s en el correo y envíalo: la donación se apuntará sola.", amount, ns.KeyLabel("i" .. id))
   return true
 end
