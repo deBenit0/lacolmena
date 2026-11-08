@@ -2,7 +2,7 @@
 local H = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/harness.lua")
 math.randomseed(tonumber(os.getenv("SEED") or "12345"))
 
-local files = { "test_codec.lua", "test_data.lua", "test_sync.lua", "test_ui.lua", "test_stress.lua", "test_storm.lua", "test_mail.lua", "test_easy.lua", "test_new.lua", "test_catalog.lua", "test_dungeons.lua", "test_offers.lua", "test_diag.lua", "test_tradeskill.lua", "test_guild.lua", "test_forever.lua", "test_qol.lua", "test_quality.lua", "test_extras.lua", "test_vanish.lua", "test_versions.lua" }
+local files = { "test_codec.lua", "test_data.lua", "test_sync.lua", "test_ui.lua", "test_stress.lua", "test_storm.lua", "test_mail.lua", "test_easy.lua", "test_new.lua", "test_catalog.lua", "test_dungeons.lua", "test_offers.lua", "test_diag.lua", "test_tradeskill.lua", "test_guild.lua", "test_forever.lua", "test_qol.lua", "test_quality.lua", "test_extras.lua", "test_vanish.lua", "test_versions.lua", "test_borrar.lua" }
 for _, file in ipairs(files) do
   H.Reset()
   print("== " .. file)

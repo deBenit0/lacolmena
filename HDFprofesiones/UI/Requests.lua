@@ -257,8 +257,8 @@ ns.UI.RegisterPage("requests", function(page)
         end)
       end)
       setButton(detail.b2, "Renovar", active or info.state == "expired", function() ns.Sync.Renew(r.id) end)
-      setButton(detail.b3, "Cerrar", active, function()
-        W.Confirm("¿Cerrar esta petición? Ya no se podrá aceptar.", function() ns.Sync.Close(r.id) end)
+      setButton(detail.b3, "Borrar pedido", active or info.state == "expired", function()
+        W.Confirm("¿Borrar este pedido? Desaparecerá del Tablón de todos.", function() ns.Sync.Close(r.id) end)
       end)
     else
       local mine = r.c and r.c[me]

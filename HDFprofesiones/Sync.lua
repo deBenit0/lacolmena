@@ -22,6 +22,8 @@ local want = { e = {}, r = {}, m = {} } -- lo que pediremos con un W
 local wantScheduled = false
 local infoAsked = {}
 Sync.peers = {}               -- [personaje] = versión del addon
+Sync.RESYNC_EVERY = 300       -- segundos entre resúmenes periódicos
+Sync.lastHello = nil          -- cuándo llegó el último resumen de otro jugador (para la comprobación)
 Sync.oldWarned = {}           -- [personaje] = true si ya avisé de que tiene una versión antigua
 
 ---------------------------------------------------------------------------
@@ -276,6 +278,7 @@ Comm.Register("H", function(sender, payload)
   if type(d) ~= "table" then return end
   Sync.NotePeerVersion(sender, d.av)
   if d.pv ~= ns.PROTOCOL then return end
+  Sync.lastHello = ns.Now()
   local g = ns.G()
   if not g then return end
   local realm, me = realmOf(sender), ns.Me()
@@ -643,11 +646,16 @@ function Sync.Start()
       ns.Fire("DATA_CHANGED", "summary")
     end
   end)
-  -- Un segundo resumen al rato recupera lo que se haya perdido (alguien que se fue a medias...).
+  -- Resúmenes periódicos: recuperan lo que se haya perdido (mensajes cortados, alguien que se
+  -- fue a medias...). El primero a los 3 minutos y luego cada 5 (con algo de azar para no
+  -- coincidir todos). Si nadie tiene nada nuevo, solo cuesta un mensaje pequeño.
   local key = ns.guildKey
-  ns.After(180, function()
-    if started and ns.guildKey == key then Sync.SendHello() end
-  end)
+  local function again()
+    if not started or ns.guildKey ~= key then return end
+    Sync.SendHello()
+    ns.After(Sync.RESYNC_EVERY + rand(0, 60), again)
+  end
+  ns.After(180, again)
 end
 
 function Sync.IsStarted()
