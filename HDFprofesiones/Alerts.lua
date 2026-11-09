@@ -7,6 +7,46 @@ ns.Alerts = Alerts
 
 local queue = {}
 local frame, showing, hideToken
+
+-- Tipos de aviso: cada uno se configura en Opciones (encendido, grande en el centro, sonido y
+-- también en el chat).
+Alerts.TYPES = {
+  { id = "craft", label = "Pedido que puedes hacer" },
+  { id = "accepted", label = "Novedades de tus pedidos" },
+  { id = "run", label = "Quedada nueva" },
+  { id = "group", label = "Te eligen para el grupo" },
+  { id = "remind", label = "Recordatorio de la hora" },
+  { id = "expire", label = "Algo tuyo caduca pronto" },
+  { id = "other", label = "Plazos, ofertas y lo demás" },
+}
+local TYPE_BY_ID = {}
+for _, t in ipairs(Alerts.TYPES) do TYPE_BY_ID[t.id] = t end
+
+-- Ajustes de un tipo de aviso (se crean con los valores por defecto).
+function Alerts.TypeSettings(id)
+  local s = ns.db.settings
+  s.alertTypes = s.alertTypes or {}
+  local t = s.alertTypes[id]
+  if not t then
+    t = { on = true, big = false, sound = true, chat = false }
+    s.alertTypes[id] = t
+  end
+  return t
+end
+
+-- De la 0.29: "avisos" y "sonido" eran un solo interruptor para todo. Se pasan a cada tipo.
+ns.Listen("DB_READY", function()
+  local s = ns.db.settings
+  if (s.alertsVersion or 0) < 1 then
+    for _, t in ipairs(Alerts.TYPES) do
+      local ts = Alerts.TypeSettings(t.id)
+      if s.alerts == false then ts.on = false end
+      if s.sound == false then ts.sound = false end
+    end
+    s.alerts, s.sound = true, true
+    s.alertsVersion = 1
+  end
+end)
 local SHOW_SECONDS = 15
 local MAX_AGE = 86400 -- no avisar de peticiones de hace más de un día
 
@@ -74,6 +114,28 @@ local function createFrame()
   f.text:SetPoint("RIGHT", f, "RIGHT", -34, 0)
   f.text:SetJustifyH("LEFT")
   f.text:SetWordWrap(false)
+  -- Rueda: lleva a la configuración de este tipo de aviso.
+  f.gear = CreateFrame("Button", nil, f)
+  f.gear:SetSize(14, 14)
+  f.gear:SetPoint("RIGHT", f, "TOPRIGHT", -30, -16)
+  local gearTex = f.gear:CreateTexture(nil, "ARTWORK")
+  gearTex:SetAllPoints()
+  gearTex:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
+  f.gear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  f.gear:SetScript("OnClick", function()
+    local alert = f.alert
+    Alerts.HideCurrent()
+    if ns.UI then
+      local page = ns.UI.Open("mine")
+      if page and page.FocusAlert then page:FocusAlert(alert and alert.type or "other") end
+    end
+  end)
+  f.gear:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Configurar este aviso")
+    GameTooltip:Show()
+  end)
+  f.gear:SetScript("OnLeave", function() GameTooltip:Hide() end)
   f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   f.hint:SetPoint("BOTTOMLEFT", f.icon, "BOTTOMRIGHT", 10, 0)
   f.hint:SetText("Clic para verla")
@@ -95,7 +157,7 @@ local function createFrame()
   f:SetScript("OnClick", function(self)
     local alert = self.alert
     Alerts.HideCurrent()
-    if alert and ns.UI then ns.UI.Open(alert.page or "requests", alert.id) end
+    if alert and ns.UI then ns.UI.Open(alert.page or "market", alert.id) end
   end)
   f:Hide()
   return f
@@ -118,8 +180,18 @@ local function show(alert)
   local g = ns.G()
   local r = alert.id and g and g.requests[alert.id]
   frame.commit:SetShown(alert.canCommit and r and Data.CanServe(r, ns.Now()) or false)
+  -- Cartel pequeño arriba o aviso grande en el centro, según el tipo.
+  local ts = Alerts.TypeSettings(alert.type or "other")
+  frame:ClearAllPoints()
+  if ts.big then
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 160)
+    frame:SetScale(1.5)
+  else
+    frame:SetPoint("TOP", UIParent, "TOP", 0, -140)
+    frame:SetScale(1)
+  end
   frame:Show()
-  if ns.db.settings.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
+  if ts.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
   local token = {}
   hideToken = token
   ns.After(SHOW_SECONDS, function()
@@ -146,12 +218,16 @@ function Alerts.Push(alert)
   if not ns.db or not ns.db.settings.alerts then return end
   local c = ns.MyChar()
   if c and c.u then return end -- "no disponible": sin avisos
+  alert.type = TYPE_BY_ID[alert.type or ""] and alert.type or "other"
+  local ts = Alerts.TypeSettings(alert.type)
+  if not ts.on then return end
   local now, key = GetTime(), alert.text or ""
   if recent[key] and now - recent[key] < Alerts.DEDUP_SECONDS then return end
   recent[key] = now
   for k, t in pairs(recent) do
     if now - t > Alerts.DEDUP_SECONDS then recent[k] = nil end
   end
+  if ts.chat then ns.Print(alert.text or "") end
   queue[#queue + 1] = alert
   Alerts.Flush()
 end
@@ -175,7 +251,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
       g.alerted[new.id] = true
       local text = string.format("%s pide %dx %s", ns.ShortName(new.a), new.q, ns.KeyLabel(new.k))
       if new.pr then text = text .. " (" .. Data.WHEN[new.pr].ask:lower() .. ")" end
-      Alerts.Push({ id = new.id, icon = icon, text = text, canCommit = true })
+      Alerts.Push({ id = new.id, icon = icon, text = text, canCommit = true, type = "craft" })
     end
   end
 
@@ -186,7 +262,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
       local sentBefore = before and before.s or 0
       if (cm.s or 0) > sentBefore then
         Alerts.Push({
-          id = new.id, icon = icon,
+          id = new.id, icon = icon, type = "accepted",
           text = string.format("%s te ha enviado %dx %s por correo", ns.ShortName(name), cm.s - sentBefore, ns.KeyLabel(new.k)),
         })
       end
@@ -200,7 +276,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
     if owner and owner ~= before then
       local w = cm.w and Data.WHEN[cm.w]
       Alerts.Push({
-        id = new.id, icon = icon,
+        id = new.id, icon = icon, type = "accepted",
         text = string.format("%s te hace %dx %s%s", ns.ShortName(owner), new.q, ns.KeyLabel(new.k),
           w and (" (" .. w.label:gsub("^Lo hago ", ""):lower() .. ")") or ""),
       })
@@ -213,7 +289,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
     local before = owner and old.c and old.c[owner]
     if owner and cm.ex and before and not before.ex and before.n then
       local w = cm.w and Data.WHEN[cm.w]
-      Alerts.Push({ id = new.id, icon = icon,
+      Alerts.Push({ id = new.id, icon = icon, type = "accepted",
         text = string.format("%s necesita más tiempo para %s%s", ns.ShortName(owner), ns.KeyLabel(new.k),
           w and (": " .. w.label:gsub("^Lo hago ", ""):lower()) or "") })
     end
@@ -259,12 +335,33 @@ function Alerts.CheckDeadlines()
               ns.KeyLabel(r.k), ns.ShortName(r.a)) })
         elseif expired then
           once(key .. ":late", { id = id, icon = icon,
-            text = string.format("Se pasó tu plazo: %s vuelve al tablón", ns.KeyLabel(r.k)) })
+            text = string.format("Se pasó tu plazo: %s vuelve al Mercado", ns.KeyLabel(r.k)) })
         end
       elseif r.a == me and expired then
         once(key .. ":back", { id = id, icon = icon,
-          text = string.format("%s no lo entregó a tiempo: %s vuelve al tablón", ns.ShortName(name), ns.KeyLabel(r.k)) })
+          text = string.format("%s no lo entregó a tiempo: %s vuelve al Mercado", ns.ShortName(name), ns.KeyLabel(r.k)) })
       end
+    end
+  end
+  -- Lo mío que caduca en menos de un día (una vez por pedido u oferta y plazo).
+  for id, r in pairs(g.requests) do
+    if r.a == me then
+      local info = Data.RequestInfo(r, now)
+      local left = info.expires and (info.expires - now)
+      if Data.IsActiveState(info.state) and left and left > 0 and left <= 86400 then
+        local _, icon = ns.KeyInfo(r.k)
+        once("exp:" .. id .. ":" .. info.expires, { id = id, icon = icon, type = "expire", page = "market",
+          text = string.format("Tu pedido de %s caduca en %s: renuévalo si aún lo quieres", ns.KeyLabel(r.k),
+            ns.FormatDuration(left)) })
+      end
+    end
+  end
+  for _, o in ipairs(ns.Offers.List(now)) do
+    local left = (o.t or 0) + ns.Offers.OFFER_TTL - now
+    if o.owner == me and left > 0 and left <= 86400 then
+      local _, icon = ns.KeyInfo("i" .. o.id)
+      once("expo:" .. o.key .. ":" .. (o.t or 0), { icon = icon, type = "expire", page = "market",
+        text = string.format("Tu oferta de %s caduca en %s", ns.KeyLabel("i" .. o.id), ns.FormatDuration(left)) })
     end
   end
   -- Olvidar avisos viejos.
@@ -273,25 +370,25 @@ function Alerts.CheckDeadlines()
   end
 end
 -- Quedadas de mazmorra: una nueva para mi nivel y si me han elegido para el grupo.
-local DUNGEON_ICON = "Interface\\Icons\\INV_Misc_Key_03"
+local DUNGEON_ICON = ns.Dungeons and ns.Dungeons.KEY_ICON or "Interface\\Icons\\INV_Misc_Key_03"
 function Alerts.OnRunUpdated(old, new)
   local g, me, now = ns.G(), ns.Me(), ns.Now()
   local D = ns.Dungeons
   if not new or not g or not me or D.State(new, now) ~= "open" then return end
   g.runAlerted = g.runAlerted or {}
   local dg = D.Dungeon(new.d)
-  local when = new.at > now + 120 and ("a las " .. D.Clock(new.at)) or "ahora"
+  local when = new.at > now + 120 and (D.DayText(new.at, now) .. " a las " .. D.Clock(new.at)) or "ahora"
   if not old and new.a ~= me and not g.runAlerted[new.id] then
     local level = D.MyLevel()
     if level >= dg.min and level <= dg.max + 3 then
       g.runAlerted[new.id] = true
-      Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON,
+      Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "run",
         text = string.format("%s propone %s %s", ns.ShortName(new.a), dg.name, when) })
     end
   end
   local place = D.MyPlace(new)
   if place and place ~= "suplente" and new.a ~= me and D.MyPlace(old) ~= place then
-    Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON,
+    Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "group",
       text = string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.ShortName(new.a)) })
   end
 end
@@ -309,7 +406,7 @@ function Alerts.CheckRuns()
     local key = "run:" .. id .. ":" .. r.at
     if su and not su.o and D.State(r, now) == "open" and left > 0 and left <= D.REMIND_BEFORE and not g.warned[key] then
       g.warned[key] = now
-      Alerts.Push({ id = id, page = "dungeons", icon = DUNGEON_ICON,
+      Alerts.Push({ id = id, page = "dungeons", icon = DUNGEON_ICON, type = "remind",
         text = string.format("%s empieza en %s", D.Dungeon(r.d).name, ns.FormatDuration(left)) })
     end
   end

@@ -324,7 +324,11 @@ Comm.Register("H", function(sender, payload)
     end
   end
   for id in pairs(theirR) do
-    if not g.requests[id] then want.r[id] = true end
+    -- las copias con el nombre mal escrito no se piden si ya tengo el pedido de verdad
+    local cid = Data.CanonicalRequestId(id)
+    if not g.requests[id] and not g.requests[cid] and not (cid ~= id and g.gone and g.gone[cid]) then
+      want.r[id] = true
+    end
   end
   -- Quedadas de mazmorra.
   local theirM = {}
@@ -444,6 +448,15 @@ Comm.Register("Q", function(sender, payload)
   if Data.FromFuture(r, ns.Now()) then return end
   markInflight("Q:" .. r.id, nil, Data.RequestHash(r))
   want.r[r.id] = nil
+  -- Copia con el nombre del autor mal escrito (de quien tiene una versión vieja): se junta con
+  -- el pedido de verdad.
+  local copy = Data.Canonicalize(r)
+  if copy ~= r then
+    want.r[copy.id] = nil
+    local gone = ns.G().gone
+    if gone and gone[copy.id] then return end -- el de verdad ya terminó: la copia no lo resucita
+    r = copy
+  end
   local changed, old, merged, behind = Data.ApplyRequest(r, ns.Now())
   if behind then
     schedule("Q", r.id, rand(1.5, 5)) -- teníamos algo que la recibida no tenía

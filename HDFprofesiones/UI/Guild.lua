@@ -1,5 +1,6 @@
--- Página "Hermandad": necesidades de la hermandad (todos aportan por correo), miembro de la
--- semana y, para oficiales, el anuncio del Inicio y la lista de inactivos.
+-- Página "Hermandad": miembro de la semana, karma con barras, quién fabrica qué (cada profesión
+-- con quién la tiene y a qué nivel) y la zona de oficiales (anuncio, pedidos de la hermandad,
+-- bienvenida e inactivos). Los pedidos de la hermandad se ven y se aportan en el Mercado.
 local _, ns = ...
 local W, S = ns.W, ns.Social
 
@@ -17,151 +18,225 @@ function ns.UI.ContributeNeed(item)
     end)
 end
 
-ns.UI.RegisterPage("guild", function(page)
-  -- Columna izquierda: necesidades.
-  page.needsTitle = W.Text(page, "GameFontNormal")
-  page.needsTitle:SetPoint("TOPLEFT", 6, -6)
-  page.needsTitle:SetText("Pedidos de la hermandad")
-  -- Los oficiales crean pedidos de hermandad con "Pedir" (en la profesión o en Pedir materiales)
-  -- marcando "Para la hermandad"; este botón lleva directo a la lista de materiales.
-  page.addNeed = W.Button(page, "Añadir", 70, 20, function()
-    ns.UI.ShowPage("materials")
-    ns.Print("elige el material, pulsa Pedir y marca \"Para la hermandad\".")
+-- Profesiones que salen en «Quién fabrica qué», en este orden.
+local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182, 755, 773, 40 }
+
+-- Todos los de la hermandad con una profesión, con su nivel (de más a menos).
+local function peopleWith(pk)
+  local g = ns.G()
+  local rows = {}
+  if not g then return rows end
+  for name, e in pairs(g.entries) do
+    local p = type(e.p) == "table" and e.p[pk]
+    if p then
+      rows[#rows + 1] = { name = name, class = e.c or ns.ClassOf(name), pk = pk, r = p.r, unavailable = e.u,
+        online = ns.Guild.IsOnline(name), seen = ns.Guild.LastSeen(name) }
+    end
+  end
+  table.sort(rows, function(a, b)
+    if (a.r or 0) ~= (b.r or 0) then return (a.r or 0) > (b.r or 0) end
+    return a.name < b.name
   end)
-  page.addNeed:SetPoint("TOPLEFT", 226, -2)
+  return rows
+end
+ns.UI.PeopleWith = peopleWith
 
-  -- Recetas que faltan: lo que se pide y nadie de la hermandad sabe hacer.
-  page.missing = W.Button(page, "Faltan", 64, 20, function() ns.UI.ShowMissingRecipes() end)
-  page.missing:SetPoint("TOPLEFT", 158, -2)
+-- Karma de cada persona (su principal), de más a menos.
+local function karmaRanking()
+  local g = ns.G()
+  local seen, out = {}, {}
+  for name in pairs(g and g.entries or {}) do
+    local main = S.MainOf(name) or name
+    if not seen[main] then
+      seen[main] = true
+      local k = ns.Data.KarmaFor(main)
+      if k ~= 0 then out[#out + 1] = { name = main, k = k } end
+    end
+  end
+  table.sort(out, function(a, b)
+    if a.k ~= b.k then return a.k > b.k end
+    return a.name < b.name
+  end)
+  return out
+end
 
-  local list = W.List(page, 300, 362, {
-    rows = 6,
-    rowHeight = 56,
-    keyOf = function(item) return item.key end,
-    buildRow = function(row)
-      row.icon = row:CreateTexture(nil, "ARTWORK")
-      row.icon:SetSize(32, 32)
-      row.icon:SetPoint("TOPLEFT", 2, -4)
-      row.title = W.Text(row, "GameFontHighlightSmall")
-      row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 6, 0)
-      row.title:SetPoint("RIGHT", row, "RIGHT", -2, 0)
-      row.title:SetWordWrap(false)
-      row.progress = W.Text(row, "GameFontHighlightSmall")
-      row.progress:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 6, -14)
-      row.sub = W.Text(row, "GameFontDisableSmall")
-      row.sub:SetPoint("TOPLEFT", 2, -40)
-      row.sub:SetPoint("RIGHT", row, "RIGHT", -70, 0)
-      row.sub:SetWordWrap(false)
-      row.button = W.Button(row, "Aportar", 66, 20)
-      row.button:SetPoint("BOTTOMRIGHT", -2, 2)
-      W.KeyTooltip(row, function(self) return self.item and ("i" .. self.item.id) end)
-    end,
-    updateRow = function(row, item)
-      local _, icon = ns.KeyInfo("i" .. item.id)
-      row.icon:SetTexture(icon)
-      row.title:SetText(string.format("%dx %s", item.q, ns.KeyLabel("i" .. item.id)))
-      local done = item.left == 0
-      row.progress:SetText(done and string.format("|cff40ff40¡Conseguido! %d/%d|r", item.given, item.q)
-        or string.format("Aportado: |cffffffff%d|r de %d", item.given, item.q))
-      local donors = {}
-      for i = 1, math.min(3, #item.donors) do
-        donors[#donors + 1] = S.Who(item.donors[i].name) .. " " .. item.donors[i].n
-      end
-      row.sub:SetText("Lo pide " .. ns.ShortName(item.owner)
-        .. (#donors > 0 and (" · " .. table.concat(donors, ", ")) or ""))
-      if item.owner == ns.Me() then
-        row.button:SetText("Quitar")
-        row.button:SetEnabled(true)
-        row.button:SetScript("OnClick", function()
-          W.Confirm("¿Quitar esta necesidad?", function() S.RemoveNeed(item.id) end)
-        end)
-      else
-        row.button:SetText("Aportar")
-        row.button:SetEnabled(not done)
-        row.button:SetScript("OnClick", function() ns.UI.ContributeNeed(item) end)
-      end
-    end,
-  })
-  list:SetPoint("TOPLEFT", 0, -28)
-  page.list = list
-  page.emptyNeeds = W.Text(page, "GameFontHighlightSmall", "CENTER")
-  page.emptyNeeds:SetPoint("CENTER", list, "CENTER")
-  page.emptyNeeds:SetWidth(260)
-  page.emptyNeeds:SetTextColor(0.7, 0.7, 0.7)
+ns.UI.RegisterPage("guild", function(page)
+  -- Columnas: karma (izquierda), «Quién fabrica qué» (centro) y oficiales (derecha, solo si lo eres).
+  -- Si no eres oficial, «Quién fabrica qué» se queda también con el sitio de los oficiales.
+  local COL1, COL2, COL3 = 0, 262, 604
+  local WHO_W, WHO_W_WIDE, OFF_W = 334, 526, 184
+  local state = { pk = nil }
 
-  -- Columna derecha: reconocimientos y herramientas de oficial.
-  local x = 312
-  page.weekTitle = W.Text(page, "GameFontNormal")
-  page.weekTitle:SetPoint("TOPLEFT", x, -6)
-  page.weekTitle:SetText("Miembro de la semana")
-  page.week = W.Text(page, "GameFontHighlightSmall")
-  page.week:SetPoint("TOPLEFT", x, -26)
-  page.week:SetWidth(292)
-  page.week:SetJustifyV("TOP")
-  page.week:SetSpacing(2)
+  local function title(text, x, y)
+    local fs = W.Text(page, "GameFontNormal")
+    fs:SetPoint("TOPLEFT", x, y)
+    fs:SetText(text)
+    return fs
+  end
 
-  page.officerTitle = W.Text(page, "GameFontNormal")
-  page.officerTitle:SetPoint("TOPLEFT", x, -150)
-  page.officerTitle:SetText("Oficiales")
-  page.announce = W.Input(page, 210)
-  page.announce:SetPoint("TOPLEFT", x + 4, -172)
+  -- Columna 1: miembro de la semana, en grande, y el karma con barras.
+  title("Miembro de la semana", COL1 + 4, -6)
+  local weekBox = W.Box(page, 250, 84)
+  weekBox:SetPoint("TOPLEFT", COL1, -24)
+  weekBox.icon = weekBox:CreateTexture(nil, "ARTWORK")
+  weekBox.icon:SetSize(44, 44)
+  weekBox.icon:SetPoint("LEFT", 12, 0)
+  weekBox.icon:SetTexture("Interface\\Icons\\INV_Crown_01")
+  weekBox.name = W.Text(weekBox, "GameFontNormalLarge")
+  weekBox.name:SetPoint("TOPLEFT", weekBox.icon, "TOPRIGHT", 10, -4)
+  weekBox.name:SetPoint("RIGHT", -8, 0)
+  weekBox.name:SetWordWrap(false)
+  weekBox.sub = W.Text(weekBox, "GameFontHighlightSmall")
+  weekBox.sub:SetPoint("TOPLEFT", weekBox.name, "BOTTOMLEFT", 0, -6)
+  weekBox.sub:SetPoint("RIGHT", -8, 0)
+  page.weekBox = weekBox
+
+  title("Karma", COL1 + 4, -118)
+  local karmaHint = W.Text(page, "GameFontDisableSmall")
+  karmaHint:SetPoint("TOPLEFT", COL1 + 60, -120)
+  karmaHint:SetText("+1 por dar, -1 por recibir")
+  page.bars = {}
+  for i = 1, 9 do
+    local bar = CreateFrame("Frame", nil, page)
+    bar:SetSize(250, 28)
+    bar:SetPoint("TOPLEFT", COL1, -136 - (i - 1) * 30)
+    bar.fill = bar:CreateTexture(nil, "ARTWORK")
+    bar.fill:SetPoint("LEFT", 0, 0)
+    bar.fill:SetHeight(22)
+    bar.fill:SetColorTexture(1, 0.82, 0, 0.25)
+    bar.name = W.Text(bar, "GameFontHighlightSmall")
+    bar.name:SetPoint("LEFT", 6, 0)
+    bar.name:SetPoint("RIGHT", -40, 0)
+    bar.name:SetWordWrap(false)
+    bar.value = W.Text(bar, "GameFontNormal", "RIGHT")
+    bar.value:SetPoint("RIGHT", -4, 0)
+    page.bars[i] = bar
+  end
+  page.noKarma = W.Text(page, "GameFontHighlightSmall")
+  page.noKarma:SetPoint("TOPLEFT", COL1 + 6, -140)
+  page.noKarma:SetTextColor(0.6, 0.6, 0.6)
+  page.noKarma:SetText("Aún nadie tiene karma.")
+
+  -- Columna 2: quién fabrica qué.
+  title("Quién fabrica qué", COL2 + 4, -6)
+  page.profs = {}
+  for i, pk in ipairs(WHO_PROFS) do
+    local b = CreateFrame("Button", nil, page)
+    b:SetSize(32, 32)
+    b:SetPoint("TOPLEFT", COL2 + ((i - 1) % 7) * 38, -26 - math.floor((i - 1) / 7) * 38)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b.tex:SetTexture(ns.ProfessionIcon(pk))
+    b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    b.count:SetPoint("BOTTOMRIGHT", -1, 1)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnClick", function()
+      state.pk = pk
+      page:Refresh()
+    end)
+    ns.UI.Tip(b, ns.ProfessionName(pk))
+    b.pk = pk
+    page.profs[i] = b
+  end
+  page.profTitle = W.Text(page, "GameFontNormalSmall")
+  page.profTitle:SetPoint("TOPLEFT", COL2 + 4, -106)
+  page.who = W.Crafters(page, WHO_W, 13)
+  page.who:SetPoint("TOPLEFT", COL2, -120)
+  page.noWho = W.Text(page, "GameFontHighlightSmall", "CENTER")
+  page.noWho:SetPoint("CENTER", page.who, "CENTER")
+  page.noWho:SetWidth(WHO_W - 40)
+  page.noWho:SetTextColor(0.6, 0.6, 0.6)
+
+  -- Columna 3: oficiales.
+  page.officerTitle = title("Oficiales", COL3 + 4, -6)
+  page.announce = W.Input(page, OFF_W - 66)
+  page.announce:SetPoint("TOPLEFT", COL3 + 8, -28)
   page.announce:SetMaxLetters(S.ANNOUNCE_MAX)
-  W.Placeholder(page.announce, "Anuncio para el Inicio...")
-  page.publish = W.Button(page, "Publicar", 76, 20, function()
+  W.Placeholder(page.announce, "Anuncio para el Inicio…")
+  page.publish = W.Button(page, "Publicar", 60, 20, function()
     local ok, err = S.SetAnnouncement(page.announce:GetText(), ns.Now())
     if not ok then ns.Print(err) else ns.Print("anuncio publicado en el Inicio de todos.") end
   end)
   page.publish:SetPoint("LEFT", page.announce, "RIGHT", 4, 0)
-  page.welcome = W.Check(page, "Bienvenida automática a los nuevos (susurro)", function(checked)
+  page.addNeed = W.Button(page, "+ Pedido de la hermandad", OFF_W, 22, function()
+    ns.UI.OpenOfferDialog(nil, nil, "need")
+  end)
+  page.addNeed:SetPoint("TOPLEFT", COL3, -54)
+  ns.UI.Tip(page.addNeed, "Pedido de la hermandad", "Frascos para la banda, materiales… Todos lo verán arriba del "
+    .. "Mercado y podrán aportar por correo.")
+  page.needs = W.Button(page, "", OFF_W, 22, function() ns.UI.OpenMarket(nil, "want") end)
+  page.needs:SetPoint("TOPLEFT", COL3, -80)
+  page.missing = W.Button(page, "", OFF_W, 22, function() ns.UI.ShowMissingRecipes() end)
+  page.missing:SetPoint("TOPLEFT", COL3, -106)
+  page.welcome = W.Check(page, "Bienvenida a los nuevos", function(checked)
     ns.QoL.WelcomeSettings().on = checked
   end)
-  page.welcome:SetPoint("TOPLEFT", x, -194)
+  page.welcome:SetPoint("TOPLEFT", COL3, -134)
+  ns.UI.Tip(page.welcome, "Bienvenida automática", "Saluda en el chat de hermandad a quien entra nuevo.")
   page.inactive = W.Text(page, "GameFontHighlightSmall")
-  page.inactive:SetPoint("TOPLEFT", x, -222)
-  page.inactive:SetWidth(292)
+  page.inactive:SetPoint("TOPLEFT", COL3 + 4, -164)
+  page.inactive:SetWidth(OFF_W)
   page.inactive:SetJustifyV("TOP")
   page.inactive:SetSpacing(2)
-  page.notOfficer = W.Text(page, "GameFontDisableSmall")
-  page.notOfficer:SetPoint("TOPLEFT", x, -172)
-  page.notOfficer:SetWidth(292)
-  page.notOfficer:SetText("Los oficiales publican aquí el anuncio del Inicio, las necesidades de la hermandad "
-    .. "y ven quién está inactivo. Desde cada pedido pueden marcarlo como prioridad o cerrarlo.")
 
   function page:Refresh()
     local now = ns.Now()
     local officer = S.AmOfficer()
-    local nMissing = #ns.Extras.MissingRecipes(now)
-    page.missing:SetText("Faltan (" .. nMissing .. ")")
-    local needs = S.Needs(now)
-    list:SetItems(needs)
-    page.addNeed:SetShown(officer)
-    page.emptyNeeds:SetShown(#needs == 0)
-    page.emptyNeeds:SetText(officer and "No hay pedidos de la hermandad. Pulsa Añadir (o Pedir en tu profesión) y marca \"Para la hermandad\" "
-      .. "(frascos para la banda, materiales...)." or "Ahora mismo la hermandad no necesita nada.")
 
-    local lines = {}
+    -- Miembro de la semana.
     local best = S.MemberOfTheWeek(now)
     if best then
-      lines[#lines + 1] = string.format("|cffffd100%s|r: %d ayudas la semana pasada", S.Who(best.name), best.n)
+      weekBox.name:SetText(ns.WhoColored(best.name))
+      weekBox.sub:SetText(string.format("%d ayudas la semana pasada", best.n))
     else
-      lines[#lines + 1] = "|cff999999La semana pasada nadie ayudó (o aún no hay datos).|r"
+      weekBox.name:SetText("|cff999999Nadie todavía|r")
+      weekBox.sub:SetText("La semana pasada nadie ayudó (o aún no hay datos).")
     end
-    lines[#lines + 1] = " "
-    lines[#lines + 1] = "|cffffd100Esta semana|r |cff999999(pedidos enviados, ofertas y donaciones)|r"
-    local ranking = S.Ranking("this", now)
-    for i = 1, math.min(5, #ranking) do
-      lines[#lines + 1] = string.format("%d. %s  %d", i, S.Who(ranking[i].name), ranking[i].n)
-    end
-    if #ranking == 0 then lines[#lines + 1] = "|cff999999Aún nadie.|r" end
-    page.week:SetText(table.concat(lines, "\n"))
 
-    page.announce:SetShown(officer)
-    page.publish:SetShown(officer)
-    page.inactive:SetShown(officer)
-    page.welcome:SetShown(officer)
-    if officer then page.welcome:SetChecked(ns.QoL.WelcomeSettings().on and true or false) end
-    page.notOfficer:SetShown(not officer)
+    -- Karma con barras.
+    local ranking = karmaRanking()
+    local top = ranking[1] and math.max(1, math.abs(ranking[1].k)) or 1
+    for i, bar in ipairs(page.bars) do
+      local e = ranking[i]
+      bar:SetShown(e ~= nil)
+      if e then
+        bar.name:SetText(i .. ". " .. ns.WhoColored(e.name))
+        bar.value:SetText(ns.Data.KarmaText(e.name))
+        bar.fill:SetWidth(math.max(2, 250 * math.max(0, e.k) / top))
+      end
+    end
+    page.noKarma:SetShown(#ranking == 0)
+
+    -- Quién fabrica qué: la profesión elegida (o la primera que tenga alguien).
+    local counts = {}
+    for _, pk in ipairs(WHO_PROFS) do counts[pk] = #peopleWith(pk) end
+    if not state.pk then
+      for _, pk in ipairs(WHO_PROFS) do if counts[pk] > 0 then state.pk = pk break end end
+      state.pk = state.pk or WHO_PROFS[1]
+    end
+    for _, b in ipairs(page.profs) do
+      b.count:SetText(counts[b.pk] > 0 and tostring(counts[b.pk]) or "")
+      b.tex:SetDesaturated(b.pk ~= state.pk)
+    end
+    local rows = peopleWith(state.pk)
+    page.profTitle:SetText(ns.ProfessionName(state.pk) .. " |cffbbbbbb(" .. #rows .. ")|r")
+    page.who:SetItems(rows)
+    page.noWho:SetShown(#rows == 0)
+    page.noWho:SetText("Nadie ha publicado " .. ns.ProfessionName(state.pk) .. ".\nCada uno debe abrir la ventana de su profesión una vez.")
+
+    -- Oficiales.
+    for _, f in ipairs({ page.officerTitle, page.announce, page.publish, page.addNeed, page.needs, page.missing,
+      page.welcome, page.inactive }) do
+      f:SetShown(officer)
+    end
+    page.who:SetWidth(officer and WHO_W or WHO_W_WIDE)
+    page.noWho:SetWidth((officer and WHO_W or WHO_W_WIDE) - 40)
     if officer then
+      local nNeeds = 0
+      for _, n in ipairs(S.Needs(now)) do if n.left > 0 then nNeeds = nNeeds + 1 end end
+      page.needs:SetText(string.format("Pedidos de la hermandad (%d)", nNeeds))
+      page.missing:SetText(string.format("Nadie sabe hacerlo (%d)", #ns.Extras.MissingRecipes(now)))
+      page.welcome:SetChecked(ns.QoL.WelcomeSettings().on and true or false)
       local c = ns.MyChar()
       if not page.announce:HasFocus() then page.announce:SetText(c and c.announce and c.announce.x or "") end
       local inactive, noAddon = S.Inactive(now)
@@ -172,7 +247,7 @@ ns.UI.RegisterPage("guild", function(page)
       out[#out + 1] = string.format("|cffffd100Sin el addon: %d|r", #noAddon)
       local names = {}
       for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.ShortName(noAddon[i]) end
-      if #names > 0 then out[#out + 1] = "  " .. table.concat(names, ", ") .. (#noAddon > 8 and "..." or "") end
+      if #names > 0 then out[#out + 1] = "  " .. table.concat(names, ", ") .. (#noAddon > 8 and "…" or "") end
       page.inactive:SetText(table.concat(out, "\n"))
     end
   end

@@ -65,6 +65,25 @@ Dungeons.LIST = {
 Dungeons.BY_ID = {}
 for _, dg in ipairs(Dungeons.LIST) do Dungeons.BY_ID[dg.id] = dg end
 
+-- Un icono del juego distinto para cada mazmorra (la llave si no tiene).
+Dungeons.KEY_ICON = "Interface\\Icons\\INV_Misc_Key_03"
+local ICONS = {
+  [1] = "Spell_Fire_FlameShock", [101] = "INV_Hammer_05", [102] = "Spell_Shadow_RaiseDead",
+  [2] = "INV_Misc_MonsterFang_01", [3] = "Trade_Mining", [4] = "Ability_Mount_BlackDireWolf",
+  [5] = "Spell_Frost_SummonWaterElemental", [6] = "INV_Misc_Key_04", [103] = "INV_Misc_Shovel_01",
+  [104] = "Spell_Holy_MagicalSentry", [9] = "Spell_Holy_HolyBolt", [7] = "INV_Gizmo_02",
+  [8] = "Spell_Nature_Thorns", [105] = "Spell_Frost_FrostWard", [10] = "Spell_Shadow_AnimateDead",
+  [106] = "Ability_Warrior_BattleShout", [11] = "INV_Misc_Rune_01", [12] = "INV_Misc_Head_Troll_01",
+  [13] = "Spell_Nature_ProtectionformNature", [107] = "Spell_Shadow_Teleport", [14] = "Spell_Shadow_LifeDrain",
+  [15] = "Spell_Fire_LavaSpawn", [16] = "INV_Misc_Head_Dragon_Black", [17] = "Ability_Druid_Maul",
+  [108] = "Ability_Warrior_WarCry", [18] = "INV_Misc_Bone_HumanSkull_01", [19] = "Spell_Shadow_DarkRitual",
+  [109] = "Spell_Arcane_StarFire",
+}
+function Dungeons.Icon(d)
+  local name = ICONS[d]
+  return name and ("Interface\\Icons\\" .. name) or Dungeons.KEY_ICON
+end
+
 Dungeons.ACTIVE_FOR = 3 * 3600   -- una quedada se puede usar hasta 3 h después de su hora
 Dungeons.KEEP_FOR = 12 * 3600    -- y se borra 12 h después
 Dungeons.REMIND_BEFORE = 10 * 60 -- aviso a los apuntados 10 min antes
@@ -119,6 +138,27 @@ end
 
 function Dungeons.RolesFor(class)
   return Dungeons.CLASS_ROLES[class] or 4
+end
+
+-- Día de una quedada respecto a hoy: "hoy", "mañana" o "sáb 14" (reloj del ordenador).
+Dungeons.WEEKDAYS = { "dom", "lun", "mar", "mié", "jue", "vie", "sáb" }
+
+-- Número de día (en hora local) de un momento del addon: sirve para comparar días.
+function Dungeons.DayNumber(at)
+  if not date then return 0 end
+  local ok, t = pcall(date, "*t", at + ns.EPOCH)
+  if not ok or type(t) ~= "table" then return 0 end
+  local midnight = at + ns.EPOCH - (t.hour * 3600 + t.min * 60 + t.sec)
+  return floor((midnight + 43200) / 86400)
+end
+
+function Dungeons.DayText(at, now)
+  local diff = Dungeons.DayNumber(at) - Dungeons.DayNumber(now)
+  if diff <= 0 then return "hoy" end
+  if diff == 1 then return "mañana" end
+  local ok, t = pcall(date, "*t", at + ns.EPOCH)
+  if not ok or type(t) ~= "table" then return "" end
+  return Dungeons.WEEKDAYS[t.wday] .. " " .. t.day
 end
 
 -- Hora de una quedada en el reloj del ordenador ("21:30").
@@ -442,8 +482,11 @@ function Dungeons.MakeGroup(id, now)
   if r.gp then
     prefer = {}
     local party = partyNames()
-    for _, name in ipairs(Dungeons.Members(r.gp)) do
-      if name ~= me and not party[ns.ShortName(name):lower()] then prefer[name] = 3 end
+    -- Si aún no has invitado a nadie, no se castiga a nadie por "no haber entrado".
+    if next(party) then
+      for _, name in ipairs(Dungeons.Members(r.gp)) do
+        if name ~= me and not party[ns.ShortName(name):lower()] then prefer[name] = 3 end
+      end
     end
     for name in pairs(r.s or {}) do
       if name == me or party[ns.ShortName(name):lower()] then prefer[name] = 1 end
@@ -548,6 +591,7 @@ end
 
 ns.On("CHAT_MSG_SYSTEM", function(msg)
   if not next(pending) or type(msg) ~= "string" then return end
+  if issecretvalue and issecretvalue(msg) then return end -- el juego a veces no deja leerlo
   local who = notFoundPattern and msg:match(notFoundPattern)
   if not who and (msg:find("encuentra", 1, true) or msg:lower():find("not found", 1, true)) then
     who = msg:match("'([^']+)'")

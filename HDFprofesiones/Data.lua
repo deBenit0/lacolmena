@@ -759,10 +759,75 @@ function Data.ApplyRequest(incoming, now)
   return true, cur, merged, behind
 end
 
+-- Nombre de verdad de alguien de la hermandad. En WoW Forever cada uno guarda su nombre con su
+-- reino interno (Xepe-CAMWOWEU4Realm4PvP) y el chat de hermandad lo da con apellido y sin reino
+-- («Xepe Barbabrote»): si no coincide con ninguna ficha, se busca la ficha con ese nombre corto
+-- (o con su primera palabra), solo si hay una. Fuera del chat solo se tocan los nombres con
+-- apellido (los que vienen del chat): un «Nombre-Reino» normal es de verdad aunque no tenga ficha.
+function Data.CanonicalName(name, fromChat)
+  local g = ns.G()
+  if type(name) ~= "string" or not g or g.entries[name] then return name end
+  local short = ns.ShortName(name):lower()
+  if not fromChat and not short:find(" ", 1, true) then return name end
+  local first = short:match("^(%S+)")
+  local byShort, nShort, byFirst, nFirst = nil, 0, nil, 0
+  for n, ent in pairs(g.entries) do
+    if not ent.demo then
+      local s = ns.ShortName(n):lower()
+      if s == short then byShort, nShort = n, nShort + 1 end
+      if s == first then byFirst, nFirst = n, nFirst + 1 end
+    end
+  end
+  if nShort == 1 then return byShort end
+  if nShort == 0 and nFirst == 1 then return byFirst end
+  return name
+end
+
+-- Id de verdad de una petición (autor de verdad + su sufijo). Devuelve id, autor.
+function Data.CanonicalRequestId(id)
+  local a, suffix = tostring(id):match("^(.*):([^:]+)$")
+  if not a then return id end
+  local ca = Data.CanonicalName(a)
+  return ca .. ":" .. suffix, ca
+end
+
+-- Si la petición es una copia con el nombre mal escrito, devuelve otra con el id y autor de
+-- verdad; si no, la misma.
+function Data.Canonicalize(r)
+  if type(r) ~= "table" or type(r.id) ~= "string" then return r end
+  local cid, ca = Data.CanonicalRequestId(r.id)
+  if cid == r.id then return r end
+  local c = deepCopy(r)
+  c.id, c.a = cid, ca
+  return c
+end
+
+-- Junta las copias repetidas (el mismo pedido con el nombre del autor escrito de otra forma)
+-- con el pedido de verdad. Devuelve cuántas ha juntado.
+function Data.MergeCopies(now)
+  local g = ns.G()
+  if not g then return 0 end
+  local copies = {}
+  for id, r in pairs(g.requests) do
+    local c = Data.Canonicalize(r)
+    if c ~= r then copies[#copies + 1] = { id = id, req = c } end
+  end
+  for _, p in ipairs(copies) do
+    g.requests[p.id] = nil
+    g.alerted[p.id] = nil
+    g.thanked[p.id] = nil
+    if g.karmaSeen then g.karmaSeen[p.id] = nil end
+    -- si el de verdad ya terminó y se borró, la copia no lo resucita
+    if not (g.gone and g.gone[p.req.id]) then Data.ApplyRequest(p.req, now) end
+  end
+  return #copies
+end
+
 -- Borra las peticiones terminadas hace tiempo.
 function Data.Purge(now)
   local g = ns.G()
   if not g then return end
+  Data.MergeCopies(now)
   -- Los borrados se recuerdan un tiempo: así no vuelven desde el historial del chat.
   g.gone = g.gone or {}
   for id, t in pairs(g.gone) do

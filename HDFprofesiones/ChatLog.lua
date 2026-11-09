@@ -75,7 +75,8 @@ function ChatLog.Parse(text, author)
     if not vals[i] then return nil end
   end
   if p ~= #data + 1 then return nil end
-  author = ns.FullName(author)
+  -- El chat da el nombre con apellido y sin reino: se busca su ficha para que sea el mismo pedido.
+  author = Data.CanonicalName(ns.FullName(author), true)
   local r = Data.SanitizeRequest({
     id = author .. ":" .. suffix, a = author, t = t, av = math.max(0, t - 1),
     k = (vals[1] == 1 and "e" or "i") .. vals[2], q = vals[3],

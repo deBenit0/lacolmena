@@ -297,51 +297,69 @@ local function buildCatalog(page, mode)
     end)
   lowCheck:SetPoint("LEFT", profButton, "RIGHT", 10, 0)
 
-  -- Lista agrupada por profesión, con cabeceras plegables como en la ventana de profesiones.
-  local list = W.List(page, 250, 368, {
-    rows = 16,
-    rowHeight = 22,
-    keyOf = function(item) return item.id end,
+  -- Rejilla de iconos agrupada (por tipo de material o de equipo), con cabeceras plegables.
+  -- Cada línea de la lista es una cabecera o una fila de iconos.
+  local COLS, CELL = 9, 44
+  local list = W.List(page, 430, 368, {
+    rows = 8,
+    rowHeight = CELL,
+    keyOf = function(line) return line.id end,
     buildRow = function(row)
-      row.icon = row:CreateTexture(nil, "ARTWORK")
-      row.icon:SetSize(18, 18)
-      row.icon:SetPoint("LEFT", 12, 0)
-      row.count = W.Text(row, "GameFontNormalSmall", "RIGHT")
-      row.count:SetPoint("RIGHT", -2, 0)
-      row.text = W.Text(row, "GameFontHighlightSmall")
-      row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-      row.text:SetPoint("RIGHT", row, "RIGHT", -36, 0)
-      row.text:SetWordWrap(false)
-      row.header = W.Text(row, "GameFontNormal")
+      row.header = W.ListText(row, "GameFontNormal")
       row.header:SetPoint("LEFT", 2, 0)
       row.header:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-      W.KeyTooltip(row, function(self) return self.item and not self.item.header and self.item.key end)
-    end,
-    updateRow = function(row, item)
-      row.header:SetShown(item.header)
-      row.icon:SetShown(not item.header)
-      row.text:SetShown(not item.header)
-      row.count:SetShown(not item.header)
-      if item.header then
-        row.header:SetText((item.collapsed and "[+] " or "[-] ") .. item.label .. " |cffbbbbbb(" .. item.count .. ")|r")
-        return
+      row.cells = {}
+      for i = 1, COLS do
+        local cell = CreateFrame("Button", nil, row)
+        cell:SetSize(CELL - 4, CELL - 4)
+        cell:SetPoint("LEFT", (i - 1) * CELL, 0)
+        cell.icon = cell:CreateTexture(nil, "ARTWORK")
+        cell.icon:SetAllPoints()
+        cell.sel = cell:CreateTexture(nil, "OVERLAY")
+        cell.sel:SetPoint("TOPLEFT", -2, 2)
+        cell.sel:SetPoint("BOTTOMRIGHT", 2, -2)
+        cell.sel:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+        cell.sel:SetBlendMode("ADD")
+        cell.count = cell:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        cell.count:SetPoint("BOTTOMRIGHT", -1, 1)
+        cell.star = W.Text(cell, "GameFontNormal")
+        cell.star:SetPoint("TOPLEFT", 1, -1)
+        cell.star:SetText("|cffffd100*|r")
+        cell:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        cell:SetScript("OnClick", function(self)
+          if not self.item then return end
+          state.key, state.pk = self.item.key, self.item.pk
+          page.list:Refresh()
+          page:RefreshDetail(true)
+        end)
+        W.KeyTooltip(cell, function(self) return self.item and self.item.key end)
+        row.cells[i] = cell
       end
-      row.icon:SetTexture(item.icon)
-      row.text:SetText(item.label)
-      if item.online > 0 then
-        row.count:SetText("|cff40ff40" .. item.online .. "|r/" .. item.count)
-      else
-        row.count:SetText(item.count)
+      -- La fila en sí no se marca al elegir (se marca la casilla).
+      row.selectedTex:SetAlpha(0)
+    end,
+    updateRow = function(row, line)
+      row.header:SetShown(line.header == true)
+      if line.header then
+        row.header:SetText((line.collapsed and "[+] " or "[-] ") .. line.label .. " |cffbbbbbb(" .. line.count .. ")|r")
+      end
+      for i, cell in ipairs(row.cells) do
+        local item = not line.header and line.cells[i]
+        cell.item = item or nil
+        cell:SetShown(item and true or false)
+        if item then
+          cell.icon:SetTexture(item.icon)
+          cell.sel:SetShown(item.key == state.key)
+          cell.count:SetText(item.online > 0 and ("|cff40ff40" .. item.online .. "|r") or "")
+          cell.star:SetShown(item.fav == true)
+        end
       end
     end,
-    onSelect = function(item)
-      if item.header then
-        savedCollapsed()[item.pk] = not item.collapsed
+    onSelect = function(line)
+      if line.header then
+        savedCollapsed()[line.pk] = not line.collapsed
         page:Refresh()
-        return
       end
-      state.key, state.pk = item.key, item.pk
-      page:RefreshDetail(true)
     end,
   })
   list:SetPoint("TOPLEFT", 0, -30)
@@ -416,15 +434,15 @@ local function buildCatalog(page, mode)
     rowHeight = 20,
     keyOf = function(row) return row.name end,
     buildRow = function(row)
-      row.name = W.Text(row, "GameFontHighlightSmall")
+      row.name = W.ListText(row, "GameFontHighlightSmall")
       row.name:SetPoint("LEFT", 4, 0)
       row.name:SetWidth(100)
       row.name:SetWordWrap(false)
-      row.status = W.Text(row, "GameFontHighlightSmall")
+      row.status = W.ListText(row, "GameFontHighlightSmall")
       row.status:SetPoint("LEFT", 108, 0)
       row.status:SetPoint("RIGHT", row, "RIGHT", -70, 0)
       row.status:SetWordWrap(false)
-      row.count = W.Text(row, "GameFontNormalSmall", "RIGHT")
+      row.count = W.ListText(row, "GameFontNormalSmall", "RIGHT")
       row.count:SetPoint("RIGHT", -2, 0)
       row:SetScript("OnEnter", function(self)
         local c = self.item
@@ -565,7 +583,7 @@ local function buildCatalog(page, mode)
       for _, slot in ipairs(detail.slots) do slot:Hide() end
       detail.matsNote:Hide()
       if #list.items > 0 then
-        detail.empty:SetText("Elige un objeto de la lista.")
+        detail.empty:SetText("Elige un objeto de la rejilla.")
       elseif materials and ns.db.settings.onlyMyReagents then
         detail.empty:SetText("No hay materiales de tus recetas que dé la hermandad. Abre tus profesiones "
           .. "para que el addon sepa qué usas, o desmarca \"Solo lo que usan mis recetas\".")
@@ -742,10 +760,10 @@ local function buildCatalog(page, mode)
     for _, k in ipairs(groupKeys) do
       for _, item in ipairs(groups[k]) do
         if favs[item.key] then
-          item.label = "|cffffd100*|r " .. item.label
+          item.fav = true
           favItems[#favItems + 1] = {
             id = "fav:" .. item.key, key = item.key, pk = item.pk, sort = item.sort, icon = item.icon,
-            count = item.count, online = item.online, label = item.label,
+            count = item.count, online = item.online, label = item.label, fav = true,
           }
         end
       end
@@ -778,10 +796,193 @@ local function buildCatalog(page, mode)
         for _, item in ipairs(group) do items[#items + 1] = item end
       end
     end
-    list:SetItems(items)
+    -- Las cabeceras van en su línea; los objetos de cada grupo, en filas de COLS iconos.
+    local lines, run = {}, nil
+    for _, item in ipairs(items) do
+      if item.header then
+        run = nil
+        lines[#lines + 1] = item
+      else
+        if not run or #run.cells >= COLS then
+          run = { id = "l:" .. item.id, cells = {} }
+          lines[#lines + 1] = run
+        end
+        run.cells[#run.cells + 1] = item
+      end
+    end
+    page.items = items
+    list:SetItems(lines)
     page:RefreshDetail()
   end
 end
 
-ns.UI.RegisterPage("materials", function(page) buildCatalog(page, "materials") end)
-ns.UI.RegisterPage("equipment", function(page) buildCatalog(page, "equipment") end)
+-- «Ofrecer»: lo que llevas en las bolsas, en rejilla. Al pulsar un objeto se abre la ventana
+-- de ofrecer con él ya puesto.
+local function buildOffer(page)
+  local COLS, CELL = 9, 44
+  local intro = W.Text(page, "GameFontHighlight")
+  intro:SetPoint("TOPLEFT", 4, -6)
+  intro:SetText("Pulsa lo que quieras ofrecer de tus bolsas, o arrástralo aquí desde ellas.")
+  local function cursorItem()
+    if not GetCursorInfo then return end
+    local kind, id = GetCursorInfo()
+    if kind == "item" and id then
+      if ClearCursor then ClearCursor() end
+      ns.UI.OpenOfferDialog(tonumber(id))
+    end
+  end
+  local list = W.List(page, 430, 368, {
+    rows = 8,
+    rowHeight = CELL,
+    keyOf = function(line) return line.id end,
+    buildRow = function(row)
+      row.cells = {}
+      for i = 1, COLS do
+        local cell = CreateFrame("Button", nil, row)
+        cell:SetSize(CELL - 4, CELL - 4)
+        cell:SetPoint("LEFT", (i - 1) * CELL, 0)
+        cell.icon = cell:CreateTexture(nil, "ARTWORK")
+        cell.icon:SetAllPoints()
+        cell.count = cell:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        cell.count:SetPoint("BOTTOMRIGHT", -1, 1)
+        cell:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        cell:SetScript("OnClick", function(self)
+          if self.item then ns.UI.OpenOfferDialog(self.item.id, self.item.count) end
+        end)
+        cell:SetScript("OnReceiveDrag", cursorItem)
+        W.KeyTooltip(cell, function(self) return self.item and ("i" .. self.item.id) end)
+        row.cells[i] = cell
+      end
+      row.selectedTex:SetAlpha(0)
+      row:SetScript("OnReceiveDrag", cursorItem)
+    end,
+    updateRow = function(row, line)
+      for i, cell in ipairs(row.cells) do
+        local item = line.cells[i]
+        cell.item = item
+        cell:SetShown(item ~= nil)
+        if item then
+          local _, icon = ns.KeyInfo("i" .. item.id)
+          cell.icon:SetTexture(icon)
+          cell.count:SetText(item.count > 1 and tostring(item.count) or "")
+        end
+      end
+    end,
+  })
+  list:SetPoint("TOPLEFT", 0, -30)
+  list:SetScript("OnReceiveDrag", cursorItem)
+  page.list = list
+
+  local side = W.Box(page, 350, 368)
+  side:SetPoint("TOPLEFT", list, "TOPRIGHT", 8, 0)
+  side.text = W.Text(side, "GameFontHighlight")
+  side.text:SetPoint("TOPLEFT", 14, -14)
+  side.text:SetWidth(320)
+  side.text:SetJustifyV("TOP")
+  side.mine = W.Button(side, "Ver lo que ofrezco", 160, 22, function() ns.UI.OpenMarket("mine", "offer") end)
+  side.mine:SetPoint("BOTTOM", 0, 12)
+  page.side = side
+
+  page.empty = W.Text(page, "GameFontNormal", "CENTER")
+  page.empty:SetPoint("CENTER", list, "CENTER")
+  page.empty:SetWidth(380)
+  page.empty:SetTextColor(0.7, 0.7, 0.7)
+  page.empty:SetText("No llevas nada que se pueda ofrecer en las bolsas.")
+
+  function page:Refresh()
+    local items = ns.Scan.BagItems()
+    table.sort(items, function(a, b) return ns.KeyName("i" .. a.id) < ns.KeyName("i" .. b.id) end)
+    local lines, run = {}, nil
+    for _, item in ipairs(items) do
+      if not run or #run.cells >= COLS then
+        run = { id = "l:" .. item.id, cells = {} }
+        lines[#lines + 1] = run
+      end
+      run.cells[#run.cells + 1] = item
+    end
+    list:SetItems(lines)
+    page.empty:SetShown(#items == 0)
+    local mine = 0
+    for _, o in ipairs(ns.Offers.List(ns.Now())) do
+      if o.owner == ns.Me() then mine = mine + 1 end
+    end
+    side.text:SetText("|cffffd100Cómo funciona|r\n\n"
+      .. "1. Elige el objeto y cuántos das.\n"
+      .. "2. Pon un precio o déjalo gratis.\n"
+      .. "3. Quien lo quiera pulsa «Lo quiero» en el Mercado.\n"
+      .. "4. Se lo mandas por correo y se apunta solo.\n\n"
+      .. "Las ofertas duran " .. math.floor(ns.Offers.OFFER_TTL / 86400) .. " días.\n\n"
+      .. string.format("Ahora ofreces |cffffffff%d|r cosa%s.", mine, mine == 1 and "" or "s"))
+  end
+end
+
+-- Página «+ Pedir / + Ofrecer»: arriba se elige Materiales, Equipo u Ofrecer.
+local MODES = {
+  { id = "materials", label = "Pedir materiales" },
+  { id = "equipment", label = "Pedir equipo" },
+  { id = "offer", label = "Ofrecer de tus bolsas" },
+}
+ns.UI.RegisterPage("ask", function(page)
+  page.back = W.Button(page, "< Mercado", 90, 22, function() ns.UI.ShowPage("market") end)
+  page.back:SetPoint("TOPLEFT", 0, -2)
+  page.modes, page.frames = {}, {}
+  for i, m in ipairs(MODES) do
+    local b = W.Chip(page, m.label, 160, function() page:SetMode(m.id) end)
+    b:SetPoint("TOPLEFT", 100 + (i - 1) * 164, -2)
+    page.modes[m.id] = b
+    local f = CreateFrame("Frame", nil, page)
+    f:SetPoint("TOPLEFT", 0, -28)
+    f:SetPoint("BOTTOMRIGHT")
+    f:SetSize(ns.UI.WIDTH - 32, ns.UI.HEIGHT - 120)
+    f:Hide()
+    if m.id == "offer" then buildOffer(f) else buildCatalog(f, m.id) end
+    page.frames[m.id] = f
+  end
+  page.mode = "materials"
+
+  function page:SetMode(mode)
+    if mode == "ask" then mode = page.lastAsk or "materials" end
+    if not page.frames[mode] then mode = "materials" end
+    page.mode = mode
+    if mode ~= "offer" then page.lastAsk = mode end
+    page:Refresh()
+  end
+
+  function page:Refresh()
+    for id, f in pairs(page.frames) do
+      f:SetShown(id == page.mode)
+      page.modes[id]:SetOn(id == page.mode)
+    end
+    local f = page.frames[page.mode]
+    if f and f.Refresh then f:Refresh() end
+  end
+end)
+
+-- Abre «+ Pedir» ("ask") o «+ Ofrecer» ("offer").
+function ns.UI.OpenAsk(mode)
+  local f = ns.UI.Open("ask")
+  if f and f.SetMode then f:SetMode(mode or "ask") end
+end
+
+-- Pedir un objeto concreto (arrastrado al botón «+ Pedir»).
+function ns.UI.AskFor(key)
+  ns.UI.OpenRequestDialog({ k = key, pk = Data.SingleProfession(key), q = 1 })
+end
+
+-- Para el Mercado y Hermandad: quién fabrica (o recolecta) algo, una fila por profesión, con
+-- su nivel. Tú primero.
+function ns.UI.CrafterRows(key, withGatherers)
+  local out, me = {}, ns.Me()
+  for _, row in ipairs(crafterRows(key, withGatherers)) do
+    for _, p in ipairs(row.profs) do
+      out[#out + 1] = { name = row.name, class = row.class, pk = p.pk, r = p.r, online = row.online,
+        seen = row.seen, unavailable = row.unavailable }
+    end
+  end
+  -- Tú primero; los demás, en el orden de antes (disponibles, en línea, vistos hace poco).
+  local sorted = {}
+  for _, c in ipairs(out) do if c.name == me then sorted[#sorted + 1] = c end end
+  for _, c in ipairs(out) do if c.name ~= me then sorted[#sorted + 1] = c end end
+  return sorted
+end
+ns.UI.GearGroup, ns.UI.IsEquipment, ns.UI.MaterialGroup = gearGroup, isEquipment, materialGroup

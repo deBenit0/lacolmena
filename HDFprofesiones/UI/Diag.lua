@@ -22,7 +22,7 @@ local CHECKS = {
     local panel = HDFProfPanel
     if not panel then return nil, "abre el addon una vez y vuelve a comprobar" end
     local ok = panel.pageFrames and panel.pageFrames.dungeons ~= nil
-    return ok, ok and ("versión " .. ns.VERSION .. ", Mazmorras incluida") or "falta la de Mazmorras"
+    return ok, ok and ("versión " .. ns.VERSION .. ", Agenda incluida") or "falta la Agenda"
   end },
   { "Lista de la hermandad", function()
     if not (GetNumGuildMembers and GetGuildRosterInfo) then return false, "el juego no da la lista de miembros" end
