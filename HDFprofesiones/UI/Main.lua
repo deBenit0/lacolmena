@@ -1,34 +1,52 @@
--- Ventana principal: se abre desde una pestaña lateral pegada a la ventana de hermandad.
+-- Ventana principal: se abre desde una pestaña lateral pegada a la ventana de hermandad o desde
+-- el minimapa. Pestañas arriba (Inicio · Mercado · Agenda · Hermandad) y la rueda de Opciones.
+-- Se puede encoger a una tira pequeña con el número de avisos.
 local _, ns = ...
 local W = ns.W
 local UI = { pages = {} }
 ns.UI = UI
 
-local panel
+UI.WIDTH, UI.HEIGHT = 820, 540
+
+local panel, mini
 local hosts = {}
--- Secciones del addon (fila de arriba). Mazmorras y Eventos se ven pero aún no se pueden abrir.
+-- Pestañas de arriba. Eventos y raids van dentro de la Agenda.
 local SECTIONS = {
-  { id = "home", label = "Inicio" },
-  { id = "orders", label = "Pedidos" },
-  { id = "dungeons", label = "Mazmorras" },
-  { id = "events", label = "Eventos", soon = true },
-  { id = "raids", label = "Raids", soon = true },
+  { id = "home", label = "Inicio", page = "home" },
+  { id = "market", label = "Mercado", page = "market" },
+  { id = "agenda", label = "Agenda", page = "dungeons" },
+  { id = "guild", label = "Hermandad", page = "guild" },
 }
 ns.MOTTO = "Mi vida por el fundillo"
 
--- Todas las páginas. "tab" = pestaña de la sección Pedidos que se enciende con ella.
+-- Todas las páginas y la pestaña que se enciende con cada una.
 local PAGES = {
   { id = "home", section = "home" },
-  { id = "board", section = "orders", label = "Tablón", tab = "board" },
-  { id = "materials", section = "orders", label = "Pedir materiales", tab = "materials" },
-  { id = "equipment", section = "orders", label = "Pedir equipo", tab = "equipment" },
-  { id = "requests", section = "orders", tab = "board" }, -- detalle de un pedido (se entra desde el tablón)
-  { id = "guild", section = "orders", label = "Hermandad", tab = "guild" },
-  { id = "mine", section = "home" }, -- "Opciones": se entra desde Inicio
-  { id = "dungeons", section = "dungeons" },
+  { id = "market", section = "market" },
+  { id = "ask", section = "market" },      -- «+ Pedir» y «+ Ofrecer»: el catálogo
+  { id = "dungeons", section = "agenda" },
+  { id = "guild", section = "guild" },
+  { id = "mine", section = "options" },    -- Opciones (rueda dentada)
 }
 local PAGE_BY_ID = {}
 for _, p in ipairs(PAGES) do PAGE_BY_ID[p.id] = p end
+
+-- Nombres de páginas de la 0.29 (los usan los avisos y otros módulos): adónde van ahora.
+local ALIASES = {
+  board = { page = "market" },
+  requests = { page = "market" },
+  materials = { page = "ask", mode = "materials" },
+  equipment = { page = "ask", mode = "equipment" },
+  agenda = { page = "dungeons" },
+  options = { page = "mine" },
+}
+
+local function resolve(id)
+  local a = ALIASES[id]
+  if a then return a.page, a.mode end
+  return PAGE_BY_ID[id] and id or "home", nil
+end
+UI.Resolve = resolve
 
 -- Cada página se registra con una función que construye su contenido.
 function UI.RegisterPage(id, create)
@@ -47,8 +65,47 @@ local function setActive(b, active)
   end
 end
 
+local function tip(frame, title, text)
+  frame:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText(title)
+    if text then GameTooltip:AddLine(text, 1, 1, 1, true) end
+    GameTooltip:Show()
+  end)
+  frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+UI.Tip = tip
+
+-- La escala más grande con la que la ventana cabe en la pantalla.
+local function fitScale(scale)
+  local h = UIParent.GetHeight and UIParent:GetHeight()
+  if type(h) == "number" and h > 0 then
+    scale = math.min(scale, (h - 40) / UI.HEIGHT)
+  end
+  return math.max(UI.MIN_SCALE, scale)
+end
+
+-- Circulito rojo con un número (pestañas y tira pequeña).
+function UI.Badge(parent)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(18, 18)
+  f:SetFrameLevel(parent:GetFrameLevel() + 5)
+  local dot = f:CreateTexture(nil, "ARTWORK")
+  dot:SetAllPoints()
+  dot:SetColorTexture(0.8, 0.1, 0.1, 0.95)
+  f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  f.text:SetPoint("CENTER", 0, 0)
+  function f:SetCount(n)
+    n = n or 0
+    self:SetShown(n > 0)
+    self.text:SetText(n > 9 and "9+" or tostring(n))
+  end
+  f:Hide()
+  return f
+end
+
 local function createPanel()
-  panel = W.Panel("HDFProfPanel", UIParent, 640, 512)
+  panel = W.Panel("HDFProfPanel", UIParent, UI.WIDTH, UI.HEIGHT)
   panel:SetFrameStrata("HIGH")
   panel:SetToplevel(true)
   panel:SetClampedToScreen(true)
@@ -62,7 +119,7 @@ local function createPanel()
   end)
   panel:Hide()
   tinsert(UISpecialFrames, "HDFProfPanel")
-  panel:SetScale(UI.SavedScale())
+  panel:SetScale(fitScale(UI.SavedScale()))
 
   -- Asa para cambiar el tamaño (escala) arrastrando la esquina. Clic derecho: por defecto.
   local grip = CreateFrame("Button", nil, panel)
@@ -81,7 +138,7 @@ local function createPanel()
   grip:SetScript("OnUpdate", function(self)
     if not self.startX or not GetCursorPosition then return end
     local x = GetCursorPosition() / UIParent:GetEffectiveScale()
-    UI.SetScale(self.startScale * (1 + (x - self.startX) / (640 * self.startScale)))
+    UI.SetScale(self.startScale * (1 + (x - self.startX) / (UI.WIDTH * self.startScale)))
   end)
   grip:SetScript("OnMouseUp", function(self, button)
     if button == "RightButton" then
@@ -91,68 +148,55 @@ local function createPanel()
       ns.db.settings.panelScale = panel:GetScale()
     end
   end)
-  grip:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Tamaño de la ventana")
-    GameTooltip:AddLine("Arrastra para hacerla más grande o más pequeña.", 1, 1, 1, true)
-    GameTooltip:AddLine("Clic derecho: tamaño y posición por defecto.", 1, 1, 1, true)
-    GameTooltip:Show()
-  end)
-  grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  tip(grip, "Tamaño de la ventana", "Arrastra para hacerla más grande o más pequeña.\nClic derecho: tamaño y posición por defecto.")
   panel.grip = grip
 
+  -- Barra de arriba: título, lema, encoger y cerrar.
+  -- El escudo de NorrisPlay, pequeño, junto al título (en todas las pestañas).
+  panel.logo = panel:CreateTexture(nil, "ARTWORK")
+  panel.logo:SetSize(14, 28)
+  panel.logo:SetPoint("TOPLEFT", 20, -9)
+  panel.logo:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
   panel.title = W.Text(panel, "GameFontNormal")
-  panel.title:SetPoint("TOPLEFT", 22, -18)
-  -- El lema de la hermandad, siempre a la vista.
-  panel.motto = W.Text(panel, "GameFontNormalLarge", "RIGHT")
-  panel.motto:SetPoint("TOPRIGHT", -38, -15)
+  panel.title:SetPoint("TOPLEFT", 40, -18)
+  panel.motto = W.Text(panel, "GameFontNormal", "RIGHT")
+  panel.motto:SetPoint("TOPRIGHT", -62, -18)
   panel.motto:SetTextColor(1, 0.45, 0.1)
   panel.motto:SetText("\194\171" .. ns.MOTTO .. "\194\187")
   local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
+  local shrink = W.Button(panel, "_", 22, 20, function() UI.SetMini(true) end)
+  shrink:SetPoint("RIGHT", close, "LEFT", 2, 0)
+  tip(shrink, "Encoger", "Deja solo una tira pequeña con tus avisos. Púlsala para volver.")
+  panel.shrink = shrink
 
-  -- Secciones (Inicio, Pedidos, Mazmorras, Eventos).
+  -- Pestañas (Inicio, Mercado, Agenda, Hermandad) y la rueda de Opciones.
   panel.sections = {}
   for i, s in ipairs(SECTIONS) do
-    local b = W.Button(panel, s.label, 116, 24)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 120, -40)
-    if s.soon then
-      b:Disable()
-      if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
-      b:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(s.label)
-        GameTooltip:AddLine("Próximamente", 0.8, 0.8, 0.8)
-        GameTooltip:Show()
-      end)
-      b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    elseif s.id == "orders" then
-      b:SetScript("OnClick", function() UI.ShowPage("board") end) -- siempre al Tablón
-    else
-      b:SetScript("OnClick", function() UI.ShowPage(s.id) end)
-    end
+    local b = W.Button(panel, s.label, 124, 26, function() UI.ShowPage(s.page) end)
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 128, -40)
+    b.badge = UI.Badge(b)
+    b.badge:SetPoint("TOPRIGHT", 4, 6)
     panel.sections[s.id] = b
   end
+  local gear = CreateFrame("Button", nil, panel)
+  gear:SetSize(26, 26)
+  gear:SetPoint("TOPRIGHT", -24, -40)
+  local gearIcon = gear:CreateTexture(nil, "ARTWORK")
+  gearIcon:SetAllPoints()
+  gearIcon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
+  gear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  gear:SetScript("OnClick", function() UI.ShowPage("mine") end)
+  tip(gear, "Opciones", "Tu personaje, los avisos y lo demás.")
+  panel.gear = gear
   local line = panel:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(1, 0.82, 0, 0.35)
   line:SetHeight(1)
-  line:SetPoint("TOPLEFT", 20, -68)
-  line:SetPoint("TOPRIGHT", -20, -68)
-
-  -- Pestañas de la sección Pedidos.
-  panel.tabs = {}
-  local i = 0
-  for _, p in ipairs(PAGES) do
-    if p.label then
-      i = i + 1
-      local b = W.Button(panel, p.label, 118, 22, function() UI.ShowPage(p.id) end)
-      b:SetPoint("TOPLEFT", 20 + (i - 1) * 122, -74)
-      panel.tabs[p.id] = b
-    end
-  end
+  line:SetPoint("TOPLEFT", 20, -70)
+  line:SetPoint("TOPRIGHT", -20, -70)
 
   panel.content = CreateFrame("Frame", nil, panel)
-  panel.content:SetPoint("TOPLEFT", 16, -100)
+  panel.content:SetPoint("TOPLEFT", 16, -76)
   panel.content:SetPoint("BOTTOMRIGHT", -16, 16)
 
   panel.noGuild = W.Text(panel, "GameFontNormalLarge", "CENTER")
@@ -166,15 +210,11 @@ local function createPanel()
     local create = UI.pages[p.id]
     if create then
       local f = CreateFrame("Frame", nil, panel.content)
-      if p.section ~= "orders" then
-        f:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -76) -- sin pestañas debajo: más sitio
-        f:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 16)
-      else
-        f:SetAllPoints()
-      end
+      f:SetAllPoints()
+      f:SetSize(UI.WIDTH - 32, UI.HEIGHT - 92)
       f:Hide()
       -- Cada página por separado: si una falla al montarse, las demás siguen funcionando y el
-      -- error queda en el informe (Mis cosas → Copiar informe).
+      -- error queda en el informe (Opciones → Copiar informe).
       if ns.SafeCall(create, f) then
         panel.pageFrames[p.id] = f
       else
@@ -188,31 +228,34 @@ end
 
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
+  UI.UpdateBadges()
   panel.title:SetText(ns.TITLE .. "  |cff999999v" .. ns.VERSION .. "|r"
-    .. (ns.db and ns.db.settings.demo and "  |cffff8040(MODO DEMOSTRACIÓN)|r" or ""))
+    .. (ns.db and ns.db.settings.demo and "  |cffff8040(DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
-  local home = UI.current == "home"
-  panel.noGuild:SetShown(not inGuild and not home)
+  local free = UI.current == "home" or UI.current == "mine"
+  panel.noGuild:SetShown(not inGuild and not free)
   for id, f in pairs(panel.pageFrames) do
-    f:SetShown((inGuild or id == "home") and id == UI.current)
+    f:SetShown((inGuild or id == "home" or id == "mine") and id == UI.current)
   end
   local f = panel.pageFrames[UI.current]
-  if (inGuild or home) and f and f.Refresh then ns.SafeCall(f.Refresh, f) end
+  if (inGuild or free) and f and f.Refresh then ns.SafeCall(f.Refresh, f) end
 end
 
 function UI.ShowPage(id)
   if not panel then createPanel() end
-  UI.current = id
-  local page = PAGE_BY_ID[id] or PAGE_BY_ID.board
-  if page.section == "orders" then UI.lastOrders = (id == "requests") and "board" or id end
-  for sid, b in pairs(panel.sections) do
-    if b:IsEnabled() then setActive(b, sid == page.section) end
-  end
-  for pid, b in pairs(panel.tabs) do
-    b:SetShown(page.section == "orders")
-    setActive(b, pid == page.tab)
-  end
+  local pageId, mode = resolve(id)
+  UI.current = pageId
+  local page = PAGE_BY_ID[pageId]
+  for sid, b in pairs(panel.sections) do setActive(b, sid == page.section) end
+  local f = panel.pageFrames[pageId]
+  if mode and f and f.SetMode then ns.SafeCall(f.SetMode, f, mode) end
   UI.Refresh()
+  return f
+end
+
+-- Página que se ve ahora (su marco), para que otras partes puedan pedirle cosas.
+function UI.PageFrame(id)
+  return panel and panel.pageFrames[resolve(id)]
 end
 
 -- Las ventanas antiguas tienen un margen transparente a la derecha.
@@ -230,6 +273,7 @@ end
 
 function UI.Open(pageId, selectId, host)
   if not panel then createPanel() end
+  if mini and mini:IsShown() then mini:Hide() end
   host = host or visibleHost()
   panel:ClearAllPoints()
   local pos = ns.db and ns.db.settings.panelPos
@@ -244,16 +288,15 @@ function UI.Open(pageId, selectId, host)
     panel.host = nil
     panel:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
   end
+  panel:SetScale(fitScale(UI.SavedScale()))
   panel:Show()
-  UI.ShowPage(pageId or "home")
-  if selectId then
-    local f = panel.pageFrames[UI.current]
-    if f and f.SelectById then f:SelectById(selectId) end
-  end
+  local f = UI.ShowPage(pageId or "home")
+  if selectId and f and f.SelectById then f:SelectById(selectId) end
+  return f
 end
 
 -- Tamaño y posición de la ventana (se recuerdan).
-UI.MIN_SCALE, UI.MAX_SCALE = 0.7, 1.6
+UI.MIN_SCALE, UI.MAX_SCALE = 0.6, 1.5
 
 function UI.SavedScale()
   local s = ns.db and tonumber(ns.db.settings.panelScale) or 1
@@ -278,9 +321,106 @@ function UI.ResetWindow()
   ns.db.settings.panelPos = nil
   ns.db.settings.panelScale = nil
   if panel then
-    panel:SetScale(1)
+    panel:SetScale(fitScale(1))
     if panel:IsShown() then UI.Open(UI.current, nil, panel.host) end
   end
+end
+
+---------------------------------------------------------------------------
+-- Tira pequeña: el addon encogido, con el número de avisos. Al pulsarla vuelve la ventana
+-- entera en la página donde estabas.
+---------------------------------------------------------------------------
+-- Cada icono de la tira: qué cuenta y adónde lleva.
+local MINI_ITEMS = {
+  { id = "commits", icon = "Interface\\Icons\\Trade_BlackSmithing", title = "Encargos",
+    text = "Lo que tienes que enviar.", open = function() UI.OpenMarket("involved") end },
+  { id = "market", icon = "Interface\\Icons\\INV_Misc_Bag_10", title = "Mercado",
+    text = "Lo que piden y puedes fabricar.", open = function() UI.OpenMarket("craft") end },
+  { id = "agenda", icon = "Interface\\Icons\\INV_Misc_Key_03", title = "Agenda",
+    text = "Quedadas a las que no te has apuntado.", open = function() UI.Open("dungeons") end },
+}
+
+local function createMini()
+  mini = CreateFrame("Button", "HDFProfMini", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  mini:SetSize(34 + #MINI_ITEMS * 46, 34)
+  mini:SetFrameStrata("HIGH")
+  mini:SetClampedToScreen(true)
+  mini:SetMovable(true)
+  mini:RegisterForDrag("LeftButton")
+  if mini.SetBackdrop then
+    mini:SetBackdrop({
+      bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true, tileSize = 16, edgeSize = 14,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    mini:SetBackdropColor(0.05, 0.045, 0.04, 0.95)
+    mini:SetBackdropBorderColor(1, 0.82, 0, 0.8)
+  end
+  -- El icono del addon: vuelve a la ventana entera donde estabas.
+  local icon = mini:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(22, 22)
+  icon:SetPoint("LEFT", 6, 0)
+  icon:SetTexture("Interface\\Icons\\Trade_Engineering")
+  mini:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+  mini:SetScript("OnDragStart", function(self) self:StartMoving() end)
+  mini:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, relPoint, x, y = self:GetPoint(1)
+    if point and ns.db then ns.db.settings.miniPos = { point, relPoint or point, x or 0, y or 0 } end
+  end)
+  mini:SetScript("OnClick", function() UI.SetMini(false) end)
+  tip(mini, ns.TITLE, "Pulsa para abrir la ventana entera. Arrastra para moverla.")
+  -- Un icono con su número por cada sitio; al pulsarlo se abre ese sitio.
+  mini.items = {}
+  for i, it in ipairs(MINI_ITEMS) do
+    local b = CreateFrame("Button", nil, mini)
+    b:SetSize(24, 24)
+    b:SetPoint("LEFT", 34 + (i - 1) * 46, 0)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexture(it.icon)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b.count = W.Text(b, "GameFontNormal")
+    b.count:SetPoint("LEFT", b, "RIGHT", 3, 0)
+    b:RegisterForDrag("LeftButton")
+    b:SetScript("OnDragStart", function() mini:StartMoving() end)
+    b:SetScript("OnDragStop", function() mini:GetScript("OnDragStop")(mini) end)
+    b:SetScript("OnClick", function()
+      mini:Hide()
+      it.open()
+    end)
+    tip(b, it.title, it.text)
+    b.def = it
+    mini.items[it.id] = b
+  end
+  mini:Hide()
+end
+
+function UI.SetMini(on)
+  if on then
+    if not mini then createMini() end
+    UI.miniPage = UI.current
+    mini:ClearAllPoints()
+    local pos = ns.db and ns.db.settings.miniPos
+    if pos then
+      mini:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+    elseif panel then
+      mini:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+    else
+      mini:SetPoint("TOP", UIParent, "TOP", 0, -120)
+    end
+    if panel then panel:Hide() end
+    mini:Show()
+    UI.UpdateBadges()
+  else
+    if mini then mini:Hide() end
+    UI.Open(UI.miniPage or "home")
+  end
+end
+
+function UI.IsMini()
+  return mini and mini:IsShown()
 end
 
 -- Abrir (desde la pestaña o el minimapa) siempre lleva a Inicio.
@@ -290,6 +430,33 @@ function UI.Toggle(host)
   else
     UI.Open("home", nil, host)
   end
+end
+
+-- Lo que te espera, por sitios:
+--   commits = lo que tienes que enviar (encargos y ofertas que te han pedido)
+--   market  = lo que puedes fabricar de lo que piden
+--   agenda  = quedadas abiertas de otros a las que no te has apuntado
+--   guild   = pedidos de la hermandad abiertos
+function UI.Counts()
+  local c = { commits = 0, market = 0, agenda = 0, guild = 0 }
+  if not ns.G() then return c end
+  local stats = UI.BoardStats and UI.BoardStats()
+  if stats then
+    c.commits, c.market, c.guild = stats.toSend or 0, stats.servable or 0, stats.guild or 0
+  end
+  local D, me, now = ns.Dungeons, ns.Me(), ns.Now()
+  for _, r in pairs(D and D.Runs() or {}) do
+    local su = r.s and r.s[me]
+    local signed = su and not su.o and (su.r or 0) > 0
+    if r.a ~= me and not signed and D.State(r, now) == "open" then c.agenda = c.agenda + 1 end
+  end
+  return c
+end
+
+-- Cuántas cosas te esperan: lo que puedes hacer y lo que tienes que enviar.
+function UI.PendingCount()
+  local c = UI.Counts()
+  return c.commits + c.market
 end
 
 -- Ventanas en las que se ha puesto la pestaña (para el diagnóstico).
@@ -442,6 +609,19 @@ end)
 
 -- Actualiza el número de peticiones pendientes para mí en las pestañas.
 function UI.UpdateBadges()
+  local c = UI.Counts()
+  if mini and mini:IsShown() then
+    for id, b in pairs(mini.items) do
+      local n = c[id] or 0
+      b.count:SetText(n > 0 and string.format("|cffff4040%d|r", n) or "|cff999999·|r")
+      b.icon:SetDesaturated(n == 0)
+    end
+  end
+  if panel then
+    panel.sections.market.badge:SetCount(c.market + c.commits)
+    panel.sections.agenda.badge:SetCount(c.agenda)
+    panel.sections.guild.badge:SetCount(c.guild)
+  end
   if not UI.tabs then return end
   local n = ns.G() and #ns.Data.ServableRequests(ns.Now()) or 0
   for _, tab in ipairs(UI.tabs) do

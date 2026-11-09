@@ -96,7 +96,7 @@ end
 -- Borrar un pedido mío (deja de salir a los demás en cuanto se envía mi ficha).
 function Orders.Remove(id)
   local list, me = mine(), ns.Me()
-  if not list then return end
+  if not list or not me then return end
   for i = #list, 1, -1 do
     local o = list[i]
     if me .. ":" .. (o.s or o.i or 0) .. ":" .. (o.t or 0) == id then table.remove(list, i) end

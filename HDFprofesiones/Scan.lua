@@ -368,6 +368,29 @@ function Scan.Have(itemID)
   return bags + bank, bags, bank
 end
 
+-- Lo que llevo en las bolsas, para ofrecerlo: { { id, count }, ... } sin lo ligado.
+function Scan.BagItems()
+  local counts, order = {}, {}
+  for bag = 0, (NUM_BAG_SLOTS or 4) do
+    for slot = 1, containerSlots(bag) do
+      local id, count, bound
+      if C_Container and C_Container.GetContainerItemInfo then
+        local info = C_Container.GetContainerItemInfo(bag, slot)
+        if info then id, count, bound = info.itemID, info.stackCount, info.isBound end
+      else
+        id, count = containerItem(bag, slot)
+      end
+      if id and not bound then
+        if not counts[id] then order[#order + 1] = id end
+        counts[id] = (counts[id] or 0) + (count or 1)
+      end
+    end
+  end
+  local out = {}
+  for _, id in ipairs(order) do out[#out + 1] = { id = id, count = counts[id] } end
+  return out
+end
+
 ---------------------------------------------------------------------------
 -- Eventos
 ---------------------------------------------------------------------------

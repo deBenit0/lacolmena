@@ -1,6 +1,6 @@
 -- Icono redondo en el borde del minimapa (como los del juego) para abrir el addon.
 -- Se arrastra alrededor del minimapa y se recuerda dónde lo dejaste. Sin librerías.
--- Se puede quitar en Inicio → Opciones.
+-- Se puede quitar en Opciones (rueda dentada).
 local _, ns = ...
 local Minimap_ = Minimap
 local ICON = "Interface\\Icons\\Trade_Engineering"

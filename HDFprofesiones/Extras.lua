@@ -119,6 +119,11 @@ function Extras.AnnounceText(kind, obj)
   elseif kind == "need" then
     return tag .. "La hermandad necesita " .. itemText("i" .. obj.id, obj.left or obj.q)
       .. ". Si podéis aportar, mandádselo a " .. ns.ShortName(obj.owner) .. "."
+  elseif kind == "run" then
+    local D, now = ns.Dungeons, ns.Now()
+    local when = obj.at <= now + 120 and "ahora" or (D.DayText(obj.at, now) .. " a las " .. D.Clock(obj.at))
+    return tag .. "Quedada: " .. D.Dungeon(obj.d).name .. " (" .. D.LevelText(obj.d) .. "), " .. when
+      .. ". Apuntaos en la Agenda del addon o susurradme."
   end
 end
 

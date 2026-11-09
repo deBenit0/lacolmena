@@ -110,6 +110,7 @@ end)
 ns.On("TRADE_PLAYER_ITEM_CHANGED", function() snapshot() end)
 ns.On("TRADE_ACCEPT_UPDATE", function() snapshot() end)
 ns.On("UI_INFO_MESSAGE", function(_, message)
+  if issecretvalue and issecretvalue(message) then return end
   local complete = ERR_TRADE_COMPLETE
   if complete and message == complete and trade.to and trade.items then
     local to, items = trade.to, trade.items
@@ -181,6 +182,7 @@ function QoL.OnJoin(name)
 end
 
 ns.On("CHAT_MSG_SYSTEM", function(message)
+  if issecretvalue and issecretvalue(message) then return end -- el juego a veces no deja leerlo
   local pattern = joinPattern()
   local name = pattern and type(message) == "string" and message:match(pattern)
   if name then QoL.OnJoin(name) end
@@ -254,7 +256,7 @@ function QoL.ShowSummary(lines, since)
     f.text:SetWidth(364)
     f.text:SetJustifyV("TOP")
     f.text:SetSpacing(3)
-    f.open = W.Button(f, "Ver el Tablón", 120, 22, function()
+    f.open = W.Button(f, "Ver el Mercado", 120, 22, function()
       f:Hide()
       ns.UI.Open("board")
     end)

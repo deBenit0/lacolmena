@@ -1,4 +1,5 @@
--- Página "Mazmorras": quedadas propuestas, apuntarse por rol y hacer el grupo.
+-- Página "Agenda": quedadas de mazmorra (y, más adelante, eventos y raids). Arriba los filtros y
+-- la semana; a la izquierda las tarjetas con los 5 huecos por papel; a la derecha, el detalle.
 local _, ns = ...
 local W, D = ns.W, ns.Dungeons
 
@@ -88,17 +89,17 @@ local function groupCard(parent)
   card.crown:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
   card.leader = W.Text(card, "GameFontNormalLarge")
   card.leader:SetPoint("LEFT", card.crown, "RIGHT", 4, 0)
-  card.leader:SetWidth(150)
+  card.leader:SetWidth(130)
   card.leader:SetWordWrap(false)
   card.leader:SetTextColor(0.3, 0.75, 1)
   card.dungeon = W.Text(card, "GameFontHighlightSmall")
   card.dungeon:SetPoint("TOPLEFT", 28, -28)
-  card.dungeon:SetWidth(150)
+  card.dungeon:SetWidth(130)
   card.dungeon:SetWordWrap(false)
   card.dungeon:SetTextColor(0.55, 0.8, 1)
   card.status = W.Text(card, "GameFontHighlightSmall")
   card.status:SetPoint("TOPLEFT", 28, -42)
-  card.status:SetWidth(150)
+  card.status:SetWidth(130)
   card.status:SetWordWrap(false)
   card.slots = {}
   for i = 1, 5 do card.slots[i] = makeSlot(card, i) end
@@ -179,8 +180,11 @@ local function checkedMask(checks)
   return mask
 end
 
+-- Horas fijas al proponer (nil = ahora).
+local HOURS = { "now", 18, 20, 21, 22, 23 }
+
 local function createDialog()
-  dialog = W.Panel("HDFProfDungeonDialog", UIParent, 400, 236)
+  dialog = W.Panel("HDFProfDungeonDialog", UIParent, 400, 290)
   dialog:SetFrameStrata("DIALOG")
   dialog:SetToplevel(true)
   dialog:SetPoint("CENTER", 0, 60)
@@ -188,7 +192,7 @@ local function createDialog()
   tinsert(UISpecialFrames, "HDFProfDungeonDialog")
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
-  title:SetText("Proponer mazmorra")
+  title:SetText("Proponer quedada")
   local close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
@@ -229,49 +233,127 @@ local function createDialog()
   dialog.levelNote = W.Text(dialog, "GameFontHighlightSmall")
   dialog.levelNote:SetPoint("TOPLEFT", 90, -76)
 
-  -- Hora: ahora o en tramos de 15 minutos.
+  -- Día (hoy y hasta 2 semanas) y hora: botones de horas fijas y -/+ de 15 en 15 minutos.
+  local dayLabel = W.Text(dialog, "GameFontNormalSmall")
+  dayLabel:SetPoint("TOPLEFT", 24, -102)
+  dayLabel:SetText("Día")
+  dialog.dayMinus = W.Button(dialog, "<", 24, 22, function() dialog:SetDay(dialog.day - 1) end)
+  dialog.dayMinus:SetPoint("LEFT", dayLabel, "RIGHT", 44, 0)
+  dialog.dayText = W.Text(dialog, "GameFontHighlight", "CENTER")
+  dialog.dayText:SetWidth(110)
+  dialog.dayText:SetPoint("LEFT", dialog.dayMinus, "RIGHT", 4, 0)
+  dialog.dayPlus = W.Button(dialog, ">", 24, 22, function() dialog:SetDay(dialog.day + 1) end)
+  dialog.dayPlus:SetPoint("LEFT", dialog.dayText, "RIGHT", 4, 0)
   local hLabel = W.Text(dialog, "GameFontNormalSmall")
-  hLabel:SetPoint("TOPLEFT", 24, -102)
+  hLabel:SetPoint("TOPLEFT", 24, -130)
   hLabel:SetText("Hora")
-  dialog.minus = W.Button(dialog, "-", 24, 22, function() dialog:SetSlot(dialog.slot - 1) end)
+  dialog.minus = W.Button(dialog, "-", 24, 22, function() dialog:StepTime(-1) end)
   dialog.minus:SetPoint("LEFT", hLabel, "RIGHT", 38, 0)
   dialog.timeText = W.Text(dialog, "GameFontHighlight", "CENTER")
   dialog.timeText:SetWidth(110)
   dialog.timeText:SetPoint("LEFT", dialog.minus, "RIGHT", 4, 0)
-  dialog.plus = W.Button(dialog, "+", 24, 22, function() dialog:SetSlot(dialog.slot + 1) end)
+  dialog.plus = W.Button(dialog, "+", 24, 22, function() dialog:StepTime(1) end)
   dialog.plus:SetPoint("LEFT", dialog.timeText, "RIGHT", 4, 0)
-  -- slot 0 = ahora; 1, 2... = siguiente cuarto de hora, el siguiente...
-  function dialog:SlotTime(slot)
-    local now = ns.Now()
-    if slot <= 0 then return nil end
-    local base = (math.floor((now + ns.EPOCH) / 900) + 1) * 900 - ns.EPOCH
-    return base + (slot - 1) * 900
+  dialog.plus:SetScript("OnMouseWheel", nil)
+  dialog.hours = {}
+  for i, hv in ipairs(HOURS) do
+    local h = type(hv) == "number" and hv or nil
+    local b = W.Button(dialog, h and (h .. ":00") or "Ahora", 44, 20, function() dialog:SetHour(h) end)
+    b:SetPoint("TOPLEFT", 84 + (i - 1) * 46, -152)
+    b.hour = h
+    dialog.hours[i] = b
   end
-  function dialog:SetSlot(slot)
-    self.slot = math.max(0, math.min(96, slot))
-    local at = self:SlotTime(self.slot)
+  dialog.MAX_DAYS = 13 -- hasta 2 semanas
+  -- Medianoche de hoy (hora local) en tiempo del addon.
+  local function todayStart()
+    local now = ns.Now()
+    local ok, t = pcall(date, "*t", now + ns.EPOCH)
+    if not ok or type(t) ~= "table" then return now end
+    return now - (t.hour * 3600 + t.min * 60 + t.sec)
+  end
+  -- El primer cuarto de hora que aún no ha pasado hoy (en minutos desde medianoche).
+  local function firstFree()
+    local now = ns.Now()
+    return math.floor((now - todayStart()) / 900 + 1) * 15
+  end
+  -- minutes = nil: "ahora" (solo hoy).
+  function dialog:SlotTime()
+    if not self.minutes then return nil end
+    return todayStart() + self.day * 86400 + self.minutes * 60
+  end
+  function dialog:Update()
+    self.dayText:SetText(self.day == 0 and "Hoy" or D.DayText(todayStart() + self.day * 86400 + 43200, ns.Now()))
+    local at = self:SlotTime()
     self.timeText:SetText(at and ("a las " .. D.Clock(at)) or "Ahora")
-    self.minus:SetEnabled(self.slot > 0)
+    self.dayMinus:SetEnabled(self.day > 0)
+    self.dayPlus:SetEnabled(self.day < self.MAX_DAYS)
+    self.minus:SetEnabled(self.minutes ~= nil and (self.day > 0 or self.minutes > firstFree() - 15))
+    self.plus:SetEnabled(self.minutes == nil or self.minutes < 23 * 60 + 45)
+    -- Horas fijas: las que ya han pasado hoy, apagadas; la elegida, encendida.
+    for _, b in ipairs(self.hours) do
+      local h = b.hour
+      b:SetEnabled(h == nil or self.day > 0 or h * 60 >= firstFree())
+      local on = (h == nil and self.minutes == nil) or (h ~= nil and self.minutes == h * 60)
+      if on then b:LockHighlight() else b:UnlockHighlight() end
+    end
+  end
+  -- h = nil: ahora (solo hoy).
+  function dialog:SetHour(h)
+    if h == nil then
+      self.day, self.minutes = 0, nil
+    else
+      self.minutes = h * 60
+    end
+    self:Update()
+  end
+  function dialog:SetDay(day)
+    self.day = math.max(0, math.min(self.MAX_DAYS, day))
+    if self.day > 0 and not self.minutes then self.minutes = 21 * 60 end
+    if self.day == 0 and self.minutes and self.minutes < firstFree() then self.minutes = nil end
+    self:Update()
+  end
+  function dialog:StepTime(dir)
+    if not self.minutes then
+      if dir > 0 then self.minutes = firstFree() end
+    else
+      local m = self.minutes + dir * 15
+      if self.day == 0 and m < firstFree() then
+        self.minutes = nil
+      else
+        self.minutes = math.max(0, math.min(23 * 60 + 45, m))
+      end
+    end
+    self:Update()
+  end
+  -- Compatibilidad con lo de antes: slot 0 = ahora.
+  function dialog:SetSlot(slot)
+    self.day, self.minutes = 0, nil
+    if slot and slot > 0 then self.minutes = firstFree() + (slot - 1) * 15 end
+    self:Update()
   end
 
   -- Mis roles (quien propone se apunta a la vez).
   local rLabel = W.Text(dialog, "GameFontNormalSmall")
-  rLabel:SetPoint("TOPLEFT", 24, -136)
+  rLabel:SetPoint("TOPLEFT", 24, -192)
   rLabel:SetText("Voy de:")
-  dialog.checks = roleChecks(dialog, 90, -130)
+  dialog.checks = roleChecks(dialog, 90, -186)
   local note = W.Text(dialog, "GameFontDisableSmall")
-  note:SetPoint("TOPLEFT", 24, -160)
+  note:SetPoint("TOPLEFT", 24, -216)
   note:SetText("Desmarca todo si solo la organizas y no vas.")
 
+  dialog.chat = W.Check(dialog, "Avisar en el chat de hermandad")
+  dialog.chat:SetPoint("BOTTOMLEFT", 20, 16)
   local publish = W.Button(dialog, "Proponer", 96, 22, function() dialog:Publish() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(dialog, "Cancelar", 86, 22, function() dialog:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
+  cancel:Hide() -- con la casilla del chat no cabe: se cierra con la X o con Esc
 
   function dialog:Publish()
-    local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(self.slot), roles = checkedMask(self.checks) })
+    local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = checkedMask(self.checks) })
     if r then
       self:Hide()
+      if self.chat:GetChecked() then ns.Extras.Announce("run", r, r.id) end
       ns.UI.Open("dungeons", r.id)
     end
   end
@@ -285,6 +367,7 @@ function ns.UI.OpenDungeonDialog()
   if not dialog then createDialog() end
   dialog:SetDungeon(D.Recommended(D.MyLevel()))
   dialog:SetSlot(0)
+  dialog.chat:SetChecked(true)
   local allowed = D.RolesFor(D.MyClass())
   setupChecks(dialog.checks, D.HasRole(allowed, D.DPS) and D.DPS or allowed)
   dialog.menu:Hide()
@@ -294,55 +377,197 @@ end
 ---------------------------------------------------------------------------
 -- Página
 ---------------------------------------------------------------------------
+local ROLE_ICONS = {
+  "Interface\\Icons\\Ability_Defend", "Interface\\Icons\\Spell_Holy_FlashHeal", "Interface\\Icons\\INV_Sword_04",
+}
+local KINDS = {
+  { id = "all", label = "Todo" },
+  { id = "dungeons", label = "Mazmorras" },
+  { id = "events", label = "Eventos · pronto", soon = true },
+  { id = "raids", label = "Raids · pronto", soon = true },
+}
+
+-- Lo que le falta a una quedada: con el grupo hecho, lo que no se ha cubierto; antes, los
+-- papeles que nadie de los apuntados puede hacer.
+local function missingText(r)
+  if r.gp then
+    local m = D.Missing(r.gp)
+    return #m == 0 and "|cff40ff40grupo hecho|r" or ("|cffffd100falta " .. table.concat(m, ", "):lower() .. "|r")
+  end
+  local t, h, dps = roleCounts(r)
+  local need = {}
+  if t == 0 then need[#need + 1] = "tanque" end
+  if h == 0 then need[#need + 1] = "sanador" end
+  if dps < D.GROUP_SIZE.dps then need[#need + 1] = (D.GROUP_SIZE.dps - dps) .. " de daño" end
+  if #need == 0 then return "|cff40ff40hay gente para el grupo|r" end
+  return "|cffffd100falta " .. table.concat(need, ", ") .. "|r"
+end
+
+-- Los 5 huecos de una tarjeta: icono del papel; con el grupo hecho, la clase de quien va.
+-- Antes de hacerlo se encienden los papeles que alguien de los apuntados puede cubrir.
+local function fillSlots(slots, r)
+  local gp = r.gp
+  local t, h, dps = roleCounts(r)
+  local names = gp and { gp.t or false, gp.h or false, gp.d and gp.d[1] or false, gp.d and gp.d[2] or false,
+    gp.d and gp.d[3] or false } or {}
+  for i, slot in ipairs(slots) do
+    local role = i == 1 and 1 or i == 2 and 2 or 3
+    local name = names[i]
+    local su = name and r.s and r.s[name]
+    local coords = su and su.c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[su.c]
+    if coords then
+      slot.icon:SetTexture(CLASS_ICONS)
+      slot.icon:SetTexCoord(unpack(coords))
+      slot.icon:SetDesaturated(false)
+      slot.icon:SetAlpha(1)
+    else
+      slot.icon:SetTexture(ROLE_ICONS[role])
+      slot.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+      local covered = (role == 1 and t > 0) or (role == 2 and h > 0) or (role == 3 and dps >= i - 2)
+      if gp then covered = name and true or false end
+      slot.icon:SetDesaturated(not covered)
+      slot.icon:SetAlpha(covered and 1 or 0.35)
+    end
+  end
+end
+
+-- Cuántos días han pasado esta semana desde el lunes (lunes = 0, domingo = 6).
+local function weekdayOffset(now)
+  local ok, t = pcall(date, "*t", now + ns.EPOCH)
+  if not ok or type(t) ~= "table" then return 0 end
+  return (t.wday + 5) % 7
+end
+local MAX_WEEK = 2 -- esta semana y las dos siguientes (para llegar a 2 semanas desde hoy)
+
 ns.UI.RegisterPage("dungeons", function(page)
-  local state = { id = nil }
+  local state = { id = nil, kind = "all", day = nil, week = 0 }
 
-  page.propose = W.Button(page, "Proponer mazmorra", 150, 22, function() ns.UI.OpenDungeonDialog() end)
-  page.propose:SetPoint("TOPLEFT", 4, -2)
-  page.summary = W.Text(page, "GameFontHighlightSmall")
-  page.summary:SetPoint("LEFT", page.propose, "RIGHT", 10, 0)
+  -- Fila 1: tipos (eventos y raids, más adelante) y proponer.
+  page.kinds = {}
+  for i, k in ipairs(KINDS) do
+    local b = W.Chip(page, k.label, k.soon and 124 or 96, function()
+      state.kind = k.id
+      page:Refresh()
+    end)
+    if i == 1 then b:SetPoint("TOPLEFT", 0, -2) else b:SetPoint("LEFT", page.kinds[i - 1], "RIGHT", 2, 0) end
+    if k.soon then
+      b:Disable()
+      if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
+      ns.UI.Tip(b, (k.label:gsub(" · pronto", "")), "Próximamente: entrarán aquí, en la misma Agenda.")
+    end
+    page.kinds[i] = b
+  end
+  page.propose = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.propose:SetPoint("TOPRIGHT", 0, 0)
 
-  local list = W.List(page, 250, 388, {
-    rows = 8,
-    rowHeight = 46,
+  -- Fila 2: la semana. Cada día con sus quedadas (puntos); al pulsarlo se ven solo las suyas.
+  page.days = {}
+  local ARROW_W = 20
+  local DAY_W = (430 - 2 * (ARROW_W + 4) - 6 * 4) / 7
+  page.prevWeek = W.Button(page, "<", ARROW_W, 40, function()
+    state.week = math.max(0, state.week - 1)
+    state.day, state.id = nil, nil
+    page:Refresh()
+  end)
+  page.prevWeek:SetPoint("TOPLEFT", 0, -30)
+  ns.UI.Tip(page.prevWeek, "Semana anterior")
+  page.nextWeek = W.Button(page, ">", ARROW_W, 40, function()
+    state.week = math.min(MAX_WEEK, state.week + 1)
+    state.day, state.id = nil, nil
+    page:Refresh()
+  end)
+  page.nextWeek:SetPoint("TOPLEFT", ARROW_W + 4 + 7 * DAY_W + 6 * 4 + 4, -30)
+  ns.UI.Tip(page.nextWeek, "Semana siguiente", "Se pueden proponer quedadas hasta 2 semanas antes.")
+  for i = 1, 7 do
+    local b = CreateFrame("Button", nil, page, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    b:SetSize(DAY_W, 40)
+    b:SetPoint("TOPLEFT", ARROW_W + 4 + (i - 1) * (DAY_W + 4), -30)
+    if b.SetBackdrop then
+      b:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+      b:SetBackdropColor(0, 0, 0, 0.5)
+    end
+    b.name = W.Text(b, "GameFontHighlightSmall", "CENTER")
+    b.name:SetPoint("TOP", 0, -5)
+    b.num = W.Text(b, "GameFontNormal", "CENTER")
+    b.num:SetPoint("TOP", b.name, "BOTTOM", 0, -1)
+    b.dots = W.Text(b, "GameFontNormalSmall", "CENTER")
+    b.dots:SetPoint("BOTTOM", 0, 3)
+    b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    b:SetScript("OnClick", function(self)
+      state.day = (state.day ~= self.dayNumber) and self.dayNumber or nil
+      state.id = nil
+      page:Refresh()
+    end)
+    page.days[i] = b
+  end
+
+  -- Tarjetas de las quedadas.
+  local list = W.List(page, 430, 368, {
+    rows = 5,
+    rowHeight = 70,
     keyOf = function(item) return item.r.id end,
     buildRow = function(row)
-      row.title = W.Text(row, "GameFontHighlight")
-      row.title:SetPoint("TOPLEFT", 4, -4)
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetSize(40, 40)
+      row.icon:SetPoint("LEFT", 4, 0)
+      row.icon:SetTexture("Interface\\Icons\\INV_Misc_Key_03")
+      row.title = W.ListText(row, "GameFontHighlight")
+      row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 4)
       row.title:SetPoint("RIGHT", row, "RIGHT", -4, 0)
       row.title:SetWordWrap(false)
-      row.sub = W.Text(row, "GameFontHighlightSmall")
-      row.sub:SetPoint("TOPLEFT", 4, -20)
-      row.sub:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+      row.when = W.ListText(row, "GameFontNormalSmall")
+      row.when:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
+      row.when:SetPoint("RIGHT", row, "RIGHT", -172, 0)
+      row.when:SetWordWrap(false)
+      row.sub = W.ListText(row, "GameFontHighlightSmall")
+      row.sub:SetPoint("TOPLEFT", row.when, "BOTTOMLEFT", 0, -3)
+      row.sub:SetPoint("RIGHT", row, "RIGHT", -172, 0)
       row.sub:SetWordWrap(false)
-      row.roles = W.Text(row, "GameFontHighlightSmall")
-      row.roles:SetPoint("TOPLEFT", 4, -32)
-      row.roles:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-      row.roles:SetWordWrap(false)
+      row.slots = {}
+      for i = 1, 5 do
+        local slot = CreateFrame("Frame", nil, row)
+        slot:SetSize(28, 28)
+        slot:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4 - (5 - i) * 32, 6)
+        slot.icon = slot:CreateTexture(nil, "ARTWORK")
+        slot.icon:SetAllPoints()
+        if slot.CreateMaskTexture then
+          local mask = slot:CreateMaskTexture()
+          mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+          mask:SetAllPoints(slot.icon)
+          slot.icon:AddMaskTexture(mask)
+        end
+        row.slots[i] = slot
+      end
     end,
     updateRow = function(row, item)
       local r, now = item.r, item.now
       local dg = D.Dungeon(r.d)
-      local title = dg.name
-      if item.state ~= "open" then title = "|cff999999" .. title .. "|r" end
-      if r.gp then title = title .. "  |cff40ff40(grupo hecho)|r" end
-      row.title:SetText(title)
-      row.sub:SetText(whenText(r, now) .. " |cff666666·|r " .. ns.ShortName(r.a)
-        .. (item.state ~= "open" and (" |cff666666·|r " .. STATE_TEXT[item.state]) or ""))
-      local t, h, dps = roleCounts(r)
+      row.icon:SetTexture(D.Icon(item.r.d))
+      row.title:SetText(dg.name .. " |cff999999(" .. dg.min .. "-" .. dg.max .. ")|r")
+      local when = r.at <= now + 120 and (now > r.at + 120 and ("desde las " .. D.Clock(r.at)) or "ahora")
+        or (D.DayText(r.at, now) .. " · " .. D.Clock(r.at))
+      row.when:SetText(when)
       local mine = r.s and r.s[item.me] and not r.s[item.me].o
-      row.roles:SetText(string.format("|cffbbbbbbTanques %d · Sanadores %d · DPS %d|r%s", t, h, dps,
-        mine and "  |cff66ccff(apuntado)|r" or ""))
+      row.sub:SetText("propone " .. ns.WhoColored(r.a) .. " · " .. missingText(r)
+        .. (mine and "  |cff66ccff(vas)|r" or ""))
+      fillSlots(row.slots, r)
     end,
     onSelect = function(item)
       state.id = item.r.id
       page:RefreshDetail()
     end,
   })
-  list:SetPoint("TOPLEFT", 0, -28)
+  list:SetPoint("TOPLEFT", 0, -76)
+  page.empty = W.Text(page, "GameFontNormal", "CENTER")
+  page.empty:SetPoint("CENTER", list, "CENTER", 0, 20)
+  page.empty:SetWidth(380)
+  page.empty:SetTextColor(0.7, 0.7, 0.7)
+  page.emptyButton = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.emptyButton:SetPoint("TOP", page.empty, "BOTTOM", 0, -12)
 
-  local detail = W.Box(page, 350, 388)
-  detail:SetPoint("TOPLEFT", list, "TOPRIGHT", 6, 0)
+  local detail = W.Box(page, 350, 414)
+  detail:SetPoint("TOPLEFT", page, "TOPLEFT", 438, -30)
   detail.title = W.Text(detail, "GameFontNormalLarge")
   detail.title:SetPoint("TOPLEFT", 12, -12)
   detail.title:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
@@ -412,8 +637,7 @@ ns.UI.RegisterPage("dungeons", function(page)
     detail.done:SetShown(r ~= nil and r.gp ~= nil and r.a == ns.Me())
     detail.empty:SetShown(r == nil)
     if not r then
-      detail.empty:SetText(#list.items > 0 and "Elige una quedada de la lista."
-        or "No hay quedadas. Pulsa \"Proponer mazmorra\" para montar una.")
+      detail.empty:SetText(#list.items > 0 and "Pulsa una quedada para ver el detalle." or "")
       return
     end
     local me, now = ns.Me(), ns.Now()
@@ -421,7 +645,7 @@ ns.UI.RegisterPage("dungeons", function(page)
     local st = D.State(r, now)
     local open = st == "open"
     detail.title:SetText(dg.name .. " |cff999999(" .. dg.min .. "-" .. dg.max .. ")|r")
-    detail.sub:SetText("Propone " .. ns.ShortName(r.a) .. " · " .. whenText(r, now)
+    detail.sub:SetText("Propone " .. ns.WhoColored(r.a) .. " · " .. D.DayText(r.at, now) .. " · " .. whenText(r, now)
       .. (open and "" or (" · " .. STATE_TEXT[st])))
 
     -- Apuntados por rol (alguien puede salir en varios).
@@ -450,7 +674,10 @@ ns.UI.RegisterPage("dungeons", function(page)
       local g = {}
       local bench = {}
       for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.ShortName(name) end
-      if #bench > 0 then g[#g + 1] = "|cffbbbbbbSuplentes: " .. table.concat(bench, ", ") .. "|r" end
+      -- En una sola línea: con muchos suplentes se pisaría con «Me apunto de».
+      local more = #bench > 4 and (" y " .. (#bench - 4) .. " más") or ""
+      for i = #bench, 5, -1 do bench[i] = nil end
+      if #bench > 0 then g[#g + 1] = "|cffbbbbbbSuplentes: " .. table.concat(bench, ", ") .. more .. "|r" end
       local place = D.MyPlace(r)
       if place then g[#g + 1] = "|cff66ccffTú vas de " .. place .. ".|r" end
       detail.group:SetText(table.concat(g, "\n"))
@@ -503,34 +730,74 @@ ns.UI.RegisterPage("dungeons", function(page)
 
   function page:Refresh()
     local me, now = ns.Me(), ns.Now()
-    local items, open = {}, 0
+    for i, k in ipairs(KINDS) do
+      if not k.soon then page.kinds[i]:SetOn(state.kind == k.id) end
+    end
+    -- La semana: de lunes a domingo (0 = esta, 1 = la siguiente...), con un punto por quedada.
+    local today = D.DayNumber(now)
+    local offset = weekdayOffset(now)
+    local perDay = {}
+    local items = {}
     for _, r in pairs(D.Runs() or {}) do
-      local st = D.State(r, now)
-      -- solo las activas: las canceladas y las ya pasadas no se enseñan
-      if st == "open" then
-        open = open + 1
-        items[#items + 1] = { r = r, state = st, me = me, now = now }
+      if D.State(r, now) == "open" then
+        local day = math.max(today, D.DayNumber(r.at))
+        perDay[day] = (perDay[day] or 0) + 1
+        if not state.day or state.day == day then
+          items[#items + 1] = { r = r, state = "open", me = me, now = now }
+        end
       end
     end
-    table.sort(items, function(a, b)
-      if (a.state == "open") ~= (b.state == "open") then return a.state == "open" end
-      if a.r.at ~= b.r.at then
-        if a.state == "open" then return a.r.at < b.r.at end
-        return a.r.at > b.r.at
+    for i, b in ipairs(page.days) do
+      local delta = (i - 1) - offset + 7 * state.week -- días desde hoy
+      local at = now + delta * 86400
+      local day = D.DayNumber(at)
+      b.dayNumber = day
+      local ok, t = pcall(date, "*t", at + ns.EPOCH)
+      ok = ok and type(t) == "table"
+      b.name:SetText(delta == 0 and "Hoy" or (ok and D.WEEKDAYS[t.wday] or ""))
+      b.num:SetText(ok and tostring(t.day) or "")
+      -- Los días que ya han pasado o que quedan lejos (más de 2 semanas), en gris.
+      local usable = delta >= 0 and delta <= 13
+      b:SetEnabled(usable)
+      b:SetAlpha(usable and 1 or 0.4)
+      local n = perDay[day] or 0
+      b.dots:SetText(n > 0 and ("|cff40ff40" .. string.rep("•", math.min(n, 4)) .. "|r") or "")
+      if b.SetBackdropBorderColor then
+        if state.day == day then b:SetBackdropBorderColor(1, 0.82, 0, 1) else b:SetBackdropBorderColor(0.4, 0.35, 0.25, 1) end
       end
-      return a.r.id < b.r.id
+    end
+    page.prevWeek:SetEnabled(state.week > 0)
+    page.nextWeek:SetEnabled(state.week < MAX_WEEK)
+    table.sort(items, function(x, y)
+      if x.r.at ~= y.r.at then return x.r.at < y.r.at end
+      return x.r.id < y.r.id
     end)
     list:SetItems(items)
-    if state.id and not (D.Runs() or {})[state.id] then state.id = nil end
-    if not state.id and items[1] then state.id = items[1].r.id end
+    local found = false
+    for _, it in ipairs(items) do if it.r.id == state.id then found = true end end
+    if not found then state.id = items[1] and items[1].r.id or nil end
     list.selectedKey = state.id
     list:Refresh()
-    page.summary:SetText(string.format("Quedadas abiertas: |cffffffff%d|r", open))
+    local none = #items == 0
+    page.empty:SetShown(none)
+    page.emptyButton:SetShown(none)
+    page.empty:SetText(state.day and "No hay quedadas ese día." or "No hay quedadas. ¡Propón una!")
     page:RefreshDetail()
+  end
+
+  -- Abre la Agenda en el día de una quedada (desde Inicio).
+  function page:SelectDay(at)
+    local now = ns.Now()
+    state.day = D.DayNumber(math.max(at, now))
+    state.week = math.max(0, math.min(MAX_WEEK,
+      math.floor((state.day - D.DayNumber(now) + weekdayOffset(now)) / 7)))
+    state.id = nil
+    page:Refresh()
   end
 
   function page:SelectById(id)
     state.id = id
+    state.day = nil
     page:Refresh()
     list:Select(id)
   end

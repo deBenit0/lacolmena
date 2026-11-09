@@ -19,8 +19,10 @@ miembros, pedidos de la hermandad, quedadas de mazmorra y más. *¡Mi vida por e
 
 ## Cómo se abre
 
-Ventana de hermandad (**J**) → pestaña del **engranaje** en su borde derecho. Al abrirlo, el
-**Inicio** explica cómo funciona cada parte.
+Ventana de hermandad (**J**) → pestaña del **engranaje** en su borde derecho (o el icono del
+minimapa). Arriba están las pestañas **Inicio · Mercado · Agenda · Hermandad** y la rueda de
+**Opciones**; el **«?»** del Inicio explica cómo funciona cada parte. El botón **«_»** la encoge a
+una tira pequeña con tus avisos.
 
 Todos los de la hermandad deben tener **la misma versión**: la información viaja entre los que
 están conectados.

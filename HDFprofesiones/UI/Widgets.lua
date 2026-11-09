@@ -338,7 +338,7 @@ function W.AcceptRequest(r)
   local labels = {}
   for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
   local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
-  sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al tablón.", info.remaining)
+  sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al Mercado.", info.remaining)
   W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.ShortName(r.a)),
     sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
 end
@@ -389,4 +389,144 @@ function ns.SendTell(name)
   elseif ChatFrame_SendTell then
     ChatFrame_SendTell(name)
   end
+end
+
+---------------------------------------------------------------------------
+-- Piezas de la 0.30
+---------------------------------------------------------------------------
+-- Icono de cada profesión (los del juego).
+ns.PROFESSION_ICONS = {
+  [171] = "Interface\\Icons\\Trade_Alchemy", [164] = "Interface\\Icons\\Trade_BlackSmithing",
+  [333] = "Interface\\Icons\\Trade_Engraving", [202] = "Interface\\Icons\\Trade_Engineering",
+  [165] = "Interface\\Icons\\INV_Misc_ArmorKit_17", [197] = "Interface\\Icons\\Trade_Tailoring",
+  [185] = "Interface\\Icons\\INV_Misc_Food_15", [129] = "Interface\\Icons\\Spell_Holy_SealOfSacrifice",
+  [186] = "Interface\\Icons\\Trade_Mining", [755] = "Interface\\Icons\\INV_Misc_Gem_01",
+  [773] = "Interface\\Icons\\INV_Inscription_Tradeskill01", [40] = "Interface\\Icons\\Trade_BrewPoison",
+  [393] = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01", [182] = "Interface\\Icons\\Spell_Nature_NatureTouchGrow",
+}
+function ns.ProfessionIcon(pk)
+  return ns.PROFESSION_ICONS[pk] or ns.QUESTION_ICON
+end
+
+-- Clase de un jugador de la hermandad (de su ficha o de la lista de la hermandad).
+function ns.ClassOf(name)
+  local g = ns.G()
+  local e = g and g.entries[name]
+  if e and e.c then return e.c end
+  local info = ns.Guild and ns.Guild.Info(name)
+  return info and info.class
+end
+
+-- Nombre con el color de su clase (y su personaje principal entre paréntesis si es un alt).
+function ns.WhoColored(name)
+  local text = ns.ColoredName(name, ns.ClassOf(name))
+  local main = ns.Social and ns.Social.MainOf(name)
+  if main and main ~= name then text = text .. " |cff999999(" .. ns.ShortName(main) .. ")|r" end
+  return text
+end
+
+-- Botón pequeño de texto (filtros rápidos, interruptores). SetOn lo deja encendido.
+function W.Chip(parent, text, width, onClick)
+  local b = W.Button(parent, text, width, 22, onClick)
+  function b:SetOn(on)
+    local fs = self:GetFontString()
+    if on then
+      self:LockHighlight()
+      if fs then fs:SetTextColor(1, 1, 1) end
+    else
+      self:UnlockHighlight()
+      if fs then fs:SetTextColor(1, 0.82, 0) end
+    end
+    self.on = on and true or false
+  end
+  return b
+end
+
+-- Lista de quién fabrica algo: icono de la profesión, nombre con su color, nivel, si está en
+-- línea y un botón para susurrarle. La usan el Mercado y Hermandad.
+--   rows = { { name, class, pk, r (nivel), online, seen, unavailable, gather }, ... }
+function W.Crafters(parent, width, nrows)
+  local list = W.List(parent, width, nrows * 22 + 12, {
+    rows = nrows,
+    rowHeight = 22,
+    keyOf = function(c) return c.name .. ":" .. tostring(c.pk) end,
+    buildRow = function(row)
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetSize(18, 18)
+      row.icon:SetPoint("LEFT", 2, 0)
+      row.name = W.ListText(row, "GameFontHighlightSmall")
+      row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+      row.name:SetWidth(width * 0.28)
+      row.name:SetWordWrap(false)
+      row.level = W.ListText(row, "GameFontHighlightSmall")
+      row.level:SetPoint("LEFT", row.name, "RIGHT", 4, 0)
+      row.level:SetPoint("RIGHT", row, "RIGHT", -62, 0)
+      row.level:SetWordWrap(false)
+      row.tell = W.Button(row, "Susurrar", 58, 18)
+      if row.tell.SetNormalFontObject then
+        row.tell:SetNormalFontObject("GameFontNormalSmall")
+        row.tell:SetHighlightFontObject("GameFontHighlightSmall")
+      end
+      row.tell:SetPoint("RIGHT", -2, 0)
+      row.tell:SetScript("OnClick", function(self) ns.SendTell(self:GetParent().item.name) end)
+    end,
+    updateRow = function(row, c)
+      row.icon:SetTexture(ns.ProfessionIcon(c.pk))
+      local me = c.name == ns.Me()
+      row.name:SetText(me and "|cffffd100Tú|r" or ns.ColoredName(c.name, c.class))
+      local lv = ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or "")
+      local state
+      if c.unavailable then
+        state = "|cff999999no disponible|r"
+      elseif c.online then
+        state = "|cff40ff40en línea|r"
+      elseif c.seen then
+        state = "|cff999999visto hace " .. ns.FormatDuration(ns.Now() - c.seen) .. "|r"
+      end
+      row.level:SetText("|cffbbbbbb" .. lv .. "|r" .. (state and ("  " .. state) or ""))
+      row.tell:SetShown(not me)
+    end,
+  })
+  return list
+end
+
+-- Letra de las listas (Opciones → Otros): pequeña, normal o grande. Los textos de las listas se
+-- crean con W.ListText y cambian todos a la vez con W.SetListFont.
+W.FONT_SIZES = {
+  { id = "small", label = "Pequeña", factor = 0.88 },
+  { id = "normal", label = "Normal", factor = 1 },
+  { id = "large", label = "Grande", factor = 1.15 },
+}
+local listTexts = setmetatable({}, { __mode = "k" })
+
+function W.ListFontSize()
+  local id = ns.db and ns.db.settings.listFont
+  for _, s in ipairs(W.FONT_SIZES) do
+    if s.id == id then return s end
+  end
+  return W.FONT_SIZES[2]
+end
+
+local function applyListFont(fs, base)
+  local obj = _G[base]
+  if type(obj) ~= "table" or not obj.GetFont then return end
+  local path, size, flags = obj:GetFont()
+  if type(path) == "string" and type(size) == "number" then
+    fs:SetFont(path, math.floor(size * W.ListFontSize().factor + 0.5), flags or "")
+  end
+end
+
+function W.ListText(parent, font, justify)
+  font = font or "GameFontHighlightSmall"
+  local fs = W.Text(parent, font, justify)
+  listTexts[fs] = font
+  applyListFont(fs, font)
+  return fs
+end
+
+function W.SetListFont(id)
+  if not ns.db then return end
+  ns.db.settings.listFont = id
+  for fs, base in pairs(listTexts) do applyListFont(fs, base) end
+  if ns.UI.Refresh then ns.UI.Refresh() end
 end
