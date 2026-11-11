@@ -416,8 +416,8 @@ function Missing.OfferProduct(isCraft)
     ns.Print("esta receta no fabrica un objeto: no se puede ofrecer.")
     return
   end
-  local have = ns.ItemCount(id)
-  ns.UI.OpenOfferDialog(id, have > 0 and have or 1)
+  -- Desde la profesión se ofrece la receta (por encargo); lo de las bolsas, desde «Ofrecer de tus bolsas».
+  ns.UI.OpenOfferDialog(id, nil, nil, { craft = true })
 end
 
 local function offerButton()
@@ -542,8 +542,7 @@ function Missing.LayoutModern(form)
     form.hdfOffer:SetShown(itemID ~= nil and form.OutputIcon:IsShown())
     form.hdfOffer:SetScript("OnClick", function()
       if not ns.G() then return ns.Print("no estás en ninguna hermandad.") end
-      local have = ns.ItemCount(itemID)
-      ns.UI.OpenOfferDialog(itemID, have > 0 and have or 1)
+      ns.UI.OpenOfferDialog(itemID, nil, nil, { craft = true })
     end)
   end
 end

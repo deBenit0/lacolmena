@@ -153,21 +153,23 @@ local function createPanel()
   panel.title = W.Text(panel, "GameFontNormalLarge")
   panel.title:SetPoint("TOPLEFT", 40, -16)
   panel.motto = W.Text(panel, "GameFontNormal", "RIGHT")
-  panel.motto:SetPoint("TOPRIGHT", -66, -18)
+  panel.motto:SetPoint("TOPRIGHT", -66, -18) -- se recoloca junto a «_» más abajo
   panel.motto:SetTextColor(1, 0.45, 0.1)
   panel.motto:SetText("\194\171" .. ns.MOTTO .. "\194\187")
   local close = W.CloseButton(panel)
-  close:SetPoint("TOPRIGHT", -12, -12)
+  close:SetPoint("TOPRIGHT", -6, -6)
   panel.close = close
   local shrink = W.Button(panel, "_", 22, 20, function() UI.SetMini(true) end)
-  shrink:SetPoint("RIGHT", close, "LEFT", -4, 0)
+  shrink:SetPoint("RIGHT", close, "LEFT", 2, 0)
+  panel.motto:ClearAllPoints()
+  panel.motto:SetPoint("RIGHT", shrink, "LEFT", -8, 0)
   tip(shrink, "Encoger", "Deja solo una tira pequeña con tus avisos. Púlsala para volver.")
   panel.shrink = shrink
 
   -- Pestañas (Inicio, Mercado, Agenda, Hermandad) y la rueda de Opciones.
   panel.sections = {}
   for i, s in ipairs(SECTIONS) do
-    local b = W.Tab(panel, W.Upper(s.label), 124, 30, function() UI.ShowPage(s.page) end)
+    local b = W.Tab(panel, s.label, 124, 26, function() UI.ShowPage(s.page) end)
     b:SetPoint("TOPLEFT", 16 + (i - 1) * 128, -40)
     b.badge = UI.Badge(b)
     b.badge:SetPoint("TOPRIGHT", 4, 6)

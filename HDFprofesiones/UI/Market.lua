@@ -289,11 +289,11 @@ ns.UI.RegisterPage("market", function(page)
     local now = item.now or ns.Now()
     if item.kind == "group" then
       local names = {}
-      for i = 1, math.min(3, #item.children) do names[i] = ns.WhoColored(item.children[i].author) end
+      for i = 1, math.min(3, #item.children) do names[i] = ns.AuthorText(item.children[i].author) end
       return string.format("|cffffffff%d pedidos|r · %s%s", #item.children, table.concat(names, ", "),
         #item.children > 3 and "…" or "")
     end
-    local parts = { ns.WhoColored(item.author), ns.FormatDuration(now - (item.t or now)) }
+    local parts = { ns.AuthorText(item.author), ns.FormatDuration(now - (item.t or now)) }
     if item.kind == "req" then
       local r, info = item.r, item.info
       if item.pending > 0 then
@@ -355,6 +355,9 @@ ns.UI.RegisterPage("market", function(page)
       row.header:SetPoint("TOPLEFT", 2, 0)
       row.header:SetPoint("BOTTOMRIGHT", -2, 2)
       row.header:Hide()
+      row.fold = W.ListText(row.header, "GameFontHighlightSmall", "RIGHT")
+      row.fold:SetPoint("BOTTOMRIGHT", -4, 5)
+      row.fold:SetTextColor(0.6, 0.6, 0.6)
       row.pin = row:CreateTexture(nil, "ARTWORK")
       row.pin:SetPoint("TOPLEFT", 0, -2)
       row.pin:SetPoint("BOTTOMLEFT", 0, 2)
@@ -411,6 +414,7 @@ ns.UI.RegisterPage("market", function(page)
       for _, p in ipairs(row.parts) do p:SetShown(not header) end
       if header then
         row.header:SetText(item.label, item.count and ("(" .. item.count .. ")") or nil)
+        row.fold:SetText(item.cat and (item.collapsed and "+" or "-") or "")
         row.title:SetText("")
         row.pin:Hide()
         row.coin:Hide()
@@ -463,7 +467,13 @@ ns.UI.RegisterPage("market", function(page)
       row.icon:SetPoint("LEFT", item.child and 22 or 8, 0)
     end,
     onSelect = function(item)
-      if item.kind == "header" then return end
+      if item.kind == "header" then
+        if item.cat then
+          page:CollapsedCats()[item.cat] = not item.collapsed
+          page:Refresh()
+        end
+        return
+      end
       if item.kind == "group" then
         state.expanded[item.k] = not state.expanded[item.k]
         state.selected = state.expanded[item.k] and item.children[1].id or nil
@@ -641,6 +651,17 @@ ns.UI.RegisterPage("market", function(page)
   detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
   detail.crafters = W.Crafters(detail, DETAIL_W - 16, 3, 26, true)
   detail.crafters:SetPoint("TOPLEFT", 8, -194)
+  -- Lo que se ofrece: materiales de su receta (cuántos tienes) y, en «ofrecen fabricarlo», quién lo
+  -- ofrece en dos filas (para que quepa todo).
+  detail.matsLabel = W.Header(detail)
+  detail.matsLabel:Hide()
+  detail.offerers = W.Crafters(detail, DETAIL_W - 16, 2, 26, true)
+  detail.offerers:Hide()
+  local function reagents()
+    detail.reagents = detail.reagents or ns.UI.ReagentsBlock(detail, DETAIL_W - 24)
+    return detail.reagents
+  end
+  local LINE_H = 14
 
   -- b1 es la acción principal (grande, abajo); b2, b3, x1, x2 y x3, pequeñas, encima en filas de 3.
   detail.b1 = W.Button(detail, "", DETAIL_W - 16, 30)
@@ -692,6 +713,28 @@ ns.UI.RegisterPage("market", function(page)
     b:Show()
   end
 
+  -- Materiales de la receta de "key" desde la altura y (los mismos del catálogo). prefer: la
+  -- profesión que se prefiere si la hacen varias. Devuelve dónde sigue.
+  local function showReagents(key, prefer, y)
+    local rec = Data.GetIndex()[key]
+    local pk = rec and next(rec.profs) and ((prefer and rec.profs[prefer] and prefer)
+      or Data.SingleProfession(key) or next(rec.profs))
+    if not pk then return y end
+    detail.matsLabel:ClearAllPoints()
+    detail.matsLabel:SetPoint("TOPLEFT", 8, y)
+    detail.matsLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+    local var, variants, h = reagents():Set(key, pk, 12, y - 24)
+    local note
+    if var and (var.m or 1) > 1 then
+      note = string.format("(salen %d por vez)", var.m)
+    elseif variants and variants > 1 then
+      note = string.format("(hay %d recetas; se muestra una)", variants)
+    end
+    detail.matsLabel:SetText("Materiales", note)
+    detail.matsLabel:Show()
+    return y - 24 - h - 6
+  end
+
   local function setWho(key, withGatherers, labelText)
     local rows = ns.UI.CrafterRows and ns.UI.CrafterRows(key, withGatherers) or {}
     detail.whoLabel:SetText(labelText, #rows == 0 and "|cffff8040nadie de la hermandad lo tiene publicado|r" or nil)
@@ -706,7 +749,7 @@ ns.UI.RegisterPage("market", function(page)
     local info = Data.RequestInfo(r, now)
     local _, _, link = ns.KeyInfo(r.k)
     detail.title:SetText(string.format("%dx %s", r.q, noBrackets(link or ns.KeyName(r.k))))
-    detail.sub:SetText("pide " .. ns.WhoColored(r.a) .. " |cffbbbbbb(karma " .. Data.KarmaText(r.a) .. ") · hace "
+    detail.sub:SetText("pide " .. ns.AuthorText(r.a) .. " |cffbbbbbb(karma " .. Data.KarmaText(r.a) .. ") · hace "
       .. ns.FormatDuration(now - (r.t or now)) .. "|r")
     detail.steps:SetText(stepsText(r, info))
     local lines = {}
@@ -810,7 +853,7 @@ ns.UI.RegisterPage("market", function(page)
     local o, now = item.o, ns.Now()
     local _, _, link = ns.KeyInfo(item.k)
     detail.title:SetText(string.format("%dx %s", o.q, noBrackets(link or ns.KeyName(item.k))))
-    detail.sub:SetText("ofrece " .. ns.WhoColored(o.owner) .. " |cffbbbbbb(karma " .. Data.KarmaText(o.owner) .. ") · hace "
+    detail.sub:SetText("ofrece " .. ns.AuthorText(o.owner) .. " |cffbbbbbb(karma " .. Data.KarmaText(o.owner) .. ") · hace "
       .. ns.FormatDuration(now - (o.t or now)) .. "|r")
     detail.steps:SetText("Precio: " .. ns.UI.PriceText(o.g) .. "   " .. (expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) or ""))
     local lines = {}
@@ -819,7 +862,10 @@ ns.UI.RegisterPage("market", function(page)
     if item.mine then
       if #o.claims > 0 then
         lines[#lines + 1] = "|cff66ccffLo quieren:|r"
-        for _, c in ipairs(o.claims) do lines[#lines + 1] = "  " .. ns.WhoColored(c.name) .. " " .. c.left end
+        for i, c in ipairs(o.claims) do
+          if i <= 3 then lines[#lines + 1] = "  " .. ns.WhoColored(c.name) .. " " .. c.left end
+        end
+        if #o.claims > 3 then lines[#lines + 1] = string.format("  |cffbbbbbby %d más|r", #o.claims - 3) end
         lines[#lines + 1] = "|cffbbbbbbMándaselo por correo: se apunta solo.|r"
       else
         lines[#lines + 1] = "|cff999999Nadie lo ha pedido todavía.|r"
@@ -831,8 +877,11 @@ ns.UI.RegisterPage("market", function(page)
       if have > 0 then lines[#lines + 1] = string.format("|cffbbbbbbTienes %d.|r", have) end
     end
     detail.info:SetText(table.concat(lines, "\n"))
+    local infoH = math.max(#lines * LINE_H, math.ceil(detail.info:GetStringHeight() or 0))
+    detail.info:SetHeight(infoH)
     detail.whoLabel:Hide()
     detail.crafters:Hide()
+    showReagents(item.k, nil, -76 - infoH - 6)
     if item.mine then
       local first = o.claims[1]
       if first then
@@ -884,23 +933,33 @@ ns.UI.RegisterPage("market", function(page)
     detail.steps:SetText(grp.mine and (expiresText((grp.myT or 0) + ns.Offers.CRAFT_TTL, now) or "")
       or "Pídeselo y te lo fabrican.")
     local lines = {}
-    for i = 1, math.min(4, n) do
+    for i = 1, math.min(2, n) do
       local c = grp.crafters[i]
       local who = c.name == me and "|cffffd100Tú|r" or ns.WhoColored(c.name)
       lines[#lines + 1] = string.format("%s: %s · %s", who, ns.UI.PriceText(c.g),
         c.m and "pone los materiales" or "|cffbbbbbbmateriales de quien lo pide|r")
     end
-    if n > 4 then lines[#lines + 1] = string.format("|cffbbbbbby %d más|r", n - 4) end
+    if n > 2 then lines[#lines + 1] = string.format("|cffbbbbbby %d más (abajo)|r", n - 2) end
     detail.info:SetText(table.concat(lines, "\n"))
+    local infoH = math.max(#lines * LINE_H, math.ceil(detail.info:GetStringHeight() or 0))
+    detail.info:SetHeight(infoH)
     local offering, rows = {}, {}
     for _, c in ipairs(grp.crafters) do offering[c.name] = true end
     for _, r in ipairs(ns.UI.CrafterRows and ns.UI.CrafterRows(item.k) or {}) do
       if offering[r.name] then rows[#rows + 1] = r end
     end
-    detail.whoLabel:SetText("Quién lo ofrece")
-    detail.crafters:SetItems(rows)
+    -- Materiales (de la profesión del primero que lo ofrece) y, debajo, quién lo ofrece.
+    local y = showReagents(item.k, rows[1] and rows[1].pk, -76 - infoH - 6)
+    detail.whoLabel:ClearAllPoints()
+    detail.whoLabel:SetPoint("TOPLEFT", 8, y)
+    detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+    detail.whoLabel:SetText("Quién lo ofrece", "(" .. n .. ")")
     detail.whoLabel:Show()
-    detail.crafters:Show()
+    detail.crafters:Hide()
+    detail.offerers:ClearAllPoints()
+    detail.offerers:SetPoint("TOPLEFT", 8, y - 24)
+    detail.offerers:SetItems(rows)
+    detail.offerers:Show()
     if grp.mine then
       setButton(detail.b1, "Renovar 30 días", true, function()
         ns.Offers.RenewCrafts(ns.Now())
@@ -935,7 +994,7 @@ ns.UI.RegisterPage("market", function(page)
     local n = item.need
     local _, _, link = ns.KeyInfo(item.k)
     detail.title:SetText(string.format("%dx %s", n.q, noBrackets(link or ns.KeyName(item.k))))
-    detail.sub:SetText("|cffff9933para la hermandad|r · lo pide " .. ns.WhoColored(n.owner))
+    detail.sub:SetText("|cffff9933para la hermandad|r · lo pide " .. ns.AuthorText(n.owner))
     detail.steps:Hide()
     detail.progress:SetValue(n.given, n.q, string.format("aportado %d de %d · faltan %d", n.given, n.q, n.left))
     detail.progress:Show()
@@ -973,7 +1032,7 @@ ns.UI.RegisterPage("market", function(page)
   local function showOrder(item)
     local o = item.order
     detail.title:SetText(ns.KeyLabel(item.k))
-    detail.sub:SetText("pide " .. ns.WhoColored(o.owner) .. " |cffbbbbbb· hace " .. ns.FormatDuration(ns.Now() - o.t) .. "|r")
+    detail.sub:SetText("pide " .. ns.AuthorText(o.owner) .. " |cffbbbbbb· hace " .. ns.FormatDuration(ns.Now() - o.t) .. "|r")
     detail.steps:SetText("|cff40c0ffPedido de fabricación de Blizzard|r")
     detail.info:SetText(item.mine and "|cff999999Lo verán quienes saben hacerlo.|r"
       or "Cógelo en tu profesión: pestaña Pedidos › Hermandad (puede que ya esté hecho).")
@@ -1000,6 +1059,12 @@ ns.UI.RegisterPage("market", function(page)
     for _, p in ipairs(parts) do p:SetShown(item ~= nil) end
     detail.progress:Hide()
     detail.infoHeader:Hide()
+    detail.matsLabel:Hide()
+    detail.offerers:Hide()
+    if detail.reagents then detail.reagents:Hide() end
+    detail.whoLabel:ClearAllPoints()
+    detail.whoLabel:SetPoint("TOPLEFT", 8, -170)
+    detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
     detail.info:ClearAllPoints()
     detail.info:SetPoint("TOPLEFT", 12, -76)
     detail.info:SetHeight(96)
@@ -1191,17 +1256,21 @@ ns.UI.RegisterPage("market", function(page)
     sortItems(items, sortId)
     items = group(items)
     local listed = items
-    if sortId == "best" then listed = page:Sections(items) end
+    if state.side == "offer" then
+      listed = page:Categories(items)
+    elseif sortId == "best" then
+      listed = page:Sections(items)
+    end
     list:SetItems(listed)
 
-    -- Lo elegido: si ya no está en la lista, el primero.
+    -- Lo elegido: si ya no está en la lista, el primero que se vea.
     local selected
     for _, it in ipairs(items) do
       if it.id == state.selected then selected = it end
     end
     if not selected then
-      for _, it in ipairs(items) do
-        if it.kind ~= "group" then selected = it break end
+      for _, it in ipairs(listed) do
+        if it.kind ~= "group" and it.kind ~= "header" then selected = it break end
       end
       if not selected and items[1] and items[1].kind == "group" then selected = items[1].children[1] end
     end
@@ -1274,6 +1343,42 @@ ns.UI.RegisterPage("market", function(page)
       if #b > 0 then
         out[#out + 1] = { kind = "header", id = "hdr:" .. s.id, label = s.label }
         for _, it in ipairs(b) do out[#out + 1] = it end
+      end
+    end
+    return out
+  end
+
+  -- «Se ofrece» va por categorías, como la ventana de profesiones (arma, ranura, consumibles...):
+  -- solo las que tienen algo, y se pliegan al pulsar su título (se recuerda).
+  function page:CollapsedCats()
+    local s = ns.db.settings
+    s.collapsed = s.collapsed or {}
+    s.collapsed.marketOffer = s.collapsed.marketOffer or {}
+    return s.collapsed.marketOffer
+  end
+  function page:Categories(items)
+    local buckets, order = {}, {}
+    for _, it in ipairs(items) do
+      local cat, label, rank = ns.UI.CraftCategory(it.k)
+      local b = buckets[cat]
+      if not b then
+        b = { cat = cat, label = label, rank = rank, items = {} }
+        buckets[cat] = b
+        order[#order + 1] = b
+      end
+      table.insert(b.items, it)
+    end
+    table.sort(order, function(a, b)
+      if a.rank ~= b.rank then return a.rank < b.rank end
+      return a.label < b.label
+    end)
+    local saved, out = page:CollapsedCats(), {}
+    for _, b in ipairs(order) do
+      local collapsed = state.search == "" and saved[b.cat] == true
+      out[#out + 1] = { kind = "header", id = "cat:" .. b.cat, cat = b.cat, label = b.label, count = #b.items,
+        collapsed = collapsed }
+      if not collapsed then
+        for _, it in ipairs(b.items) do out[#out + 1] = it end
       end
     end
     return out

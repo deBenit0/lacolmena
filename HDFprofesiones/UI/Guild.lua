@@ -21,19 +21,35 @@ end
 -- Profesiones que salen en «Quién fabrica qué», en este orden.
 local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182, 755, 773, 40 }
 
--- Todos los de la hermandad con una profesión, con su nivel (de más a menos).
-local function peopleWith(pk)
+-- Todos los de la hermandad con una profesión, con su nivel (de más a menos) o, con byKarma, por
+-- el karma de la persona (su principal) y luego por nivel.
+local function countWith(pk)
+  local g, n = ns.G(), 0
+  for _, e in pairs(g and g.entries or {}) do
+    if type(e.p) == "table" and e.p[pk] then n = n + 1 end
+  end
+  return n
+end
+
+local function peopleWith(pk, byKarma)
   local g = ns.G()
   local rows = {}
   if not g then return rows end
+  local karmaOf = {} -- una vez por persona (su principal)
   for name, e in pairs(g.entries) do
     local p = type(e.p) == "table" and e.p[pk]
     if p then
+      local main = S.MainOf(name) or name
+      if karmaOf[main] == nil then karmaOf[main] = ns.Data.KarmaFor(main) end
+      local k = karmaOf[main]
       rows[#rows + 1] = { name = name, class = e.c or ns.ClassOf(name), pk = pk, r = p.r, unavailable = e.u,
-        online = ns.Guild.IsOnline(name), seen = ns.Guild.LastSeen(name) }
+        online = ns.Guild.IsOnline(name), seen = ns.Guild.LastSeen(name), k = k,
+        karma = ns.Data.KarmaText(main), thanks = ns.Data.ThanksFor(name) }
+      if byKarma then rows[#rows].extra = "|cffbbbbbbkarma " .. rows[#rows].karma .. "|r" end
     end
   end
   table.sort(rows, function(a, b)
+    if byKarma and a.k ~= b.k then return a.k > b.k end
     if (a.r or 0) ~= (b.r or 0) then return (a.r or 0) > (b.r or 0) end
     return a.name < b.name
   end)
@@ -143,7 +159,27 @@ ns.UI.RegisterPage("guild", function(page)
   title("Roles", COL1 + 4, -322)
   local rolesHint = W.Text(page, "GameFontDisableSmall")
   rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324)
-  rolesHint:SetText("cada personaje, desde nivel 10")
+  rolesHint:SetText("desde nivel 10 · pulsa el tuyo")
+
+  -- Pulsar tanque, sanador o DPS pone ese rol a este personaje (como en Opciones); pulsar el que
+  -- ya elegiste vuelve a «Auto» (talentos).
+  local function setMyRole(role)
+    local c = ns.MyChar()
+    if not c then return end
+    if c.roleSet == role then
+      c.roleSet = nil
+    else
+      local allowed = ns.Dungeons.CLASS_ROLES[c.class or ns.Dungeons.MyClass()] or 7
+      if math.floor(allowed / role) % 2 ~= 1 then
+        ns.Print("tu clase no puede ser %s.", ns.Dungeons.RoleLabel(role):lower())
+        return
+      end
+      c.roleSet = role
+    end
+    ns.Sync.PublishMine()
+    page:Refresh()
+  end
+  page.SetMyRole = function(_, role) setMyRole(role) end
   local ROLE_SLOTS = {
     { key = 1, icon = "Interface\\Icons\\Ability_Defend", tip = "Tanques" },
     { key = 2, icon = "Interface\\Icons\\Spell_Holy_FlashHeal", tip = "Sanadores" },
@@ -175,7 +211,52 @@ ns.UI.RegisterPage("guild", function(page)
       b.label:SetText(s.key == "crafters" and "artesanos" or "recolectores")
     end
     if s.key == "unknown" then b.count:SetTextColor(0.6, 0.6, 0.6) end
-    ns.UI.Tip(b, s.tip, s.text or "Los que tienen el addon lo sacan de sus talentos (o lo eligen en Opciones).")
+    if s.row == 2 then
+      ns.UI.Tip(b, s.tip, s.text)
+    else
+      -- Aro dorado alrededor del icono en el rol de este personaje.
+      b.ring = CreateFrame("Frame", nil, b)
+      b.ring:SetSize(28, 28)
+      b.ring:SetPoint("CENTER", b.icon, "CENTER")
+      b.ringBorder = W.Border(b.ring, W.COLORS.GOLD, "OVERLAY")
+      b.ring:Hide()
+      if s.key ~= "unknown" then
+        b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        local hl = b:GetHighlightTexture()
+        if hl then
+          hl:ClearAllPoints()
+          hl:SetAllPoints(b.icon)
+        end
+        b:SetScript("OnClick", function() setMyRole(s.key) end)
+      end
+      b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(s.tip .. " (" .. tostring(self.count:GetText() or 0) .. ")")
+        local c = ns.MyChar()
+        if s.key == "unknown" then
+          GameTooltip:AddLine(s.text, 1, 1, 1, true)
+        elseif c and c.roleSet == s.key then
+          GameTooltip:AddLine("Es el tuyo: lo has elegido tú. Pulsa otra vez para volver a «Auto» (talentos).",
+            0.25, 1, 0.25, true)
+        elseif c and not c.roleSet and c.roleAuto == s.key then
+          GameTooltip:AddLine("Es el tuyo: sale de tus talentos. Pulsa para fijarlo a mano.", 0.25, 1, 0.25, true)
+        else
+          GameTooltip:AddLine("Pulsa si este personaje es " .. ns.Dungeons.RoleLabel(s.key):lower()
+            .. " (como el rol de Opciones). Otra vez: vuelve a «Auto».", 1, 1, 1, true)
+        end
+        local names = page.roleNames and page.roleNames[s.key] or {}
+        if #names > 0 then
+          table.sort(names)
+          GameTooltip:AddLine(" ")
+          for i = 1, math.min(15, #names) do
+            GameTooltip:AddLine(ns.WhoColored(names[i]), 1, 1, 1)
+          end
+          if #names > 15 then GameTooltip:AddLine(string.format("y %d más", #names - 15), 0.7, 0.7, 0.7) end
+        end
+        GameTooltip:Show()
+      end)
+      b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     b.key = s.key
     page.roleSlots[i] = b
   end
@@ -205,6 +286,15 @@ ns.UI.RegisterPage("guild", function(page)
   page.profTitle:SetPoint("TOPLEFT", COL2 + 4, -106)
   page.who = W.Crafters(page, WHO_W, 13)
   page.who:SetPoint("TOPLEFT", COL2, -120)
+  -- Ordenar por nivel (como siempre) o por karma; se recuerda.
+  page.whoSort = W.Button(page, "", 128, 18, function()
+    ns.db.settings.whoSort = (ns.db.settings.whoSort ~= "karma") and "karma" or nil
+    page:Refresh()
+  end)
+  page.whoSort:SetFontSize("small")
+  page.whoSort:SetPoint("BOTTOMRIGHT", page.who, "TOPRIGHT", 0, 1)
+  ns.UI.Tip(page.whoSort, "Ordenar", "Por nivel de la profesión o por el karma de cada persona (el de su "
+    .. "personaje principal).")
   page.noWho = W.Text(page, "GameFontHighlightSmall", "CENTER")
   page.noWho:SetPoint("CENTER", page.who, "CENTER")
   page.noWho:SetWidth(WHO_W - 40)
@@ -274,11 +364,22 @@ ns.UI.RegisterPage("guild", function(page)
     local g = ns.G()
     local rc = ns.Dungeons.RoleCounts(g and g.entries, ns.Guild.roster)
     rc.crafters, rc.gatherers = ns.UI.TradeCounts(g and g.entries)
-    for _, b in ipairs(page.roleSlots) do b.count:SetText(rc[b.key] or 0) end
+    page.roleNames = rc.names
+    local c = ns.MyChar()
+    local myRole = c and (c.roleSet or c.roleAuto)
+    for _, b in ipairs(page.roleSlots) do
+      b.count:SetText(rc[b.key] or 0)
+      if b.ring then
+        local mine = myRole ~= nil and b.key == myRole
+        b.ring:SetShown(mine)
+        -- elegido a mano: dorado; sacado de los talentos: más apagado
+        if mine and c.roleSet then b.ringBorder:SetColor(1, 0.82, 0, 1) else b.ringBorder:SetColor(0.6, 0.5, 0.25, 1) end
+      end
+    end
 
     -- Quién fabrica qué: la profesión elegida (o la primera que tenga alguien).
     local counts = {}
-    for _, pk in ipairs(WHO_PROFS) do counts[pk] = #peopleWith(pk) end
+    for _, pk in ipairs(WHO_PROFS) do counts[pk] = countWith(pk) end
     if not state.pk then
       for _, pk in ipairs(WHO_PROFS) do if counts[pk] > 0 then state.pk = pk break end end
       state.pk = state.pk or WHO_PROFS[1]
@@ -287,7 +388,9 @@ ns.UI.RegisterPage("guild", function(page)
       b.count:SetText(counts[b.pk] > 0 and tostring(counts[b.pk]) or "")
       b.tex:SetDesaturated(b.pk ~= state.pk)
     end
-    local rows = peopleWith(state.pk)
+    local byKarma = ns.db.settings.whoSort == "karma"
+    page.whoSort:SetText(byKarma and "Ordenar: karma" or "Ordenar: nivel")
+    local rows = peopleWith(state.pk, byKarma)
     page.profTitle:SetText(ns.ProfessionName(state.pk) .. " |cffbbbbbb(" .. #rows .. ")|r")
     page.who:SetItems(rows)
     page.noWho:SetShown(#rows == 0)
