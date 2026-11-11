@@ -17,8 +17,11 @@ function Guild.IsOnline(name)
   return ns.Demo and ns.Demo.IsOnline(name) or false
 end
 
+-- Ficha de la lista. Se busca también con otro reino interno o con apellido: si no, a un
+-- oficial con otro reino nadie lo reconocía como oficial y se ignoraban sus cierres.
 function Guild.Info(name)
-  return roster[name]
+  if type(name) ~= "string" then return nil end
+  return roster[name] or (Guild.Find(name))
 end
 
 function Guild.MarkSeen(name)
@@ -28,7 +31,7 @@ end
 
 -- Última vez que se vio al personaje (segundos relativos), o nil si no se sabe.
 function Guild.LastSeen(name)
-  local r = roster[name]
+  local r = Guild.Info(name)
   if r and r.online then return ns.Now() end
   if ns.Demo and ns.Demo.IsDemo(name) then return ns.Demo.LastSeen(name) end
   local g = ns.G()
