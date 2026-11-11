@@ -215,6 +215,60 @@ local function isEquipment(key)
   return equipLoc ~= nil and not NON_EQUIP[equipLoc]
 end
 
+-- Categorías como las de la ventana de profesiones del juego: tipo de arma, ranura de la
+-- armadura, bolsas, consumibles por tipo, materiales... Devuelve clave, nombre y orden.
+local WEAPON_CATS = {
+  { 0, "Hachas de una mano" }, { 1, "Hachas de dos manos" }, { 4, "Mazas de una mano" }, { 5, "Mazas de dos manos" },
+  { 7, "Espadas de una mano" }, { 8, "Espadas de dos manos" }, { 6, "Armas de asta" }, { 10, "Bastones" },
+  { 13, "Armas de puño" }, { 15, "Dagas" }, { 2, "Arcos" }, { 18, "Ballestas" }, { 3, "Armas de fuego" },
+  { 16, "Armas arrojadizas" }, { 19, "Varitas" }, { 20, "Cañas de pescar" }, { 14, "Armas (varias)" },
+}
+local ARMOR_CATS = {
+  { "INVTYPE_HEAD", "Cabeza" }, { "INVTYPE_SHOULDER", "Hombros" }, { "INVTYPE_CLOAK", "Capas" },
+  { "INVTYPE_CHEST", "Pecho" }, { "INVTYPE_ROBE", "Pecho" }, { "INVTYPE_WRIST", "Muñecas" },
+  { "INVTYPE_HAND", "Manos" }, { "INVTYPE_WAIST", "Cintura" }, { "INVTYPE_LEGS", "Piernas" },
+  { "INVTYPE_FEET", "Pies" }, { "INVTYPE_NECK", "Cuello" }, { "INVTYPE_FINGER", "Anillos" },
+  { "INVTYPE_TRINKET", "Abalorios" }, { "INVTYPE_SHIELD", "Escudos" }, { "INVTYPE_HOLDABLE", "Mano izquierda" },
+  { "INVTYPE_BODY", "Camisas" }, { "INVTYPE_TABARD", "Tabardos" },
+}
+local CONSUMABLE_CATS = {
+  [1] = "Pociones", [2] = "Elixires", [3] = "Frascos", [4] = "Pergaminos", [5] = "Comida y bebida",
+  [6] = "Mejoras de objeto", [7] = "Vendas",
+}
+local WEAPON_RANK, ARMOR_RANK = {}, {}
+for i, w in ipairs(WEAPON_CATS) do WEAPON_RANK[w[1]] = { rank = i, label = w[2] } end
+for i, a in ipairs(ARMOR_CATS) do ARMOR_RANK[a[1]] = { rank = i, label = a[2] } end
+
+local function craftCategory(key)
+  local kind, id = ns.ParseKey(key)
+  if kind == "e" then return "c:enchant", "Encantamientos", 600 end
+  if kind ~= "i" then return "c:other", "Otros", 900 end
+  local equipLoc, classID, subclassID = ns.ItemInstant(id)
+  if classID == 2 then
+    local w = WEAPON_RANK[subclassID] or WEAPON_RANK[14]
+    return "c:w:" .. w.label, w.label, 100 + w.rank
+  elseif classID == 4 then
+    local a = ARMOR_RANK[equipLoc or ""]
+    if a then return "c:a:" .. a.label, a.label, 200 + a.rank end
+    return "c:a:other", "Armaduras (varias)", 290
+  elseif classID == 1 then
+    return "c:bags", "Bolsas", 300
+  elseif classID == 11 then
+    return "c:quiver", "Carcajes y cartucheras", 301
+  elseif classID == 6 then
+    return "c:ammo", "Munición", 302
+  elseif classID == 0 then
+    local label = CONSUMABLE_CATS[subclassID]
+    if label then return "c:cons:" .. subclassID, label, 400 + subclassID end
+    return "c:cons", "Consumibles", 409
+  elseif classID == 7 or classID == 5 then
+    local groupKey, label = materialGroup(key)
+    if not groupKey or label == "Varios" or label == "Otros" then return "c:mats", "Materiales", 520 end
+    return "c:" .. groupKey, label, 500 + ((classID == 7 and subclassID) or 19)
+  end
+  return "c:other", "Otros", 900
+end
+
 -- Nombres de los tipos de armadura y de arma (subclases de Classic), para la línea gris.
 local ARMOR_NAMES = { [1] = "Tela", [2] = "Cuero", [3] = "Malla", [4] = "Placas", [6] = "Escudo" }
 local WEAPON_NAMES = {
@@ -243,6 +297,82 @@ local STAR_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
 local LIST_W, DETAIL_W, BODY_H = 400, 380, 386
 local CARD_H, HEAD_H, LIST_ROWS = 44, 24, 8
 local MAT_H = 18
+
+-- Materiales de una receta: una fila cada uno (icono, «Barra de cobre x8» y «tienes 12», en verde
+-- si llegan y en naranja si no); con más de 4, en dos columnas. Si aún no se saben, se piden a la
+-- hermandad. Lo usan el catálogo y el detalle del Mercado.
+local function reagentsBlock(parent, width)
+  local block = { slots = {} }
+  for i = 1, MAX_REAGENTS do
+    local slot = CreateFrame("Button", nil, parent)
+    slot:SetHeight(MAT_H)
+    slot.icon = slot:CreateTexture(nil, "ARTWORK")
+    slot.icon:SetSize(16, 16)
+    slot.icon:SetPoint("LEFT", 0, 0)
+    slot.have = W.Text(slot, "GameFontHighlightSmall", "RIGHT")
+    slot.have:SetPoint("RIGHT", -2, 0)
+    slot.name = W.Text(slot, "GameFontHighlightSmall")
+    slot.name:SetPoint("LEFT", slot.icon, "RIGHT", 6, 0)
+    slot.name:SetPoint("RIGHT", slot.have, "LEFT", -6, 0)
+    slot.name:SetWordWrap(false)
+    W.KeyTooltip(slot, function(self) return self.itemID and ("i" .. self.itemID) end)
+    slot:Hide()
+    block.slots[i] = slot
+  end
+  block.note = W.Text(parent, "GameFontHighlightSmall")
+  block.note:SetJustifyV("TOP")
+  block.note:SetTextColor(0.75, 0.75, 0.75)
+  block.note:Hide()
+
+  function block:Hide()
+    for _, slot in ipairs(self.slots) do slot:Hide() end
+    self.note:Hide()
+  end
+
+  -- Pone los materiales de la receta (key en la profesión pk) desde (x, y), para «times» veces.
+  -- Devuelve la variante (nil si aún no se sabe), cuántas recetas hay y el alto que ocupa.
+  function block:Set(key, pk, x, y, times)
+    times = times or 1
+    local var, variants = recipeInfo(key, pk)
+    local ids = {}
+    if var then
+      for id in pairs(var.r) do ids[#ids + 1] = id end
+      table.sort(ids)
+    end
+    local two = #ids > 4
+    local colW = two and math.floor((width - 4) / 2) or width
+    local perCol = two and math.ceil(#ids / 2) or #ids
+    for i, slot in ipairs(self.slots) do
+      local id = ids[i]
+      slot.itemID = id
+      slot:SetShown(id ~= nil)
+      if id then
+        local col, line = 0, i - 1
+        if two then col, line = math.floor((i - 1) / perCol), (i - 1) % perCol end
+        slot:ClearAllPoints()
+        slot:SetPoint("TOPLEFT", x + col * (colW + 4), y - line * MAT_H)
+        slot:SetWidth(colW)
+        local need = var.r[id] * times
+        local have = ns.Scan.Have(id)
+        local _, icon = ns.KeyInfo("i" .. id)
+        slot.icon:SetTexture(icon)
+        slot.name:SetText(ns.KeyName("i" .. id) .. " |cffffffffx" .. need .. "|r")
+        slot.have:SetText((have >= need and "|cff40ff40" or "|cffff9933") .. "tienes " .. have .. "|r")
+      end
+    end
+    self.note:SetShown(not var)
+    if not var then
+      self.note:ClearAllPoints()
+      self.note:SetPoint("TOPLEFT", x, y)
+      self.note:SetWidth(width)
+      self.note:SetHeight(MAT_H * 2)
+      self.note:SetText("Pidiendo los materiales a la hermandad...")
+      return nil, nil, MAT_H * 2
+    end
+    return var, variants, math.max(1, perCol) * MAT_H
+  end
+  return block
+end
 
 -- Lo que tienes de un objeto: texto corto para la fila ("Bolsas"/"Banco") y la frase del detalle.
 local function haveInfo(key)
@@ -385,10 +515,23 @@ local function buildCatalog(page, mode)
       .. "sin lo de mucho menos nivel.")
   end
 
+  -- Debajo: esconder lo que nadie de la hermandad tiene publicado (se guarda; apagada al empezar).
+  local madeSetting = materials and "onlyMadeMaterials" or "onlyMadeEquipment"
+  local madeLabel = materials and "Solo lo que alguien da" or "Solo lo que alguien fabrica"
+  local madeCheck = W.Check(page, madeLabel, function(checked)
+    ns.db.settings[madeSetting] = checked
+    page:Refresh()
+  end)
+  madeCheck:SetPoint("TOPLEFT", 2, -32)
+  ns.UI.Tip(madeCheck, madeLabel, materials
+    and "Esconde los materiales que nadie de la hermandad fabrica ni recolecta (o no lo tiene publicado)."
+    or "Esconde lo que nadie de la hermandad sabe fabricar (o no lo tiene publicado).")
+  page.madeCheck = madeCheck
+
   -- Lista: títulos de sección (tipo de material o ranura de equipo, plegables) y una tarjeta por
   -- objeto con su icono, el nombre en el color de su calidad y una línea gris debajo.
-  local list = W.List(page, LIST_W, BODY_H, {
-    rows = LIST_ROWS,
+  local list = W.List(page, LIST_W, BODY_H - 26, {
+    rows = LIST_ROWS - 1,
     rowHeight = CARD_H,
     maxRows = 16,
     card = true,
@@ -468,13 +611,13 @@ local function buildCatalog(page, mode)
       page:RefreshDetail(true)
     end,
   })
-  list:SetPoint("TOPLEFT", 0, -34)
+  list:SetPoint("TOPLEFT", 0, -60)
 
   -----------------------------------------------------------------------
   -- Detalle del objeto elegido.
   -----------------------------------------------------------------------
   local detail = W.Box(page, DETAIL_W, BODY_H)
-  detail:SetPoint("TOPLEFT", list, "TOPRIGHT", 8, 0)
+  detail:SetPoint("TOPLEFT", page, "TOPLEFT", LIST_W + 8, -34)
 
   detail.icon = CreateFrame("Button", nil, detail)
   detail.icon:SetSize(40, 40)
@@ -530,26 +673,8 @@ local function buildCatalog(page, mode)
   detail.matsLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
 
   -- Materiales: una fila cada uno ("Barra de cobre x8 ... tienes 12"); con más de 4, en dos columnas.
-  detail.slots = {}
-  for i = 1, MAX_REAGENTS do
-    local slot = CreateFrame("Button", nil, detail)
-    slot:SetHeight(MAT_H)
-    slot.icon = slot:CreateTexture(nil, "ARTWORK")
-    slot.icon:SetSize(16, 16)
-    slot.icon:SetPoint("LEFT", 0, 0)
-    slot.have = W.Text(slot, "GameFontHighlightSmall", "RIGHT")
-    slot.have:SetPoint("RIGHT", -2, 0)
-    slot.name = W.Text(slot, "GameFontHighlightSmall")
-    slot.name:SetPoint("LEFT", slot.icon, "RIGHT", 6, 0)
-    slot.name:SetPoint("RIGHT", slot.have, "LEFT", -6, 0)
-    slot.name:SetWordWrap(false)
-    W.KeyTooltip(slot, function(self) return self.itemID and ("i" .. self.itemID) end)
-    detail.slots[i] = slot
-  end
-  detail.matsNote = W.Text(detail, "GameFontHighlightSmall")
-  detail.matsNote:SetPoint("RIGHT", detail, "RIGHT", -12, 0)
-  detail.matsNote:SetJustifyV("TOP")
-  detail.matsNote:SetTextColor(0.75, 0.75, 0.75)
+  local reagents = reagentsBlock(detail, DETAIL_W - 24)
+  detail.reagents, detail.slots, detail.matsNote = reagents, reagents.slots, reagents.note
 
   -- Cantidad con - y +, como el "Crear" de la ventana de profesiones.
   detail.qtyLabel = W.Text(detail, "GameFontNormalSmall")
@@ -620,40 +745,12 @@ local function buildCatalog(page, mode)
 
   -- Materiales de la receta, desde la altura y. Devuelve cuántos salen por vez.
   local function showMaterials(key, pk, y)
-    local var, variants = recipeInfo(key, pk)
-    local ids = {}
-    if var then
-      for id in pairs(var.r) do ids[#ids + 1] = id end
-      table.sort(ids)
-    end
-    local two = #ids > 4
-    local colW = two and math.floor((DETAIL_W - 28) / 2) or (DETAIL_W - 24)
-    local perCol = two and math.ceil(#ids / 2) or #ids
-    for i, slot in ipairs(detail.slots) do
-      local id = ids[i]
-      slot.itemID = id
-      slot:SetShown(id ~= nil)
-      if id then
-        local col, line = 0, i - 1
-        if two then col, line = math.floor((i - 1) / perCol), (i - 1) % perCol end
-        slot:ClearAllPoints()
-        slot:SetPoint("TOPLEFT", 12 + col * (colW + 4), y - line * MAT_H)
-        slot:SetWidth(colW)
-        local need = var.r[id]
-        local have = ns.Scan.Have(id)
-        local _, icon = ns.KeyInfo("i" .. id)
-        slot.icon:SetTexture(icon)
-        slot.name:SetText(ns.KeyName("i" .. id) .. " |cffffffffx" .. need .. "|r")
-        slot.have:SetText((have >= need and "|cff40ff40" or "|cffff9933") .. "tienes " .. have .. "|r")
-      end
-    end
+    local var, variants = reagents:Set(key, pk, 12, y)
     detail.matsLabel:SetText("Materiales", variants and variants > 1
       and string.format("(hay %d recetas; se muestra una)", variants) or nil)
-    detail.matsNote:SetShown(not var)
     if not var then
       place(detail.matsNote, y, 12)
       detail.matsNote:SetHeight(MAT_H * 2)
-      detail.matsNote:SetText("Pidiendo los materiales a la hermandad...")
     end
     local made = var and var.m or 1
     state.step = made
@@ -683,6 +780,9 @@ local function buildCatalog(page, mode)
       elseif materials and ns.db.settings.onlyMyReagents then
         detail.empty:SetText("No hay materiales de tus recetas que dé la hermandad. Abre tus profesiones "
           .. "para que el addon sepa qué usas, o desmarca \"Solo lo que usan mis recetas\".")
+      elseif ns.db.settings[madeSetting] then
+        detail.empty:SetText("Nadie de la hermandad tiene publicado nada de esto. Desmarca \"" .. madeLabel
+          .. "\" para verlo todo.")
       else
         detail.empty:SetText("Aún no hay nada. Cada miembro debe abrir la ventana de sus profesiones una vez.")
       end
@@ -789,6 +889,8 @@ local function buildCatalog(page, mode)
   function page:Refresh()
     if ns.db.settings[filterSetting] == nil then ns.db.settings[filterSetting] = not materials end
     lowCheck:SetChecked(ns.db.settings[filterSetting])
+    local onlyMade = ns.db.settings[madeSetting] and true or false
+    madeCheck:SetChecked(onlyMade)
     local index = Data.GetIndex()
     local profSet, groups = {}, {}
     local playerLevel = UnitLevel("player") or 60
@@ -849,6 +951,14 @@ local function buildCatalog(page, mode)
       end
       if materials or not rec then
         for _, who in ipairs((Data.GatherersOf(key))) do countWho(who, true) end
+      end
+      -- «Solo lo que alguien fabrica»: fuera lo que nadie tiene publicado (en esa profesión, si se eligió).
+      if onlyMade and makers + gather == 0 then
+        local anyone = false
+        for _, cr in ipairs(rec and rec.crafters or {}) do
+          if not state.prof or cr.p == state.prof then anyone = true break end
+        end
+        if not anyone then return end
       end
       -- Línea gris de la tarjeta.
       local parts = {}
@@ -1133,12 +1243,29 @@ local function buildCraftOffer(page)
     page:Refresh()
   end
 
+  -- Categorías plegadas (se recuerdan); al buscar, todo abierto.
+  local function savedCollapsed()
+    ns.db.settings.collapsed = ns.db.settings.collapsed or {}
+    ns.db.settings.collapsed.craft = ns.db.settings.collapsed.craft or {}
+    return ns.db.settings.collapsed.craft
+  end
+
+  -- Lista por categorías, como la ventana de profesiones del juego; arriba, las que ya ofreces.
   local list = W.List(page, 430, 368, {
     rows = 8,
     rowHeight = 44,
+    maxRows = 16,
     card = true,
-    keyOf = function(line) return line.key end,
+    heightOf = function(line) return line.header and 24 or 44 end,
+    isHeader = function(line) return line.header == true end,
+    keyOf = function(line) return line.header and line.id or line.key end,
     buildRow = function(row)
+      row.head = W.Header(row)
+      row.head:SetPoint("TOPLEFT", 2, 0)
+      row.head:SetPoint("BOTTOMRIGHT", -2, 2)
+      row.fold = W.ListText(row.head, "GameFontHighlightSmall", "RIGHT")
+      row.fold:SetPoint("BOTTOMRIGHT", -4, 5)
+      row.fold:SetTextColor(0.6, 0.6, 0.6)
       row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
       row.check:SetSize(24, 24)
       row.check:SetPoint("LEFT", 2, 0)
@@ -1154,9 +1281,17 @@ local function buildCraftOffer(page)
       row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
       row.sub:SetPoint("RIGHT", row, "RIGHT", -6, 0)
       row.sub:SetWordWrap(false)
-      W.KeyTooltip(row, function(self) return self.item and self.item.key end)
+      row.parts = { row.check, row.icon, row.title, row.sub }
+      W.KeyTooltip(row, function(self) return self.item and not self.item.header and self.item.key end)
     end,
     updateRow = function(row, line)
+      row.head:SetShown(line.header == true)
+      for _, p in ipairs(row.parts) do p:SetShown(not line.header) end
+      if line.header then
+        row.head:SetText(line.label, "(" .. line.count .. ")")
+        row.fold:SetText(line.collapsed and "+" or "-")
+        return
+      end
       local _, icon = ns.KeyInfo(line.key)
       row.icon:SetTexture(icon or ns.QUESTION_ICON)
       row.title:SetText(ns.KeyName(line.key))
@@ -1168,6 +1303,11 @@ local function buildCraftOffer(page)
         .. (o and (" · |cffffd100ofrecida|r " .. ns.UI.PriceText(o.g)) or ""))
     end,
     onSelect = function(line)
+      if line.header then
+        savedCollapsed()[line.cat] = not line.collapsed
+        page:Refresh()
+        return
+      end
       state.selected = line.key
       page:Refresh()
     end,
@@ -1236,7 +1376,7 @@ local function buildCraftOffer(page)
     local c = ns.MyChar()
     local index = Data.GetIndex()
     local mineCrafts = Offers.MyCrafts()
-    local lines, seen, me = {}, {}, ns.Me()
+    local all, seen, me = {}, {}, ns.Me()
     for pk, prof in pairs(c and c.profs or {}) do
       for k in pairs(prof.recipes or {}) do
         if not seen[k] then
@@ -1250,20 +1390,50 @@ local function buildCraftOffer(page)
                 others = others + 1
               end
             end
-            lines[#lines + 1] = { key = k, pk = pk, name = name, others = others, offered = mineCrafts[k] ~= nil }
+            all[#all + 1] = { key = k, pk = pk, name = name, others = others, offered = mineCrafts[k] ~= nil }
           end
         end
       end
     end
-    -- Las ofrecidas primero; luego las que sabe hacer menos gente; luego por nombre.
-    table.sort(lines, function(a, b)
-      if a.offered ~= b.offered then return a.offered end
-      if a.others ~= b.others then return a.others < b.others end
-      return a.name < b.name
+    -- Las ofrecidas, arriba en su grupo; el resto por categorías (arma, ranura, consumibles...),
+    -- en el orden de la ventana de profesiones. Dentro, las que sabe hacer menos gente primero.
+    local offered, groups, order = {}, {}, {}
+    for _, line in ipairs(all) do
+      if line.offered then
+        offered[#offered + 1] = line
+      else
+        local cat, label, rank = craftCategory(line.key)
+        local grp = groups[cat]
+        if not grp then
+          grp = { cat = cat, label = label, rank = rank, lines = {} }
+          groups[cat] = grp
+          order[#order + 1] = grp
+        end
+        grp.lines[#grp.lines + 1] = line
+      end
+    end
+    table.sort(order, function(a, b)
+      if a.rank ~= b.rank then return a.rank < b.rank end
+      return a.label < b.label
     end)
+    if #offered > 0 then table.insert(order, 1, { cat = "offered", label = "Las que ofreces", lines = offered }) end
+    local saved, lines = savedCollapsed(), {}
+    for _, grp in ipairs(order) do
+      table.sort(grp.lines, function(a, b)
+        if a.others ~= b.others then return a.others < b.others end
+        return a.name < b.name
+      end)
+      local collapsed = state.search == "" and saved[grp.cat] == true
+      lines[#lines + 1] = { header = true, id = "h:" .. grp.cat, cat = grp.cat, label = grp.label,
+        count = #grp.lines, collapsed = collapsed }
+      if not collapsed then
+        for _, line in ipairs(grp.lines) do lines[#lines + 1] = line end
+      end
+    end
+    page.recipes = all
     list.selectedKey = state.selected
     list:SetItems(lines)
-    page.empty:SetShown(#lines == 0)
+    page.empty:SetShown(#all == 0)
     page.empty:SetText(state.search ~= "" and "Ninguna receta tuya con ese nombre."
       or "Aún no se ha leído ninguna profesión tuya: abre su ventana una vez.")
 
@@ -1367,3 +1537,4 @@ function ns.UI.CrafterRows(key, withGatherers)
   return sorted
 end
 ns.UI.GearGroup, ns.UI.IsEquipment, ns.UI.MaterialGroup = gearGroup, isEquipment, materialGroup
+ns.UI.CraftCategory, ns.UI.ReagentsBlock = craftCategory, reagentsBlock

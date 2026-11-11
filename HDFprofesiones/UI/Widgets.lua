@@ -204,121 +204,47 @@ function W.Text(parent, font, justify)
   return fs
 end
 
--- Cómo se ve un botón: oscuro con borde y letras doradas; encendido (LockHighlight, SetOn o el
--- principal), relleno dorado oscuro con letras blancas; apagado, gris.
-local function buttonLook(b)
-  local enabled = b:IsEnabled()
-  local on = b.hdfOn or b.hdfPrimary
-  local bg = on and C.ON or C.CARD
-  local edge = (on or b.hdfPrimary) and C.GOLD or C.LINE
-  local tr, tg, tb = C.GOLD[1], C.GOLD[2], C.GOLD[3]
-  if on then tr, tg, tb = 1, 1, 1 end
-  if not enabled then
-    bg, edge = C.CARD, { 0.3, 0.28, 0.25 }
-    tr, tg, tb = 0.5, 0.5, 0.5
-  end
-  b.bg:SetColorTexture(bg[1], bg[2], bg[3], 1)
-  b.border:SetColor(edge[1], edge[2], edge[3], 1)
-  local fs = b.fs
-  if fs then fs:SetTextColor(tr, tg, tb) end
-end
-W.ButtonLook = buttonLook
-
+-- Botones del juego (UIPanelButtonTemplate, rojos). Al pedirlo él, vuelven los de antes; las
+-- listas de tarjetas siguen con el estilo nuevo.
 function W.Button(parent, text, width, height, onClick)
-  local b = CreateFrame("Button", nil, parent)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   b:SetSize(width, height or 22)
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetAllPoints()
-  b.border = W.Border(b, C.LINE)
-  b.hover = b:CreateTexture(nil, "HIGHLIGHT")
-  b.hover:SetPoint("TOPLEFT", 1, -1)
-  b.hover:SetPoint("BOTTOMRIGHT", -1, 1)
-  b.hover:SetColorTexture(1, 0.82, 0, 0.14)
-  b.fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  b.fs:SetPoint("LEFT", 4, 0)
-  b.fs:SetPoint("RIGHT", -4, 0)
-  b.fs:SetJustifyH("CENTER")
-  b.fs:SetWordWrap(false)
-  b:SetFontString(b.fs)
   b:SetText(text)
   if onClick then b:SetScript("OnClick", onClick) end
-  -- Encendido, apagado y bloqueado cambian el aspecto (los demás archivos usan estas funciones).
-  local lock, unlock = b.LockHighlight, b.UnlockHighlight
-  local setEnabled, enable, disable = b.SetEnabled, b.Enable, b.Disable
-  function b:LockHighlight()
-    self.hdfOn = true
-    lock(self)
-    buttonLook(self)
-  end
-  function b:UnlockHighlight()
-    self.hdfOn = false
-    unlock(self)
-    buttonLook(self)
-  end
-  function b:SetEnabled(v)
-    setEnabled(self, v)
-    buttonLook(self)
-  end
-  function b:Enable()
-    enable(self)
-    buttonLook(self)
-  end
-  function b:Disable()
-    disable(self)
-    buttonLook(self)
-  end
-  -- Botón principal: siempre relleno (PEDIR, APORTAR...).
-  function b:SetPrimary(v)
-    self.hdfPrimary = v and true or false
-    buttonLook(self)
-  end
+  -- Botón principal (PEDIR, APORTAR...): con la plantilla del juego basta la letra grande.
+  function b:SetPrimary(v) end
   -- Letra: "small", "normal" o "large".
   function b:SetFontSize(size)
-    self.fs:SetFontObject(size == "small" and "GameFontNormalSmall" or size == "large" and "GameFontNormalLarge"
-      or "GameFontNormal")
-    buttonLook(self)
+    if not self.SetNormalFontObject then return end
+    if size == "small" then
+      self:SetNormalFontObject("GameFontNormalSmall")
+      self:SetHighlightFontObject("GameFontHighlightSmall")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisableSmall") end
+    elseif size == "large" then
+      self:SetNormalFontObject("GameFontNormalLarge")
+      self:SetHighlightFontObject("GameFontHighlightLarge")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisableLarge") end
+    else
+      self:SetNormalFontObject("GameFontNormal")
+      self:SetHighlightFontObject("GameFontHighlight")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisable") end
+    end
   end
-  buttonLook(b)
   return b
 end
 
--- Botón de cerrar (una X en un botón del mismo estilo): esconde la ventana donde está.
+-- Botón de cerrar del juego (la X roja).
 function W.CloseButton(parent)
-  local b = W.Button(parent, "X", 22, 20, function(self) self:GetParent():Hide() end)
-  return b
+  return CreateFrame("Button", nil, parent, "UIPanelCloseButton")
 end
 
--- Pestaña de arriba, como las de un navegador: la elegida se une al contenido de debajo.
+-- Pestaña de arriba: botón del juego; la elegida se queda con el brillo y letras blancas.
 function W.Tab(parent, text, width, height, onClick)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, height or 28)
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetPoint("TOPLEFT", 0, 0)
-  b.bg:SetPoint("BOTTOMRIGHT", 0, 0)
-  b.border = W.Border(b, C.LINE)
-  b.hover = b:CreateTexture(nil, "HIGHLIGHT")
-  b.hover:SetPoint("TOPLEFT", 1, -1)
-  b.hover:SetPoint("BOTTOMRIGHT", -1, 1)
-  b.hover:SetColorTexture(1, 0.82, 0, 0.12)
-  b.fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  b.fs:SetPoint("LEFT", 4, 0)
-  b.fs:SetPoint("RIGHT", -4, 0)
-  b.fs:SetWordWrap(false)
-  b:SetFontString(b.fs)
-  b:SetText(text)
-  if onClick then b:SetScript("OnClick", onClick) end
+  local b = W.Button(parent, text, width, height or 26, onClick)
   function b:SetOn(on)
+    if on then self:LockHighlight() else self:UnlockHighlight() end
+    if self.SetNormalFontObject then self:SetNormalFontObject(on and "GameFontHighlight" or "GameFontNormal") end
     self.on = on and true or false
-    local bg = on and C.CARD_SEL or C.CARD
-    self.bg:SetColorTexture(bg[1], bg[2], bg[3], 1)
-    -- La elegida baja 1 px más para tapar la raya de debajo y no tiene borde abajo.
-    self.bg:SetPoint("BOTTOMRIGHT", 0, on and -1 or 0)
-    local e = on and C.GOLD or C.LINE
-    self.border:SetColor(e[1], e[2], e[3], 1)
-    self.border.bottom:SetShown(not on)
-    self.border.left:SetPoint("BOTTOMLEFT", 0, on and -1 or 0)
-    self.border.right:SetPoint("BOTTOMRIGHT", 0, on and -1 or 0)
-    if on then self.fs:SetTextColor(1, 1, 1) else self.fs:SetTextColor(C.GOLD[1], C.GOLD[2], C.GOLD[3]) end
   end
   b:SetOn(false)
   return b
@@ -686,14 +612,44 @@ if ChatEdit_InsertLink and not (ChatFrameUtil and ChatEdit_InsertLink == ChatFra
 end
 W.LinkHooked = hookedInsert
 
--- Abrir un susurro (función nueva del juego o la antigua).
-function ns.SendTell(name)
-  if not name then return end
-  if ChatFrameUtil and ChatFrameUtil.SendTell then
-    ChatFrameUtil.SendTell(name)
-  elseif ChatFrame_SendTell then
-    ChatFrame_SendTell(name)
+-- Nombre con el que se le puede susurrar a alguien de la hermandad. En WoW Forever cada uno
+-- guarda su nombre con el reino interno que le da su juego ("Kael-CAMWOWEU4Realm4PvP") y el
+-- servidor no encuentra a nadie así (el mismo fallo que tuvo invitar en la 0.28). Vale el nombre
+-- tal como lo da la lista de la hermandad y, si es de mi reino o no está en la lista, el corto.
+function ns.TellName(name)
+  if type(name) ~= "string" or name == "" then return nil end
+  local short = ns.ShortName(name)
+  -- ¿Hay otro en la hermandad con el mismo nombre corto? Entonces el corto no basta.
+  local twins = 0
+  for n in pairs(ns.Guild and ns.Guild.roster or {}) do
+    if ns.ShortName(n):lower() == short:lower() then twins = twins + 1 end
   end
+  if twins > 1 then
+    local info = ns.Guild.Find and ns.Guild.Find(name)
+    if info and type(info.raw) == "string" and info.raw ~= "" then return info.raw end
+    return name
+  end
+  return short
+end
+
+-- Abrir un susurro: la función nueva del juego o la antigua y, si fallan, la caja del chat con
+-- "/w Nombre " ya escrito. Devuelve el nombre usado.
+function ns.SendTell(name)
+  local target = ns.TellName(name)
+  if not target then return nil end
+  local send = (ChatFrameUtil and ChatFrameUtil.SendTell) or ChatFrame_SendTell
+  if send and pcall(send, target) then return target, "tell" end
+  local text = "/w " .. target .. " "
+  local open = (ChatFrameUtil and ChatFrameUtil.OpenChat) or ChatFrame_OpenChat
+  if open and pcall(open, text) then return target, "open" end
+  local edit = (ChatEdit_ChooseBoxForSend and ChatEdit_ChooseBoxForSend())
+    or (DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.editBox)
+  if edit then
+    if ChatEdit_ActivateChat then pcall(ChatEdit_ActivateChat, edit) end
+    pcall(edit.SetText, edit, text)
+    return target, "edit"
+  end
+  return target, nil
 end
 
 ---------------------------------------------------------------------------
@@ -730,11 +686,20 @@ function ns.WhoColored(name)
   return text
 end
 
+-- Quien pide u ofrece algo, con su color y «(alt de Principal)» si es un alt.
+function ns.AuthorText(name)
+  local text = ns.ColoredName(name, ns.ClassOf(name))
+  local main = ns.Social and ns.Social.MainOf(name)
+  if main and main ~= name then text = text .. " |cff999999(alt de " .. ns.ShortName(main) .. ")|r" end
+  return text
+end
+
 -- Botón pequeño de texto (filtros rápidos, interruptores). SetOn lo deja encendido.
 function W.Chip(parent, text, width, onClick)
   local b = W.Button(parent, text, width, 22, onClick)
   function b:SetOn(on)
     if on then self:LockHighlight() else self:UnlockHighlight() end
+    if self.SetNormalFontObject then self:SetNormalFontObject(on and "GameFontHighlight" or "GameFontNormal") end
     self.on = on and true or false
   end
   return b

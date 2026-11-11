@@ -181,6 +181,60 @@ local function statusTag(status, color)
   return color and "|cffffd100[?]|r" or "[?]"
 end
 
+-- Lo que se ha leído de los talentos y el rol (para ver en el juego por qué no sale tu rol).
+function Diag.TalentLine()
+  local parts = {}
+  local tabs = "no hay GetNumTalentTabs"
+  if GetNumTalentTabs then
+    local ok, n = pcall(GetNumTalentTabs)
+    tabs = ok and ("ramas " .. tostring(n)) or ("GetNumTalentTabs error: " .. tostring(n))
+    if ok and tonumber(n) and GetTalentTabInfo then
+      local raw = {}
+      for tab = 1, math.min(4, tonumber(n)) do
+        local okI, a, b, c, d, e = pcall(GetTalentTabInfo, tab)
+        raw[#raw + 1] = okI and string.format("[%s|%s|%s|%s|%s]", tostring(a), tostring(b), tostring(c), tostring(d),
+          tostring(e)) or "[error]"
+      end
+      if #raw > 0 then tabs = tabs .. " " .. table.concat(raw, " ") end
+    end
+  end
+  parts[#parts + 1] = tabs
+  local points = ns.Scan.TalentPoints and ns.Scan.TalentPoints()
+  if type(points) == "table" then
+    local p = {}
+    for i = 1, #points do p[i] = tostring(points[i]) end
+    parts[#parts + 1] = "puntos " .. table.concat(p, "/")
+  else
+    parts[#parts + 1] = "puntos: ninguno leído"
+  end
+  if GetSpecialization then
+    local ok, spec = pcall(GetSpecialization)
+    local role = ""
+    if ok and spec and GetSpecializationRole then
+      local ok2, r = pcall(GetSpecializationRole, spec)
+      role = ok2 and (" rol " .. tostring(r)) or ""
+    end
+    parts[#parts + 1] = "GetSpecialization " .. (ok and tostring(spec) or "error") .. role
+  else
+    parts[#parts + 1] = "sin GetSpecialization"
+  end
+  local c = ns.MyChar()
+  local D = ns.Dungeons
+  parts[#parts + 1] = "auto " .. tostring(c and c.roleAuto and D.RoleLabel(c.roleAuto) or "-")
+  parts[#parts + 1] = "elegido " .. tostring(c and c.roleSet and D.RoleLabel(c.roleSet) or "Auto")
+  return "Talentos: " .. table.concat(parts, " · ")
+end
+
+-- Qué función de susurrar hay (los botones «Susurrar»).
+function Diag.TellLine()
+  local how = (ChatFrameUtil and ChatFrameUtil.SendTell and "ChatFrameUtil.SendTell")
+    or (ChatFrame_SendTell and "ChatFrame_SendTell") or "ninguna"
+  local open = (ChatFrameUtil and ChatFrameUtil.OpenChat and "ChatFrameUtil.OpenChat")
+    or (ChatFrame_OpenChat and "ChatFrame_OpenChat") or "ninguna"
+  return string.format("Susurrar: %s (si falla, %s); ejemplo: %s -> %s", how, open, tostring(ns.Me()),
+    tostring(ns.TellName and ns.TellName(ns.Me())))
+end
+
 -- Texto del informe (sin colores, para copiar y pegar).
 function Diag.Report()
   local lines = {}
@@ -192,6 +246,10 @@ function Diag.Report()
   if UnitClass then class = select(2, UnitClass("player")) end
   lines[#lines + 1] = string.format("Personaje: %s (%s %s)", ns.Me() or "?", tostring(class),
     tostring(UnitLevel and UnitLevel("player")))
+  local okT, talents = pcall(Diag.TalentLine)
+  lines[#lines + 1] = okT and talents or ("Talentos: error " .. tostring(talents))
+  local okW, tell = pcall(Diag.TellLine)
+  lines[#lines + 1] = okW and tell or ("Susurrar: error " .. tostring(tell))
   lines[#lines + 1] = ""
   lines[#lines + 1] = "AUTOCOMPROBACIÓN"
   local results, good, bad, unknown = Diag.Run()

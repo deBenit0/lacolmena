@@ -336,7 +336,8 @@ local function createOfferDialog()
     local craftable = self.mode ~= "need" and self.id and ns.Offers.Knows("i" .. self.id)
     if not craftable then kind = "have" end
     self.kind = kind
-    for _, w in ipairs({ self.kindLabel, self.kindHave, self.kindCraft }) do w:SetShown(craftable and true or false) end
+    -- Sin elegir: desde la profesión es siempre por encargo; desde las bolsas, lo que tengo.
+    for _, w in ipairs({ self.kindLabel, self.kindHave, self.kindCraft }) do w:Hide() end
     self.kindHave:SetOn(kind == "have")
     self.kindCraft:SetOn(kind == "craft")
     local craft = kind == "craft"
@@ -382,6 +383,8 @@ local function createOfferDialog()
       ok, err = ns.Social.AddNeed(self.id, tonumber(self.qty:GetText()), ns.Now())
     elseif self.kind == "craft" then
       ok, err = ns.Offers.SetCraft("i" .. tostring(self.id), self:Price(), self.matsOn, ns.Now())
+    elseif self.id and ns.ItemCount(self.id) < 1 then
+      ok, err = nil, "No llevas ninguno: para ofrecer fabricarlo, hazlo desde tu ventana de profesión."
     else
       ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
     end
@@ -405,6 +408,10 @@ end
 -- opts = { edit = cambiar una oferta mía, price, craft = ofrecer fabricarlo, mats }
 function ns.UI.OpenOfferDialog(id, qty, mode, opts)
   opts = opts or {}
+  if opts.craft and id and not opts.edit and not ns.Offers.Knows("i" .. id) then
+    ns.Print("aún no tengo leída esa receta tuya: cierra y abre la ventana de la profesión y vuelve a intentarlo.")
+    return
+  end
   if not ns.G() then
     ns.Print("no estás en ninguna hermandad.")
     return
@@ -425,8 +432,8 @@ function ns.UI.OpenOfferDialog(id, qty, mode, opts)
   d:SetExpanded(not need)
   d.matsOn = opts.mats and true or false
   -- Fabricar por encargo si lo piden, o si es una receta mía y no tengo ninguno.
-  d.kind = (opts.craft or (id and ns.ItemCount(id) == 0 and ns.Offers.Knows("i" .. id))) and "craft" or "have"
-  d.title:SetText(need and "Lo que necesita la hermandad" or (opts.edit and "Cambiar tu oferta" or "Ofrecer a la hermandad"))
+  d.kind = opts.craft and "craft" or "have"
+  d.title:SetText(need and "Lo que necesita la hermandad" or (opts.edit and "Cambiar tu oferta" or opts.craft and "Ofrecer fabricarlo por encargo" or "Ofrecer a la hermandad"))
   d.publishButton:SetText(need and "Añadir" or (opts.edit and "Guardar" or "Ofrecer"))
   d.moreButton:Hide()
   d.summary:Hide()

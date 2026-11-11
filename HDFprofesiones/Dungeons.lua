@@ -65,15 +65,19 @@ end
 -- el nivel 10 (antes no hay talentos). Los que tienen el addon dicen su rol; del resto, las clases
 -- que solo pueden ser DPS cuentan como DPS y las demás quedan «sin saber».
 Dungeons.ROLE_MIN_LEVEL = 10
+-- out.names[rol] = nombres de cada uno (para el tooltip de la Hermandad).
 function Dungeons.RoleCounts(entries, roster)
   local out = { [1] = 0, [2] = 0, [4] = 0, unknown = 0 }
+  out.names = { [1] = {}, [2] = {}, [4] = {}, unknown = {} }
   local seen = {}
   local function add(name, role, level, class)
     if seen[name] then return end
     seen[name] = true
     if (tonumber(level) or 0) < Dungeons.ROLE_MIN_LEVEL then return end
     role = Dungeons.CleanRole(role) or (Dungeons.CLASS_ROLES[class] == Dungeons.DPS and Dungeons.DPS) or nil
-    if role then out[role] = out[role] + 1 else out.unknown = out.unknown + 1 end
+    local key = role or "unknown"
+    out[key] = out[key] + 1
+    table.insert(out.names[key], name)
   end
   for name, e in pairs(entries or {}) do
     local r = roster and roster[name]
