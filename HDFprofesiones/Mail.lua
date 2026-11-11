@@ -35,6 +35,9 @@ end
 -- un pedido de la hermandad. "how" es el texto para el chat ("por correo" o "en mano").
 function Mail.RegisterDelivery(to, items, how)
   if not to or not ns.G() then return 0 end
+  -- El destinatario escrito («Exagono Exagonal», o con otro reino interno) se pasa al nombre
+  -- de su ficha; si no, no coincidía con nada y no se apuntaba la entrega.
+  to = Data.CanonicalName(ns.FullName(to) or to, true)
   local now = ns.Now()
   local changed = Data.RegisterMail(to, items, now)
   for _, r in ipairs(changed) do
@@ -98,7 +101,8 @@ local function applyCOD()
   if not cod or not SendMailCODButton or not SendMailMoney or not MoneyInputFrame_SetCopper then return end
   -- Si ha cambiado el destinatario, ya no es nuestro correo.
   local to = SendMailNameEditBox and SendMailNameEditBox:GetText() or ""
-  if to:lower() ~= ns.ShortName(cod.to):lower() and to:lower() ~= cod.to:lower() then
+  if to:lower() ~= ns.ShortName(cod.to):lower() and to:lower() ~= cod.to:lower()
+    and (ns.FullName(to) or ""):lower() ~= (ns.FullName(cod.to) or ""):lower() then
     cod = nil
     return
   end
@@ -143,7 +147,7 @@ end
 function Mail.Prepare(r, amount)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(r.a))
+  SendMailNameEditBox:SetText(ns.TellName(r.a) or ns.ShortName(r.a))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName(r.k)))
   end
@@ -160,7 +164,7 @@ ns.On("MAIL_FAILED", function() pending = nil end)
 function Mail.PrepareOffer(who, id, amount, price)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(who))
+  SendMailNameEditBox:SetText(ns.TellName(who) or ns.ShortName(who))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName("i" .. id)))
   end
@@ -173,7 +177,7 @@ end
 function Mail.PrepareNeed(owner, id, amount)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(owner))
+  SendMailNameEditBox:SetText(ns.TellName(owner) or ns.ShortName(owner))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("Para la hermandad: %dx %s", amount, ns.KeyName("i" .. id)))
   end

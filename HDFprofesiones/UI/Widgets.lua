@@ -616,8 +616,17 @@ W.LinkHooked = hookedInsert
 -- guarda su nombre con el reino interno que le da su juego ("Kael-CAMWOWEU4Realm4PvP") y el
 -- servidor no encuentra a nadie así (el mismo fallo que tuvo invitar en la 0.28). Vale el nombre
 -- tal como lo da la lista de la hermandad y, si es de mi reino o no está en la lista, el corto.
+-- Con apellidos (WoW Forever: «Exagono Exagonal») hace falta el nombre completo: sale de la
+-- lista de la hermandad o de lo que se ha visto en el chat. Sin él, el correo iría a otro
+-- «Exagono» o a nadie.
 function ns.TellName(name)
   if type(name) ~= "string" or name == "" then return nil end
+  local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(name)
+  local raw = info and type(info.raw) == "string" and info.raw ~= "" and info.raw or nil
+  local key = ns.FullName(name)
+  local complete = (raw and (raw:match("^([^%-]+)") or raw)) or (key and ns.fullNames[key])
+  if not complete and ns.fullNames[name] then complete = ns.fullNames[name] end
+  if complete and complete:find(ns.SurnameSeparator(), 1, true) then return complete end
   local short = ns.ShortName(name)
   -- ¿Hay otro en la hermandad con el mismo nombre corto? Entonces el corto no basta.
   local twins = 0
@@ -632,11 +641,37 @@ function ns.TellName(name)
   return short
 end
 
--- Abrir un susurro: la función nueva del juego o la antigua y, si fallan, la caja del chat con
+-- Abrir un susurro: la caja del chat en modo susurro (como Responder); si no, la función del juego o la caja con
 -- "/w Nombre " ya escrito. Devuelve el nombre usado.
 function ns.SendTell(name)
   local target = ns.TellName(name)
   if not target then return nil end
+  -- Como "Responder" del juego: se pone la caja en modo susurro sin escribir ningún comando.
+  -- (Con el comando escrito, en el cliente en español la caja se quedaba en Hermandad con
+  -- "/cw Nombre" dentro, sin pasar a susurro.)
+  local choose = ChatEdit_ChooseBoxForSend or (ChatFrameUtil and ChatFrameUtil.ChooseBoxForSend)
+  local okBox, edit = false, nil
+  if choose then okBox, edit = pcall(choose) end
+  if okBox and type(edit) == "table" and edit.SetAttribute then
+    edit:SetAttribute("chatType", "WHISPER")
+    edit:SetAttribute("tellTarget", target)
+    if ChatEdit_UpdateHeader then
+      pcall(ChatEdit_UpdateHeader, edit)
+    elseif edit.UpdateHeader then
+      pcall(edit.UpdateHeader, edit)
+    end
+    local active = ChatEdit_GetActiveWindow or (ChatFrameUtil and ChatFrameUtil.GetActiveWindow)
+    local open = ChatFrame_OpenChat or (ChatFrameUtil and ChatFrameUtil.OpenChat)
+    local isActive = false
+    if active then
+      local ok, w = pcall(active)
+      isActive = ok and w == edit
+    end
+    if open and not isActive then pcall(open, "") end
+    if edit:GetAttribute("chatType") == "WHISPER" and edit:GetAttribute("tellTarget") == target then
+      return target, "reply"
+    end
+  end
   local send = (ChatFrameUtil and ChatFrameUtil.SendTell) or ChatFrame_SendTell
   if send and pcall(send, target) then return target, "tell" end
   local text = "/w " .. target .. " "
@@ -710,7 +745,7 @@ end
 -- Hermandad.
 --   rows = { { name, class, pk, r (nivel), online, seen, unavailable, gather, extra, karma, level }, ... }
 --   rowHeight: alto de cada fila (22 si no se dice); bare: sin recuadro alrededor.
-function W.Crafters(parent, width, nrows, rowHeight, bare)
+function W.Crafters(parent, width, nrows, rowHeight, bare, onSelect)
   rowHeight = rowHeight or 22
   -- Con sitio, el estado (en línea, visto hace...) va en su columna; si no, junto al nivel.
   local wide = width >= 380
@@ -720,6 +755,7 @@ function W.Crafters(parent, width, nrows, rowHeight, bare)
     card = true,
     bare = bare,
     keyOf = function(c) return c.name .. ":" .. tostring(c.pk) end,
+    onSelect = onSelect,
     buildRow = function(row)
       local iconSize = math.min(20, rowHeight - 6)
       row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -752,6 +788,7 @@ function W.Crafters(parent, width, nrows, rowHeight, bare)
         GameTooltip:SetText(ns.ColoredName(c.name, c.class) .. (c.level and (" (nivel " .. c.level .. ")") or ""))
         GameTooltip:AddLine(ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or ""), 1, 1, 1)
         if c.karma then GameTooltip:AddLine("Karma: " .. c.karma .. "   Encargos completados: " .. (c.thanks or 0), 0.8, 0.8, 0.8) end
+        if onSelect then GameTooltip:AddLine("Clic: ver su historial", 0.5, 0.8, 1) end
         GameTooltip:Show()
       end)
       row:SetScript("OnLeave", function() GameTooltip:Hide() end)

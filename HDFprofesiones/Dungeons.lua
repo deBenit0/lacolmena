@@ -606,6 +606,8 @@ local function inviteCandidates(full)
       list[#list + 1] = n
     end
   end
+  -- Con apellido (WoW Forever) primero el nombre completo; si no, el corto.
+  if ns.TellName then add(ns.TellName(full)) end
   add(short)
   local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(full)
   if info and info.raw then add(info.raw) end

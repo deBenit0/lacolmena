@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.32.0"
+ns.VERSION = "0.33.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -185,12 +185,37 @@ function ns.Realm()
   return realm or ""
 end
 
+-- Apellidos de WoW Forever: cada personaje es «Nombre Apellido». El addon guarda a cada uno
+-- como «Nombre-Reino» (como siempre) y se apunta aquí su nombre completo, que es el que hace
+-- falta para el correo, susurrar e invitar.
+--   ns.fullNames["Nombre-Reino"] = "Nombre Apellido"
+ns.fullNames = {}
+
+function ns.SurnameSeparator()
+  local c = Constants and Constants.CharacterNameSeparatorConsts
+  local sep = c and c.CHARACTERNAME_SURNAME_SEPARATOR
+  if type(sep) == "string" and sep ~= "" and sep ~= "-" then return sep end
+  return " "
+end
+
 function ns.FullName(name)
   if type(name) ~= "string" or name == "" then return nil end
-  if name:find("-", 1, true) then return name end
-  local realm = ns.Realm()
-  if realm == "" then return name end
-  return name .. "-" .. realm
+  local who, realm = name:match("^([^%-]+)%-(.+)$")
+  who = who or name
+  who = who:match("^%s*(.-)%s*$")
+  if who == "" then return nil end
+  realm = realm and realm:gsub("%s", "") or ns.Realm()
+  -- Con apellido: se guarda el nombre completo y se usa el nombre de pila.
+  local sep = ns.SurnameSeparator()
+  local cut = who:find(sep, 1, true)
+  local complete
+  if cut and cut > 1 then
+    complete = who
+    who = who:sub(1, cut - 1)
+  end
+  local full = (realm ~= "") and (who .. "-" .. realm) or who
+  if complete then ns.fullNames[full] = complete end
+  return full
 end
 
 function ns.ShortName(full)
@@ -200,9 +225,17 @@ end
 
 function ns.Me()
   if not ns.me then
-    local name = UnitName("player")
+    local name, surname = UnitName("player")
     local realm = ns.Realm()
-    if name and name ~= "" and realm ~= "" then ns.me = name .. "-" .. realm end
+    if name and name ~= "" and realm ~= "" then
+      -- Si el juego lo da entero («Ana Smith»), antes se guardaba así: se recuerda para pasar sus datos.
+      if name:find(ns.SurnameSeparator(), 1, true) then ns.meOld = name .. "-" .. realm end
+      ns.me = ns.FullName(name .. "-" .. realm)
+      -- Forever da el apellido aparte (otros juegos dan ahí el reino, pero nunca para "player").
+      if type(surname) == "string" and surname ~= "" and not ns.fullNames[ns.me] then
+        ns.fullNames[ns.me] = ns.ShortName(ns.me) .. ns.SurnameSeparator() .. surname
+      end
+    end
   end
   return ns.me
 end
@@ -416,6 +449,12 @@ function ns.MyChar()
   local me = ns.Me()
   if not me or not ns.db then return nil end
   local c = ns.db.chars[me]
+  if not c and ns.meOld and ns.meOld ~= me and ns.db.chars[ns.meOld] then
+    -- antes se guardaba con el apellido: se pasa al nombre de pila
+    c = ns.db.chars[ns.meOld]
+    ns.db.chars[ns.meOld] = nil
+    ns.db.chars[me] = c
+  end
   if not c then
     c = { profs = {}, bank = {} }
     ns.db.chars[me] = c

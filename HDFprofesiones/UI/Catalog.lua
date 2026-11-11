@@ -215,6 +215,14 @@ local function isEquipment(key)
   return equipLoc ~= nil and not NON_EQUIP[equipLoc]
 end
 
+-- ¿Es consumible? (pociones, elixires, frascos, comida, vendas...)
+local function isConsumable(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return false end
+  local _, classID = ns.ItemInstant(id)
+  return classID == 0
+end
+
 -- Categorías como las de la ventana de profesiones del juego: tipo de arma, ranura de la
 -- armadura, bolsas, consumibles por tipo, materiales... Devuelve clave, nombre y orden.
 local WEAPON_CATS = {
@@ -384,9 +392,10 @@ end
 
 local function buildCatalog(page, mode)
   local materials = mode == "materials"
+  local consumables = mode == "consumables" -- como equipo, pero sin clases
   local state = { search = "", prof = nil, key = nil, pk = nil, gatherOnly = {} }
   -- «Pedir equipo» empieza en tu clase (lo que puede llevar). nil = todas.
-  if not materials then state.class = ns.Dungeons.MyClass() end
+  if not materials and not consumables then state.class = ns.Dungeons.MyClass() end
 
   -- Grupos plegados: se recuerda lo que elige el jugador; si no ha elegido, se pliegan
   -- todos salvo Favoritos y (en materiales) las profesiones que dan lo que usan tus recetas.
@@ -402,7 +411,7 @@ local function buildCatalog(page, mode)
 
   -- Barra superior: (en equipo) clases; búsqueda, profesión y la casilla de filtro.
   local x = 8
-  if not materials then
+  if not materials and not consumables then
     page.classAll = W.Chip(page, "Todas", 50, function()
       state.class = nil
       page:Refresh()
@@ -448,11 +457,13 @@ local function buildCatalog(page, mode)
 
   local search = W.Input(page, materials and 160 or 132)
   search:SetPoint("TOPLEFT", x, -8)
-  search:SetScript("OnTextChanged", function(self)
+  search:SetScript("OnTextChanged", function(self, userInput)
     state.search = self:GetText():lower()
     page:Refresh()
+    if userInput and page.onSearch then page.onSearch(self:GetText()) end
   end)
   W.Placeholder(search, "Buscar objeto...")
+  page.searchBox = search
 
   local profButton = W.Button(page, "Profesión: todas", materials and 160 or 124, 22)
   profButton:SetPoint("LEFT", search, "RIGHT", 8, 0)
@@ -510,13 +521,15 @@ local function buildCatalog(page, mode)
       page:Refresh()
     end)
   lowCheck:SetPoint("LEFT", profButton, "RIGHT", 6, 0)
-  if not materials then
+  if consumables then
+    ns.UI.Tip(lowCheck, "Solo lo que puedo usar", "Lo que puedes usar a tu nivel.")
+  elseif not materials then
     ns.UI.Tip(lowCheck, "Solo lo que puedo usar", "Lo que puede llevar la clase elegida (o la tuya) a tu nivel, "
       .. "sin lo de mucho menos nivel.")
   end
 
   -- Debajo: esconder lo que nadie de la hermandad tiene publicado (se guarda; apagada al empezar).
-  local madeSetting = materials and "onlyMadeMaterials" or "onlyMadeEquipment"
+  local madeSetting = materials and "onlyMadeMaterials" or (consumables and "onlyMadeConsumables") or "onlyMadeEquipment"
   local madeLabel = materials and "Solo lo que alguien da" or "Solo lo que alguien fabrica"
   local madeCheck = W.Check(page, madeLabel, function(checked)
     ns.db.settings[madeSetting] = checked
@@ -1025,9 +1038,9 @@ local function buildCatalog(page, mode)
         end
       end
     else
-      -- Equipo: una vez cada objeto, agrupado por ranura.
+      -- Equipo: una vez cada objeto, agrupado por ranura. Consumibles: por tipo (pociones...).
       for key, rec in pairs(index) do
-        if isEquipment(key) then
+        if (consumables and isConsumable(key)) or (not consumables and isEquipment(key)) then
           local profs = {}
           for pk in pairs(rec.profs) do
             profSet[pk] = true
@@ -1035,7 +1048,13 @@ local function buildCatalog(page, mode)
           end
           table.sort(profs, function(x1, y1) return tostring(x1) < tostring(y1) end)
           if not state.prof or rec.profs[state.prof] then
-            local groupKey, groupLabel = gearGroup(key)
+            local groupKey, groupLabel
+            if consumables then
+              local _, label = craftCategory(key)
+              groupKey, groupLabel = "k:" .. label, label
+            else
+              groupKey, groupLabel = gearGroup(key)
+            end
             add(key, rec.profs[state.prof or false] and state.prof or profs[1], rec, groupKey, groupLabel)
           end
         end
@@ -1093,7 +1112,7 @@ local function buildCatalog(page, mode)
           if mine[id] then useful = true break end
         end
       end
-      local collapsed = isCollapsed(k, not useful)
+      local collapsed = isCollapsed(k, not useful and not consumables) -- consumibles: abiertos
       items[#items + 1] = {
         id = "h:" .. tostring(k), header = true, pk = k, label = groupLabels[k],
         count = #group, collapsed = collapsed,
@@ -1103,6 +1122,12 @@ local function buildCatalog(page, mode)
       end
     end
     page.items = items
+    -- Cuántos objetos salen con la búsqueda (sin contar las cabeceras ni los repetidos de Favoritos).
+    local n = 0
+    for _, it in ipairs(items) do
+      if not it.header and not tostring(it.id):find("^fav:") then n = n + 1 end
+    end
+    page.matches = n
     list.selectedKey = state.key
     list:SetItems(items)
     page:RefreshDetail()
@@ -1458,48 +1483,113 @@ local function buildCraftOffer(page)
   end
 end
 
--- Página «+ Pedir / + Ofrecer»: arriba se elige Materiales, Equipo u Ofrecer.
-local MODES = {
-  { id = "materials", label = "Pedir materiales" },
-  { id = "equipment", label = "Pedir equipo" },
-  { id = "offer", label = "Ofrecer de tus bolsas" },
-  { id = "craft", label = "Ofrecer fabricar" },
+-- Página «+ Pedir / + Ofrecer»: arriba «Pedir», «Ofrecer de tus bolsas» y «Ofrecer fabricar».
+-- «Pedir» tiene tres tipos (Materiales, Equipo, Consumibles) con un solo buscador: lo que se
+-- escribe vale para los tres, cada tipo dice cuántos encuentra y, si en el tipo abierto no
+-- sale nada, se pasa solo al que sí tiene.
+local ASK_TYPES = {
+  { id = "materials", label = "Materiales", tip = "Minerales, hierbas, telas, pieles... lo que se recolecta o se fabrica para otras recetas." },
+  { id = "equipment", label = "Equipo", tip = "Armas, armaduras, bolsas y abalorios, por ranura y por clase." },
+  { id = "consumables", label = "Consumibles", tip = "Pociones, elixires, frascos, comida y vendas." },
 }
+local MODES = {
+  { id = "ask", label = "Pedir", width = 80 },
+  { id = "offer", label = "Ofrecer de tus bolsas", width = 150 },
+  { id = "craft", label = "Ofrecer fabricar", width = 124 },
+}
+local function isAskType(mode)
+  for _, t in ipairs(ASK_TYPES) do if t.id == mode then return true end end
+  return false
+end
 ns.UI.RegisterPage("ask", function(page)
   page.back = W.Button(page, "< Mercado", 90, 22, function() ns.UI.ShowPage("market") end)
   page.back:SetPoint("TOPLEFT", 0, -2)
-  page.modes, page.frames = {}, {}
-  for i, m in ipairs(MODES) do
-    local b = W.Chip(page, m.label, 160, function() page:SetMode(m.id) end)
-    b:SetPoint("TOPLEFT", 100 + (i - 1) * 164, -2)
+  page.modes, page.types, page.frames = {}, {}, {}
+  local x = 100
+  for _, m in ipairs(MODES) do
+    local b = W.Chip(page, m.label, m.width, function() page:SetMode(m.id) end)
+    b:SetPoint("TOPLEFT", x, -2)
+    x = x + m.width + 4
     page.modes[m.id] = b
+  end
+  ns.UI.Tip(page.modes.ask, "Pedir", "Pide materiales, equipo o consumibles a la hermandad.")
+  x = x + 14
+  for _, t in ipairs(ASK_TYPES) do
+    local b = W.Chip(page, t.label, 100, function() page:SetMode(t.id) end)
+    b:SetPoint("TOPLEFT", x, -2)
+    x = x + 102
+    ns.UI.Tip(b, t.label, t.tip)
+    page.types[t.id] = b
+  end
+  local function newFrame(id)
     local f = CreateFrame("Frame", nil, page)
     f:SetPoint("TOPLEFT", 0, -28)
     f:SetPoint("BOTTOMRIGHT")
     f:SetSize(ns.UI.WIDTH - 32, ns.UI.HEIGHT - 120)
     f:Hide()
-    if m.id == "offer" then buildOffer(f)
-    elseif m.id == "craft" then buildCraftOffer(f)
-    else buildCatalog(f, m.id) end
-    page.frames[m.id] = f
+    page.frames[id] = f
+    return f
   end
+  for _, t in ipairs(ASK_TYPES) do buildCatalog(newFrame(t.id), t.id) end
+  buildOffer(newFrame("offer"))
+  buildCraftOffer(newFrame("craft"))
   page.mode = "materials"
+
+  -- Un solo buscador para los tres tipos de «Pedir».
+  local search = ""
+  local function typeLabels()
+    for _, t in ipairs(ASK_TYPES) do
+      local f, b = page.frames[t.id], page.types[t.id]
+      if search ~= "" and f.matches then
+        b:SetText(t.label .. " " .. (f.matches > 0 and "|cffffffff" or "|cff808080") .. f.matches .. "|r")
+      else
+        b:SetText(t.label)
+      end
+    end
+  end
+  for _, t in ipairs(ASK_TYPES) do
+    page.frames[t.id].onSearch = function(text)
+      search = text
+      for _, o in ipairs(ASK_TYPES) do
+        local f = page.frames[o.id]
+        if o.id ~= t.id and f.searchBox:GetText() ~= text then f.searchBox:SetText(text) end
+      end
+      -- Si aquí no sale nada y en otro tipo sí, se pasa a ese.
+      local here = page.frames[page.mode]
+      if text ~= "" and here and here.matches == 0 then
+        for _, o in ipairs(ASK_TYPES) do
+          local f = page.frames[o.id]
+          if (f.matches or 0) > 0 then
+            page:SetMode(o.id)
+            f.searchBox:SetFocus()
+            f.searchBox:SetCursorPosition(#text)
+            break
+          end
+        end
+      end
+      typeLabels()
+    end
+  end
 
   function page:SetMode(mode)
     if mode == "ask" then mode = page.lastAsk or "materials" end
     if not page.frames[mode] then mode = "materials" end
     page.mode = mode
-    if mode ~= "offer" and mode ~= "craft" then page.lastAsk = mode end
+    if isAskType(mode) then page.lastAsk = mode end
     page:Refresh()
   end
 
   function page:Refresh()
-    for id, f in pairs(page.frames) do
-      f:SetShown(id == page.mode)
-      page.modes[id]:SetOn(id == page.mode)
+    local asking = isAskType(page.mode)
+    for id, f in pairs(page.frames) do f:SetShown(id == page.mode) end
+    for id, b in pairs(page.modes) do b:SetOn(id == page.mode or (id == "ask" and asking)) end
+    for id, b in pairs(page.types) do
+      b:SetShown(asking)
+      b:SetOn(id == page.mode)
     end
     local f = page.frames[page.mode]
     if f and f.Refresh then f:Refresh() end
+    if asking then typeLabels() end
   end
 end)
 

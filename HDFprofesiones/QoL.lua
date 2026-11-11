@@ -100,7 +100,7 @@ QoL.TradeSnapshot = snapshot
 
 local function tradePartner()
   local name = GetUnitName and GetUnitName("NPC", true) or (UnitName and UnitName("NPC"))
-  return name and ns.FullName(name:gsub("%s", "")) or nil
+  return name and ns.FullName(name) or nil
 end
 
 ns.On("TRADE_SHOW", function()

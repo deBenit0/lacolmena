@@ -38,6 +38,12 @@ local CHECKS = {
     for _ in pairs(c and c.gather or {}) do n = n + 1 end
     return true, (modern and "C_SkillInfo" or "clásico") .. (n > 0 and (", " .. n .. " de recolección") or "")
   end },
+  { "Nombres de pila repetidos", function()
+    local text = ns.Guild.DupesText()
+    if text then return false, "se pisan en el addon: " .. text end
+    if not ns.Guild.full then return nil, "falta la lista entera de la hermandad" end
+    return true, "ninguno"
+  end },
   { "Pestaña en la ventana de hermandad", function()
     local hosts = ns.UI.HostNames()
     if #hosts > 0 then return true, table.concat(hosts, ", ") end
@@ -231,8 +237,9 @@ function Diag.TellLine()
     or (ChatFrame_SendTell and "ChatFrame_SendTell") or "ninguna"
   local open = (ChatFrameUtil and ChatFrameUtil.OpenChat and "ChatFrameUtil.OpenChat")
     or (ChatFrame_OpenChat and "ChatFrame_OpenChat") or "ninguna"
-  return string.format("Susurrar: %s (si falla, %s); ejemplo: %s -> %s", how, open, tostring(ns.Me()),
-    tostring(ns.TellName and ns.TellName(ns.Me())))
+  local first, second = UnitName("player")
+  return string.format("Susurrar: %s (si falla, %s); el juego te llama \"%s\" + \"%s\"; ejemplo: %s -> %s", how, open,
+    tostring(first), tostring(second), tostring(ns.Me()), tostring(ns.TellName and ns.TellName(ns.Me())))
 end
 
 -- Texto del informe (sin colores, para copiar y pegar).

@@ -132,6 +132,7 @@ function Data.SanitizeEntry(e)
   if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
   if ns.Social then ns.Social.SanitizeInto(out, e) end -- alts, oficiales, necesidades, ayudas
   if ns.Orders then ns.Orders.SanitizeInto(out, e) end -- pedidos de fabricación de hermandad
+  if ns.History then ns.History.SanitizeInto(out, e) end -- historial público
   return out
 end
 
@@ -173,6 +174,7 @@ local function restoreRest(e, c)
   fill("mc", e.mc)
   fill("mp", e.mp)
   fill("guildOrders", e.go)
+  fill("hist", e.hi)
   if e.an and not c.announce then c.announce = deepCopy(e.an) end
   if e.wk and not c.week then c.week = deepCopy(e.wk) end
   if e.od and not next(c.sent or {}) then c.sent = deepCopy(e.od) end
@@ -250,6 +252,7 @@ function Data.BuildMyEntry(now)
   if ns.Offers then ns.Offers.BuildInto(e, now) end
   if ns.Social then ns.Social.BuildInto(e, now) end
   if ns.Orders then ns.Orders.BuildInto(e, now) end
+  if ns.History then ns.History.BuildInto(e) end
   return e
 end
 
@@ -989,6 +992,7 @@ function Data.CheckThanks(r, now)
         g.thanks[me][crafter] = (g.thanks[me][crafter] or 0) + 1
         karma.kc[crafter] = (karma.kc[crafter] or 0) + Data.KARMA_POINT
         karma.kd = (karma.kd or 0) + Data.KARMA_POINT
+        if ns.History then ns.History.Add("p", r.k, d, crafter, now) end
         changed = true
       end
     end

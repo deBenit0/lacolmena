@@ -14,6 +14,7 @@ Alerts.TYPES = {
   { id = "craft", label = "Pedido que puedes hacer" },
   { id = "accepted", label = "Novedades de tus pedidos" },
   { id = "run", label = "Quedada nueva" },
+  { id = "signup", label = "Se apuntan a tu quedada" },
   { id = "group", label = "Te eligen para el grupo" },
   { id = "remind", label = "Recordatorio de la hora" },
   { id = "expire", label = "Algo tuyo caduca pronto" },
@@ -191,7 +192,7 @@ local function show(alert)
     frame:SetScale(1)
   end
   frame:Show()
-  if ts.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
+  if ts.sound then PlaySound(alert.sound or (SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
   local token = {}
   hideToken = token
   ns.After(SHOW_SECONDS, function()
@@ -384,6 +385,23 @@ function Alerts.OnRunUpdated(old, new)
       g.runAlerted[new.id] = true
       Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "run",
         text = string.format("%s propone %s %s", ns.ShortName(new.a), dg.name, when) })
+    end
+  end
+  -- En mi quedada: aviso con el sonido de invitación a grupo del juego cuando alguien se apunta.
+  if old and new.a == me then
+    for name, su in pairs(new.s or {}) do
+      local before = old.s and old.s[name]
+      local active = not su.o and su.r and su.r > 0
+      local wasActive = before and not before.o and before.r and before.r > 0
+      if name ~= me and active and not wasActive then
+        local roles = {}
+        for _, ro in ipairs(D.ROLES) do
+          if math.floor(su.r / ro.bit) % 2 == 1 then roles[#roles + 1] = ro.label end
+        end
+        Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "signup",
+          sound = (SOUNDKIT and SOUNDKIT.IG_PLAYER_INVITE) or 880,
+          text = string.format("%s se apunta a %s (%s)", ns.ShortName(name), dg.name, table.concat(roles, "/")) })
+      end
     end
   end
   local place = D.MyPlace(new)

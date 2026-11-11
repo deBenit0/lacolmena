@@ -367,6 +367,7 @@ function Social.RegisterMail(recipient, items, now)
         c.donated[need.key] = d
         items[need.id] = items[need.id] - credit
         done[#done + 1] = { id = need.id, n = credit, owner = need.owner }
+        if ns.History then ns.History.Add("a", "i" .. need.id, credit, need.owner, now) end
       end
     end
   end

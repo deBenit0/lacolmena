@@ -25,16 +25,15 @@ end
 local CHIPS = {
   { id = "craft", label = "Puedo hacerlo" },
   { id = "new", label = "Nuevos" },
-  { id = "mine", label = "Míos" },
-  { id = "involved", label = "Mis encargos" },
+  { id = "mine", label = "Lo mío" }, -- lo que has puesto tú y en lo que participas
 }
 -- Tipo de objeto (como en la 0.29).
 local TYPES = {
   { id = nil, label = "Todo" },
   { id = "mats", label = "Materiales" },
-  { id = "cons", label = "Pociones y comida" },
+  { id = "cons", label = "Consumibles" },
   { id = "bags", label = "Bolsas" },
-  { id = "gear", label = "Armas y armaduras" },
+  { id = "gear", label = "Equipo" },
   { id = "other", label = "Otros" },
 }
 local ARMOR = {
@@ -54,8 +53,6 @@ local SORTS = {
   { id = "best", label = "Ordenar: lo tuyo primero" },
   { id = "new", label = "Ordenar: nuevos" },
   { id = "rush", label = "Ordenar: prisa" },
-  { id = "tip", label = "Ordenar: propina" },
-  { id = "karma", label = "Ordenar: karma" },
 }
 local PROF_FILTER = { 164, 165, 197, 171, 202, 333, 185, 186, 393, 182 }
 
@@ -87,6 +84,7 @@ local function settings()
   s.market = s.market or {}
   local m = s.market
   m.type, m.armor, m.slot, m.sort = m.type or 1, m.armor or 1, m.slot or 1, m.sort or 1
+  if not SORTS[m.sort] then m.sort = 1 end -- antes había 5 formas de ordenar
   return m
 end
 
@@ -265,7 +263,7 @@ ns.UI.RegisterPage("market", function(page)
     state.showFilters = not state.showFilters
     page:Refresh()
   end)
-  page.filtersButton:SetPoint("TOPLEFT", 4 * 114, -30)
+  page.filtersButton:SetPoint("TOPLEFT", #CHIPS * 114, -30)
   page.sortButton = W.Button(page, "", 184, 22, function()
     local m = settings()
     m.sort = m.sort % #SORTS + 1
@@ -896,9 +894,35 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.b2, "Quitar oferta", true, function()
         W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
       end)
-      setButton(detail.b3, "Editar", true, function()
-        ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g })
-      end, "Cambiar la cantidad o el precio.")
+      if first then
+        setButton(detail.b3, "Ya lo he enviado", true, function()
+          local function mark(cl)
+            local n = ns.Offers.MarkSent(cl.name, o.id, ns.Now())
+            if n > 0 then ns.Print("apuntado: %dx %s entregadas a %s.", n, ns.KeyLabel("i" .. o.id), ns.ShortName(cl.name)) end
+          end
+          -- lo que se apunta: lo que le falta, sin pasar de lo que queda en la oferta
+          local function amount(cl) return math.min(cl.left or 0, o.q or 0) end
+          if #o.claims == 1 then
+            W.Confirm(string.format("¿Ya le has dado %dx %s a %s? Se apuntará como entregado.", amount(first),
+              ns.KeyName("i" .. o.id), ns.ShortName(first.name)), function() mark(first) end)
+          else
+            -- La quieren varios: se elige a quién se le ha dado (hasta 4).
+            local labels, shown = {}, {}
+            for i = 1, math.min(4, #o.claims) do
+              local cl = o.claims[i]
+              shown[i] = cl
+              labels[i] = string.format("%s (%d)", ns.ShortName(cl.name), amount(cl))
+            end
+            W.Choose("¿A quién se lo has dado?", string.format("%s · se apuntará como entregado",
+              ns.KeyName("i" .. o.id)), labels, function(i) if shown[i] then mark(shown[i]) end end)
+          end
+        end, "Si se lo diste sin que el addon lo viera (desde un alt, en mano...). Si lo mandas por correo "
+          .. "desde aquí, se apunta solo.")
+      else
+        setButton(detail.b3, "Editar", true, function()
+          ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g })
+        end, "Cambiar la cantidad o el precio.")
+      end
     elseif item.claimed then
       setButton(detail.b1, "Ya no lo quiero", true, function() ns.Offers.Unclaim(o.key) end)
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
@@ -1089,8 +1113,7 @@ ns.UI.RegisterPage("market", function(page)
   local function chipMatch(chip, item)
     if chip == "craft" then return item.canServe or item.pending > 0 end
     if chip == "new" then return item.new end
-    if chip == "mine" then return item.mine end
-    if chip == "involved" then return item.pending > 0 or (item.claimed == true) end
+    if chip == "mine" then return item.mine or item.pending > 0 or item.claimed == true end
     return true
   end
 
@@ -1137,11 +1160,6 @@ ns.UI.RegisterPage("market", function(page)
       elseif sort == "rush" then
         local ra, rb = a.r and a.r.pr or 9, b.r and b.r.pr or 9
         if ra ~= rb then return ra < rb end
-      elseif sort == "tip" then
-        local ta, tb = a.r and a.r.g or 0, b.r and b.r.g or 0
-        if ta ~= tb then return ta > tb end
-      elseif sort == "karma" then
-        if a.karma ~= b.karma then return a.karma > b.karma end
       else
         local ra, rb = ns.UI.MarketRank(a), ns.UI.MarketRank(b)
         if ra ~= rb then return ra < rb end
@@ -1289,13 +1307,11 @@ ns.UI.RegisterPage("market", function(page)
         text, button, fn = "No hay nada en el Mercado ahora mismo.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
       elseif state.chip == "craft" then
         text, button, fn = "Nadie pide nada que puedas hacer.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
-      elseif state.chip == "involved" then
-        text, button, fn = "No tienes encargos pendientes.", "Ver lo que puedo hacer", function() page:SetChip("craft") end
       elseif state.chip == "mine" then
         if state.side == "offer" then
-          text, button, fn = "No estás ofreciendo nada.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
+          text, button, fn = "No estás ofreciendo nada ni has cogido ofertas.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
         else
-          text, button, fn = "No tienes pedidos abiertos.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
+          text, button, fn = "No tienes pedidos abiertos ni encargos pendientes.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
         end
       elseif state.side == "offer" then
         text, button, fn = "Nadie ofrece nada con estos filtros.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
@@ -1392,6 +1408,7 @@ ns.UI.RegisterPage("market", function(page)
 
   -- Abre con un filtro rápido puesto (desde Inicio o los avisos).
   function page:SetChip(chip, side)
+    if chip == "involved" then chip = "mine" end -- «Mis encargos» ahora va dentro de «Lo mío»
     state.chip = chip
     state.selected = nil
     if side then

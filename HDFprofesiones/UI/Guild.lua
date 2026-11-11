@@ -135,8 +135,11 @@ ns.UI.RegisterPage("guild", function(page)
   karmaHint:SetText("+1 por dar, -1 por recibir")
   page.bars = {}
   for i = 1, 6 do
-    local bar = CreateFrame("Frame", nil, page)
+    local bar = CreateFrame("Button", nil, page)
     bar:SetSize(250, 28)
+    bar:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
+    bar:SetScript("OnClick", function(self) if self.who then ns.UI.ShowHistory(self.who) end end)
+    ns.UI.Tip(bar, "Historial", "Clic: lo que ha pedido, hecho y aportado.")
     bar:SetPoint("TOPLEFT", COL1, -136 - (i - 1) * 30)
     bar.fill = bar:CreateTexture(nil, "ARTWORK")
     bar.fill:SetPoint("LEFT", 0, 0)
@@ -284,7 +287,7 @@ ns.UI.RegisterPage("guild", function(page)
   end
   page.profTitle = W.Text(page, "GameFontNormalSmall")
   page.profTitle:SetPoint("TOPLEFT", COL2 + 4, -106)
-  page.who = W.Crafters(page, WHO_W, 13)
+  page.who = W.Crafters(page, WHO_W, 13, nil, nil, function(c) ns.UI.ShowHistory(c.name) end)
   page.who:SetPoint("TOPLEFT", COL2, -120)
   -- Ordenar por nivel (como siempre) o por karma; se recuerda.
   page.whoSort = W.Button(page, "", 128, 18, function()
@@ -352,6 +355,7 @@ ns.UI.RegisterPage("guild", function(page)
     for i, bar in ipairs(page.bars) do
       local e = ranking[i]
       bar:SetShown(e ~= nil)
+      bar.who = e and e.name
       if e then
         bar.name:SetText(i .. ". " .. ns.WhoColored(e.name))
         bar.value:SetText(ns.Data.KarmaText(e.name))
@@ -424,6 +428,83 @@ ns.UI.RegisterPage("guild", function(page)
     end
   end
 end)
+
+-- Ventana del historial de una persona: lo que ha pedido (y quién se lo hizo) y lo que ha hecho
+-- o aportado. Sale de las fichas de la hermandad (ver History.lua).
+local historyWindow
+local HISTORY_LINES = 60
+local KIND_TEXT = { p = "pedido", o = "oferta", a = "aportación" }
+
+local function historyLine(h, now, gave)
+  local other = ns.ShortName(h.who)
+  local text
+  if h.kind == "a" then
+    text = string.format("aportado a %s", other)
+  elseif gave then
+    text = string.format("para %s", other)
+  else
+    text = string.format("lo hizo %s", other)
+  end
+  return string.format("%dx %s\n   |cffbbbbbb%s (%s) · hace %s|r", h.n, ns.KeyLabel(h.key), text, KIND_TEXT[h.kind] or "",
+    ns.FormatDuration(now - h.t))
+end
+
+function ns.UI.ShowHistory(name)
+  if not name then return end
+  if not historyWindow then
+    local f = W.Panel("HDFProfHistory", UIParent, 640, 420)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 40)
+    f:Hide()
+    tinsert(UISpecialFrames, "HDFProfHistory")
+    f.title = W.Text(f, "GameFontNormalLarge")
+    f.title:SetPoint("TOP", 0, -16)
+    local close = W.CloseButton(f)
+    close:SetPoint("TOPRIGHT", -10, -10)
+    f.cols = {}
+    for i, label in ipairs({ "Ha pedido", "Ha hecho y aportado" }) do
+      local x = 20 + (i - 1) * 310
+      local head = W.Text(f, "GameFontNormal")
+      head:SetPoint("TOPLEFT", x, -46)
+      -- Con rueda o barra para bajar: caben las 30 de cada uno.
+      local scroll = CreateFrame("ScrollFrame", "HDFProfHistoryScroll" .. i, f, "UIPanelScrollFrameTemplate")
+      scroll:SetPoint("TOPLEFT", x, -66)
+      scroll:SetSize(270, 300)
+      local child = CreateFrame("Frame", nil, scroll)
+      child:SetSize(270, 300)
+      scroll:SetScrollChild(child)
+      local text = W.Text(child, "GameFontHighlightSmall")
+      text:SetPoint("TOPLEFT", 0, 0)
+      text:SetWidth(266)
+      text:SetJustifyH("LEFT")
+      text:SetJustifyV("TOP")
+      text:SetSpacing(2)
+      f.cols[i] = { label = label, head = head, text = text, scroll = scroll, child = child }
+    end
+    f.hint = W.Text(f, "GameFontDisableSmall")
+    f.hint:SetPoint("BOTTOMLEFT", 20, 14)
+    f.hint:SetWidth(600)
+    f.hint:SetText("Lo hecho lo apunta quien lo recibe. Cada personaje guarda sus últimos 30. "
+      .. "Solo lo de quien tiene la versión 0.33 o más nueva.")
+    historyWindow = f
+  end
+  local f, now = historyWindow, ns.Now()
+  local got, gave = ns.History.For(name)
+  f.title:SetText("Historial de " .. ns.WhoColored(name))
+  for i, list in ipairs({ got, gave }) do
+    local col = f.cols[i]
+    col.head:SetText(string.format("%s |cffbbbbbb(%d)|r", col.label, #list))
+    local lines = {}
+    for j = 1, math.min(#list, HISTORY_LINES) do lines[#lines + 1] = historyLine(list[j], now, i == 2) end
+    if #list > HISTORY_LINES then lines[#lines + 1] = string.format("|cff999999y %d más...|r", #list - HISTORY_LINES) end
+    col.text:SetText(#lines > 0 and table.concat(lines, "\n") or "|cff999999Nada todavía.|r")
+    col.child:SetHeight(math.max(300, (col.text:GetStringHeight() or 0) + 8))
+    col.scroll:SetVerticalScroll(0)
+  end
+  f:Show()
+  return f
+end
 
 -- Ventana "Recetas que faltan".
 local missingWindow

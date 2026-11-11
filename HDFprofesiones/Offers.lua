@@ -414,6 +414,28 @@ function Offers.RegisterMail(recipient, items, now)
   return done
 end
 
+-- «Ya lo he enviado» (a mano): por si no se detectó el correo o el comercio (lo mandó un alt,
+-- se lo dio en mano...). Apunta lo que quedaba de su «lo quiero» como entregado.
+function Offers.MarkSent(who, id, now)
+  local c, g, me = mine(), ns.G(), ns.Me()
+  if not c or not g or not who then return 0 end
+  local o = c.offers[id]
+  local e = g.entries[who]
+  local claim = e and e.cl and e.cl[key(me, id)]
+  if not o or not claim then return 0 end
+  local credit = min(Offers.ClaimLeft(me, who, id, claim, now), o.q)
+  if credit <= 0 then return 0 end
+  c.sent[who] = c.sent[who] or {}
+  local d = c.sent[who][id] or { n = 0 }
+  d.n, d.t = d.n + credit, now
+  c.sent[who][id] = d
+  o.q = o.q - credit
+  if o.q <= 0 then c.offers[id] = nil end
+  ns.Extras.AddStat("offers", 1)
+  publish()
+  return credit
+end
+
 -- Recibido: cuando el que ofrece me ha enviado todo lo que pedí, quito mi "lo quiero",
 -- le apunto el karma (+1 para él, -1 para mí) y aviso.
 function Offers.CheckReceived(now)
@@ -432,6 +454,7 @@ function Offers.CheckReceived(now)
       karma.kc = karma.kc or {}
       karma.kc[owner] = (karma.kc[owner] or 0) + Data.KARMA_POINT
       karma.kd = (karma.kd or 0) + Data.KARMA_POINT
+      if ns.History then ns.History.Add("o", "i" .. id, claim.q, owner, now) end
       changed = true
       if ns.Alerts then
         local _, icon = ns.KeyInfo("i" .. id)
