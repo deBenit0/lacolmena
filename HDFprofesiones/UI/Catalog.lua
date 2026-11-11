@@ -215,9 +215,48 @@ local function isEquipment(key)
   return equipLoc ~= nil and not NON_EQUIP[equipLoc]
 end
 
+-- Nombres de los tipos de armadura y de arma (subclases de Classic), para la línea gris.
+local ARMOR_NAMES = { [1] = "Tela", [2] = "Cuero", [3] = "Malla", [4] = "Placas", [6] = "Escudo" }
+local WEAPON_NAMES = {
+  [0] = "Hacha", [1] = "Hacha a dos manos", [2] = "Arco", [3] = "Arma de fuego", [4] = "Maza",
+  [5] = "Maza a dos manos", [6] = "Arma de asta", [7] = "Espada", [8] = "Espada a dos manos", [10] = "Bastón",
+  [13] = "Arma de puño", [15] = "Daga", [16] = "Arrojadiza", [18] = "Ballesta", [19] = "Varita",
+}
+local function typeName(key)
+  local kind, id = ns.ParseKey(key)
+  if kind == "e" then return "Encantamiento" end
+  local _, classID, subclassID = ns.ItemInstant(id)
+  if classID == 4 then return ARMOR_NAMES[subclassID] end
+  if classID == 2 then return WEAPON_NAMES[subclassID] end
+end
+
+-- Clases para el filtro de «Pedir equipo» (iconos del juego, en un aro).
+local CLASS_ORDER = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+local CLASS_LABEL = {
+  WARRIOR = "Guerrero", PALADIN = "Paladín", HUNTER = "Cazador", ROGUE = "Pícaro", PRIEST = "Sacerdote",
+  SHAMAN = "Chamán", MAGE = "Mago", WARLOCK = "Brujo", DRUID = "Druida",
+}
+local CLASS_ICONS = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+local TICK_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local STAR_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
+
+local LIST_W, DETAIL_W, BODY_H = 400, 380, 386
+local CARD_H, HEAD_H, LIST_ROWS = 44, 24, 8
+local MAT_H = 18
+
+-- Lo que tienes de un objeto: texto corto para la fila ("Bolsas"/"Banco") y la frase del detalle.
+local function haveInfo(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return 0 end
+  local total, bags, bank = ns.Scan.Have(id)
+  return total or 0, bags or 0, bank or 0
+end
+
 local function buildCatalog(page, mode)
   local materials = mode == "materials"
   local state = { search = "", prof = nil, key = nil, pk = nil, gatherOnly = {} }
+  -- «Pedir equipo» empieza en tu clase (lo que puede llevar). nil = todas.
+  if not materials then state.class = ns.Dungeons.MyClass() end
 
   -- Grupos plegados: se recuerda lo que elige el jugador; si no ha elegido, se pliegan
   -- todos salvo Favoritos y (en materiales) las profesiones que dan lo que usan tus recetas.
@@ -231,17 +270,62 @@ local function buildCatalog(page, mode)
     return ns.db.settings.favorites
   end
 
-  -- Barra superior: búsqueda, profesión y filtro de equipo bajo.
-  local search = W.Input(page, 160)
-  search:SetPoint("TOPLEFT", 8, -4)
+  -- Barra superior: (en equipo) clases; búsqueda, profesión y la casilla de filtro.
+  local x = 8
+  if not materials then
+    page.classAll = W.Chip(page, "Todas", 50, function()
+      state.class = nil
+      page:Refresh()
+    end)
+    page.classAll:SetPoint("TOPLEFT", 0, -6)
+    ns.UI.Tip(page.classAll, "Todas las clases", "Todo el equipo que fabrica la hermandad.")
+    page.classButtons = {}
+    for i, cls in ipairs(CLASS_ORDER) do
+      local b = CreateFrame("Button", nil, page)
+      b:SetSize(31, 31)
+      b:SetPoint("TOPLEFT", 54 + (i - 1) * 32, -1)
+      b.icon = b:CreateTexture(nil, "ARTWORK")
+      b.icon:SetSize(20, 20)
+      b.icon:SetPoint("TOPLEFT", 7, -5)
+      b.icon:SetTexture(CLASS_ICONS)
+      local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[cls]
+      if coords then b.icon:SetTexCoord(unpack(coords)) end
+      if b.CreateMaskTexture then
+        local mask = b:CreateMaskTexture()
+        mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        mask:SetAllPoints(b.icon)
+        b.icon:AddMaskTexture(mask)
+      end
+      b.ring = b:CreateTexture(nil, "OVERLAY")
+      b.ring:SetSize(53, 53)
+      b.ring:SetPoint("TOPLEFT")
+      b.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+      b.hl = b:CreateTexture(nil, "HIGHLIGHT")
+      b.hl:SetSize(24, 24)
+      b.hl:SetPoint("TOPLEFT", 5, -3)
+      b.hl:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+      b:SetScript("OnClick", function()
+        state.class = cls
+        page:Refresh()
+      end)
+      ns.UI.Tip(b, CLASS_LABEL[cls], "Lo que puede llevar un " .. CLASS_LABEL[cls]:lower()
+        .. " (tipo de armadura y armas).")
+      b.class = cls
+      page.classButtons[i] = b
+    end
+    x = 54 + #CLASS_ORDER * 32 + 10
+  end
+
+  local search = W.Input(page, materials and 160 or 132)
+  search:SetPoint("TOPLEFT", x, -8)
   search:SetScript("OnTextChanged", function(self)
     state.search = self:GetText():lower()
     page:Refresh()
   end)
   W.Placeholder(search, "Buscar objeto...")
 
-  local profButton = W.Button(page, "Profesión: todas", 160, 22)
-  profButton:SetPoint("LEFT", search, "RIGHT", 10, 0)
+  local profButton = W.Button(page, "Profesión: todas", materials and 160 or 124, 22)
+  profButton:SetPoint("LEFT", search, "RIGHT", 8, 0)
   -- Menú desplegable con "Todas" y cada profesión publicada en la hermandad.
   local menu = W.Box(page, 180, 30)
   menu:SetPoint("TOPLEFT", profButton, "BOTTOMLEFT", 0, -2)
@@ -295,186 +379,186 @@ local function buildCatalog(page, mode)
       ns.db.settings[filterSetting] = checked
       page:Refresh()
     end)
-  lowCheck:SetPoint("LEFT", profButton, "RIGHT", 10, 0)
+  lowCheck:SetPoint("LEFT", profButton, "RIGHT", 6, 0)
+  if not materials then
+    ns.UI.Tip(lowCheck, "Solo lo que puedo usar", "Lo que puede llevar la clase elegida (o la tuya) a tu nivel, "
+      .. "sin lo de mucho menos nivel.")
+  end
 
-  -- Rejilla de iconos agrupada (por tipo de material o de equipo), con cabeceras plegables.
-  -- Cada línea de la lista es una cabecera o una fila de iconos.
-  local COLS, CELL = 9, 44
-  local list = W.List(page, 430, 368, {
-    rows = 8,
-    rowHeight = CELL,
-    keyOf = function(line) return line.id end,
+  -- Lista: títulos de sección (tipo de material o ranura de equipo, plegables) y una tarjeta por
+  -- objeto con su icono, el nombre en el color de su calidad y una línea gris debajo.
+  local list = W.List(page, LIST_W, BODY_H, {
+    rows = LIST_ROWS,
+    rowHeight = CARD_H,
+    maxRows = 16,
+    card = true,
+    heightOf = function(line) return line.header and HEAD_H or CARD_H end,
+    isHeader = function(line) return line.header == true end,
+    keyOf = function(line) return line.header and line.id or line.key end,
     buildRow = function(row)
-      row.header = W.ListText(row, "GameFontNormal")
-      row.header:SetPoint("LEFT", 2, 0)
-      row.header:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-      row.cells = {}
-      for i = 1, COLS do
-        local cell = CreateFrame("Button", nil, row)
-        cell:SetSize(CELL - 4, CELL - 4)
-        cell:SetPoint("LEFT", (i - 1) * CELL, 0)
-        cell.icon = cell:CreateTexture(nil, "ARTWORK")
-        cell.icon:SetAllPoints()
-        cell.sel = cell:CreateTexture(nil, "OVERLAY")
-        cell.sel:SetPoint("TOPLEFT", -2, 2)
-        cell.sel:SetPoint("BOTTOMRIGHT", 2, -2)
-        cell.sel:SetTexture("Interface\\Buttons\\CheckButtonHilight")
-        cell.sel:SetBlendMode("ADD")
-        cell.count = cell:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-        cell.count:SetPoint("BOTTOMRIGHT", -1, 1)
-        cell.star = W.Text(cell, "GameFontNormal")
-        cell.star:SetPoint("TOPLEFT", 1, -1)
-        cell.star:SetText("|cffffd100*|r")
-        cell:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-        cell:SetScript("OnClick", function(self)
-          if not self.item then return end
-          state.key, state.pk = self.item.key, self.item.pk
-          page.list:Refresh()
-          page:RefreshDetail(true)
-        end)
-        W.KeyTooltip(cell, function(self) return self.item and self.item.key end)
-        row.cells[i] = cell
-      end
-      -- La fila en sí no se marca al elegir (se marca la casilla).
-      row.selectedTex:SetAlpha(0)
+      row.head = W.Header(row)
+      row.head:SetPoint("TOPLEFT", 2, 0)
+      row.head:SetPoint("BOTTOMRIGHT", -2, 2)
+      row.fold = W.ListText(row.head, "GameFontHighlightSmall", "RIGHT")
+      row.fold:SetPoint("BOTTOMRIGHT", -4, 5)
+      row.fold:SetTextColor(0.6, 0.6, 0.6)
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetSize(32, 32)
+      row.icon:SetPoint("LEFT", 6, 0)
+      row.title = W.ListText(row, "GameFontHighlight")
+      row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, -1)
+      row.title:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+      row.title:SetWordWrap(false)
+      row.sub = W.ListText(row, "GameFontHighlightSmall")
+      row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
+      row.sub:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+      row.sub:SetWordWrap(false)
+      row.sub:SetTextColor(0.6, 0.6, 0.6)
+      row.star = row:CreateTexture(nil, "ARTWORK")
+      row.star:SetSize(16, 16)
+      row.star:SetPoint("RIGHT", -8, 0)
+      row.star:SetTexture(STAR_ICON)
+      row.have = W.ListText(row, "GameFontHighlightSmall", "RIGHT")
+      row.have:SetTextColor(0.25, 1, 0.25)
+      row.tick = row:CreateTexture(nil, "ARTWORK")
+      row.tick:SetSize(16, 16)
+      row.tick:SetTexture(TICK_ICON)
+      row.tick:SetPoint("RIGHT", row.have, "LEFT", -2, 0)
+      row.parts = { row.icon, row.title, row.sub }
+      W.KeyTooltip(row, function(self) return self.item and not self.item.header and self.item.key end)
     end,
     updateRow = function(row, line)
-      row.header:SetShown(line.header == true)
+      row.head:SetShown(line.header == true)
+      for _, p in ipairs(row.parts) do p:SetShown(not line.header) end
       if line.header then
-        row.header:SetText((line.collapsed and "[+] " or "[-] ") .. line.label .. " |cffbbbbbb(" .. line.count .. ")|r")
+        row.head:SetText(line.label, "(" .. line.count .. ")")
+        row.fold:SetText(line.collapsed and "+" or "-")
+        row.star:Hide()
+        row.have:Hide()
+        row.tick:Hide()
+        return
       end
-      for i, cell in ipairs(row.cells) do
-        local item = not line.header and line.cells[i]
-        cell.item = item or nil
-        cell:SetShown(item and true or false)
-        if item then
-          cell.icon:SetTexture(item.icon)
-          cell.sel:SetShown(item.key == state.key)
-          cell.count:SetText(item.online > 0 and ("|cff40ff40" .. item.online .. "|r") or "")
-          cell.star:SetShown(item.fav == true)
-        end
+      row.icon:SetTexture(line.icon)
+      row.title:SetText(line.label)
+      row.sub:SetText(line.sub or "")
+      -- A la derecha: favorito y si lo tienes (bolsas o banco).
+      local right = -8
+      row.star:SetShown(line.fav == true)
+      if line.fav then right = right - 20 end
+      local total, bags = haveInfo(line.key)
+      local has = total > 0
+      row.have:SetShown(has)
+      row.tick:SetShown(has)
+      if has then
+        row.have:ClearAllPoints()
+        row.have:SetPoint("RIGHT", row, "RIGHT", right, 0)
+        row.have:SetText(bags > 0 and "Bolsas" or "Banco")
+        right = right - 64
       end
+      row.title:SetPoint("RIGHT", row, "RIGHT", right, 0)
+      row.sub:SetPoint("RIGHT", row, "RIGHT", right, 0)
     end,
     onSelect = function(line)
       if line.header then
         savedCollapsed()[line.pk] = not line.collapsed
         page:Refresh()
+        return
       end
+      state.key, state.pk = line.key, line.pk
+      page:RefreshDetail(true)
     end,
   })
-  list:SetPoint("TOPLEFT", 0, -30)
+  list:SetPoint("TOPLEFT", 0, -34)
 
+  -----------------------------------------------------------------------
   -- Detalle del objeto elegido.
-  local detail = W.Box(page, 350, 368)
+  -----------------------------------------------------------------------
+  local detail = W.Box(page, DETAIL_W, BODY_H)
   detail:SetPoint("TOPLEFT", list, "TOPRIGHT", 8, 0)
 
   detail.icon = CreateFrame("Button", nil, detail)
-  detail.icon:SetSize(36, 36)
+  detail.icon:SetSize(40, 40)
   detail.icon:SetPoint("TOPLEFT", 10, -10)
   detail.iconTex = detail.icon:CreateTexture(nil, "ARTWORK")
   detail.iconTex:SetAllPoints()
   W.KeyTooltip(detail.icon, function() return state.key end)
 
-  detail.name = W.Text(detail, "GameFontNormal")
-  detail.name:SetPoint("TOPLEFT", detail.icon, "TOPRIGHT", 8, -2)
-  detail.name:SetPoint("RIGHT", detail, "RIGHT", -104, 0)
+  detail.name = W.Text(detail, "GameFontNormalLarge")
+  detail.name:SetPoint("TOPLEFT", detail.icon, "TOPRIGHT", 10, -2)
+  detail.name:SetPoint("RIGHT", detail, "RIGHT", -34, 0)
+  detail.name:SetWordWrap(false)
 
-  -- Favoritos: lo que pides a menudo sale arriba del todo.
-  detail.fav = W.Button(detail, "+ Favorito", 90, 20, function()
+  -- Favoritos: lo que pides a menudo sale arriba del todo (la estrella, apagada si no lo es).
+  detail.fav = CreateFrame("Button", nil, detail)
+  detail.fav:SetSize(20, 20)
+  detail.fav:SetPoint("TOPRIGHT", -10, -10)
+  detail.fav.tex = detail.fav:CreateTexture(nil, "ARTWORK")
+  detail.fav.tex:SetAllPoints()
+  detail.fav.tex:SetTexture(STAR_ICON)
+  detail.fav:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  detail.fav:SetScript("OnClick", function()
     if not state.key then return end
     local favs = favorites()
     favs[state.key] = not favs[state.key] or nil
     page:Refresh()
   end)
-  detail.fav:SetPoint("TOPRIGHT", -8, -10)
-  detail.name:SetWordWrap(false)
+  ns.UI.Tip(detail.fav, "Favorito", "Los favoritos salen arriba del todo de la lista.")
+
   detail.sub = W.Text(detail, "GameFontHighlightSmall")
-  detail.sub:SetPoint("TOPLEFT", detail.name, "BOTTOMLEFT", 0, -4)
+  detail.sub:SetPoint("TOPLEFT", detail.name, "BOTTOMLEFT", 0, -5)
   detail.sub:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
+  detail.sub:SetWordWrap(false)
+  detail.sub:SetTextColor(0.75, 0.75, 0.75)
 
+  -- "Tienes N en las bolsas", con el visto bueno.
+  detail.haveTick = detail:CreateTexture(nil, "ARTWORK")
+  detail.haveTick:SetSize(16, 16)
+  detail.haveTick:SetTexture(TICK_ICON)
+  detail.haveText = W.Text(detail, "GameFontHighlight")
+  detail.haveText:SetPoint("LEFT", detail.haveTick, "RIGHT", 6, 0)
+  detail.haveText:SetTextColor(0.25, 1, 0.25)
 
-  detail.matsLabel = W.Text(detail, "GameFontNormalSmall")
-  detail.matsLabel:SetPoint("TOPLEFT", 12, -62)
-  detail.matsLabel:SetText("Materiales necesarios:")
+  detail.craftersLabel = W.Header(detail)
+  detail.craftersLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+  local crafters = W.Crafters(detail, DETAIL_W - 16, 3, 26, true)
+  detail.crafters = crafters
+  detail.noCrafters = W.Text(detail, "GameFontHighlightSmall")
+  detail.noCrafters:SetTextColor(0.6, 0.6, 0.6)
+  detail.noCrafters:SetText("Nadie lo tiene publicado aún, pero puedes pedirlo.")
 
-  -- Casillas de materiales (2 columnas), como en la ventana de profesiones.
+  detail.matsLabel = W.Header(detail)
+  detail.matsLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+
+  -- Materiales: una fila cada uno ("Barra de cobre x8 ... tienes 12"); con más de 4, en dos columnas.
   detail.slots = {}
   for i = 1, MAX_REAGENTS do
     local slot = CreateFrame("Button", nil, detail)
-    slot:SetSize(160, 28)
-    local col, line = (i - 1) % 2, math.floor((i - 1) / 2)
-    slot:SetPoint("TOPLEFT", 10 + col * 166, -78 - line * 30)
+    slot:SetHeight(MAT_H)
     slot.icon = slot:CreateTexture(nil, "ARTWORK")
-    slot.icon:SetSize(26, 26)
+    slot.icon:SetSize(16, 16)
     slot.icon:SetPoint("LEFT", 0, 0)
-    slot.need = W.Text(slot, "NumberFontNormal", "RIGHT")
-    slot.need:SetPoint("BOTTOMRIGHT", slot.icon, "BOTTOMRIGHT", 0, 1)
+    slot.have = W.Text(slot, "GameFontHighlightSmall", "RIGHT")
+    slot.have:SetPoint("RIGHT", -2, 0)
     slot.name = W.Text(slot, "GameFontHighlightSmall")
-    slot.name:SetPoint("TOPLEFT", slot.icon, "TOPRIGHT", 4, -1)
-    slot.name:SetPoint("RIGHT", slot, "RIGHT", 0, 0)
+    slot.name:SetPoint("LEFT", slot.icon, "RIGHT", 6, 0)
+    slot.name:SetPoint("RIGHT", slot.have, "LEFT", -6, 0)
     slot.name:SetWordWrap(false)
-    slot.have = W.Text(slot, "GameFontHighlightSmall")
-    slot.have:SetPoint("BOTTOMLEFT", slot.icon, "BOTTOMRIGHT", 4, 1)
     W.KeyTooltip(slot, function(self) return self.itemID and ("i" .. self.itemID) end)
     detail.slots[i] = slot
   end
   detail.matsNote = W.Text(detail, "GameFontHighlightSmall")
-  detail.matsNote:SetPoint("TOPLEFT", 12, -78)
-  detail.matsNote:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
-  detail.matsNote:SetHeight(110)
+  detail.matsNote:SetPoint("RIGHT", detail, "RIGHT", -12, 0)
   detail.matsNote:SetJustifyV("TOP")
   detail.matsNote:SetTextColor(0.75, 0.75, 0.75)
 
-  detail.craftersLabel = W.Text(detail, "GameFontNormalSmall")
-  detail.craftersLabel:SetPoint("TOPLEFT", 12, -194)
-  detail.craftersLabel:SetText(materials and "Quién lo da" or "Quién lo fabrica")
-
-  local crafters = W.List(detail, 334, 94, {
-    rows = 4,
-    rowHeight = 20,
-    keyOf = function(row) return row.name end,
-    buildRow = function(row)
-      row.name = W.ListText(row, "GameFontHighlightSmall")
-      row.name:SetPoint("LEFT", 4, 0)
-      row.name:SetWidth(100)
-      row.name:SetWordWrap(false)
-      row.status = W.ListText(row, "GameFontHighlightSmall")
-      row.status:SetPoint("LEFT", 108, 0)
-      row.status:SetPoint("RIGHT", row, "RIGHT", -70, 0)
-      row.status:SetWordWrap(false)
-      row.count = W.ListText(row, "GameFontNormalSmall", "RIGHT")
-      row.count:SetPoint("RIGHT", -2, 0)
-      row:SetScript("OnEnter", function(self)
-        local c = self.item
-        if not c then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(ns.ColoredName(c.name, c.class) .. (c.level and (" (nivel " .. c.level .. ")") or ""))
-        for _, p in ipairs(c.profs) do
-          GameTooltip:AddLine(ns.ProfessionName(p.pk) .. (p.r and string.format(" %d/%d", p.r, p.m or 0) or ""), 1, 1, 1)
-        end
-        GameTooltip:AddLine("Karma: " .. c.karma .. "   Encargos completados: " .. c.thanks, 0.8, 0.8, 0.8)
-        GameTooltip:Show()
-      end)
-      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    end,
-    updateRow = function(row, c)
-      row.name:SetText(ns.ColoredName(c.name, c.class))
-      row.status:SetText(c.status)
-      row.count:SetText("karma " .. c.karma)
-    end,
-    onSelect = function() page:RefreshButtons() end,
-  })
-  crafters:SetPoint("TOPLEFT", 8, -208)
-  detail.crafters = crafters
-
-  -- Cantidad con − y +, como el "Crear" de la ventana de profesiones.
+  -- Cantidad con - y +, como el "Crear" de la ventana de profesiones.
   detail.qtyLabel = W.Text(detail, "GameFontNormalSmall")
-  detail.qtyLabel:SetPoint("BOTTOMLEFT", 12, 42)
+  detail.qtyLabel:SetPoint("BOTTOMLEFT", 12, 50)
   detail.qtyLabel:SetText("Cantidad:")
   detail.minus = W.Button(detail, "-", 24, 20)
   detail.minus:SetPoint("LEFT", detail.qtyLabel, "RIGHT", 8, 0)
   detail.qty = W.Input(detail, 44, true)
-  detail.qty:SetPoint("LEFT", detail.minus, "RIGHT", 8, 0)
+  detail.qty:SetPoint("LEFT", detail.minus, "RIGHT", 10, 0)
   detail.qty:SetMaxLetters(4)
   detail.plus = W.Button(detail, "+", 24, 20)
   detail.plus:SetPoint("LEFT", detail.qty, "RIGHT", 4, 0)
@@ -496,20 +580,18 @@ local function buildCatalog(page, mode)
   end
 
   -- El pedido va siempre a toda la hermandad (se lo queda el primero que lo acepte).
-  detail.askAll = W.Button(detail, "Pedir a la hermandad", 150, 22, function()
+  detail.askAll = W.Button(detail, "PEDIR", DETAIL_W - 16, 30, function()
     if state.key then ns.UI.OpenRequestDialog(requestOptions()) end
   end)
   detail.askAll:SetPoint("BOTTOMLEFT", 8, 8)
-  detail.whisper = W.Button(detail, "Susurrar", 96, 22, function()
-    local c = crafters:Selected()
-    if c then ns.SendTell(c.name) end
-  end)
-  detail.whisper:SetPoint("LEFT", detail.askAll, "RIGHT", 4, 0)
+  detail.askAll:SetFontSize("large")
+  detail.askAll:SetPrimary(true)
+  ns.UI.Tip(detail.askAll, "Pedir a la hermandad", "Lo ve toda la hermandad y se lo queda el primero que lo acepte.")
 
   detail.empty = W.Text(detail, "GameFontNormal", "CENTER")
   detail.empty:SetTextColor(0.6, 0.6, 0.6)
   detail.empty:SetPoint("CENTER")
-  detail.empty:SetWidth(300)
+  detail.empty:SetWidth(DETAIL_W - 50)
 
   -- Referencias para depurar y para las pruebas.
   page.state, page.list, page.detail, page.search, page.profButton = state, list, detail, search, profButton
@@ -524,43 +606,55 @@ local function buildCatalog(page, mode)
   end
 
   function page:RefreshButtons()
-    local c = crafters:Selected()
-    local me = ns.Me()
-    local other = c and c.name ~= me
     detail.askAll:SetEnabled(state.key ~= nil)
-    detail.whisper:SetEnabled(other or false)
   end
 
-  local function showMaterials(key, pk)
+  -- Coloca una pieza del detalle a la altura y (de arriba abajo).
+  local function place(region, y, left)
+    region:ClearAllPoints()
+    region:SetPoint("TOPLEFT", left or 8, y)
+    if region == detail.craftersLabel or region == detail.matsLabel or region == detail.matsNote then
+      region:SetPoint("RIGHT", detail, "RIGHT", region == detail.matsNote and -12 or -8, 0)
+    end
+  end
+
+  -- Materiales de la receta, desde la altura y. Devuelve cuántos salen por vez.
+  local function showMaterials(key, pk, y)
     local var, variants = recipeInfo(key, pk)
     local ids = {}
     if var then
       for id in pairs(var.r) do ids[#ids + 1] = id end
       table.sort(ids)
     end
+    local two = #ids > 4
+    local colW = two and math.floor((DETAIL_W - 28) / 2) or (DETAIL_W - 24)
+    local perCol = two and math.ceil(#ids / 2) or #ids
     for i, slot in ipairs(detail.slots) do
       local id = ids[i]
       slot.itemID = id
       slot:SetShown(id ~= nil)
       if id then
+        local col, line = 0, i - 1
+        if two then col, line = math.floor((i - 1) / perCol), (i - 1) % perCol end
+        slot:ClearAllPoints()
+        slot:SetPoint("TOPLEFT", 12 + col * (colW + 4), y - line * MAT_H)
+        slot:SetWidth(colW)
         local need = var.r[id]
         local have = ns.Scan.Have(id)
         local _, icon = ns.KeyInfo("i" .. id)
         slot.icon:SetTexture(icon)
-        slot.need:SetText(need > 1 and need or "")
-        slot.name:SetText(ns.KeyName("i" .. id))
-        slot.have:SetText((have >= need and "|cff40ff40" or "|cffff5050") .. have .. "/" .. need .. "|r")
+        slot.name:SetText(ns.KeyName("i" .. id) .. " |cffffffffx" .. need .. "|r")
+        slot.have:SetText((have >= need and "|cff40ff40" or "|cffff9933") .. "tienes " .. have .. "|r")
       end
     end
-    if not var then
-      detail.matsNote:SetText("Pidiendo los materiales a la hermandad...")
-    elseif variants > 1 then
-      detail.matsNote:SetText("")
-      detail.matsLabel:SetText(string.format("Materiales necesarios (hay %d recetas; se muestra una):", variants))
-    else
-      detail.matsNote:SetText("")
-    end
+    detail.matsLabel:SetText("Materiales", variants and variants > 1
+      and string.format("(hay %d recetas; se muestra una)", variants) or nil)
     detail.matsNote:SetShown(not var)
+    if not var then
+      place(detail.matsNote, y, 12)
+      detail.matsNote:SetHeight(MAT_H * 2)
+      detail.matsNote:SetText("Pidiendo los materiales a la hermandad...")
+    end
     local made = var and var.m or 1
     state.step = made
     detail.made:SetText(made > 1 and string.format("(salen %d por vez)", made) or "")
@@ -574,16 +668,18 @@ local function buildCatalog(page, mode)
     local regions = {
       detail.fav,
       detail.icon, detail.name, detail.sub, detail.matsLabel, detail.craftersLabel, crafters,
-      detail.qtyLabel, detail.minus, detail.qty, detail.plus, detail.made,
-      detail.askAll, detail.whisper,
+      detail.qtyLabel, detail.minus, detail.qty, detail.plus, detail.made, detail.askAll,
     }
     for _, region in ipairs(regions) do region:SetShown(hasKey) end
+    detail.haveTick:Hide()
+    detail.haveText:Hide()
+    detail.noCrafters:Hide()
     detail.empty:SetShown(not hasKey)
     if not hasKey then
       for _, slot in ipairs(detail.slots) do slot:Hide() end
       detail.matsNote:Hide()
       if #list.items > 0 then
-        detail.empty:SetText("Elige un objeto de la rejilla.")
+        detail.empty:SetText("Elige un objeto de la lista.")
       elseif materials and ns.db.settings.onlyMyReagents then
         detail.empty:SetText("No hay materiales de tus recetas que dé la hermandad. Abre tus profesiones "
           .. "para que el addon sepa qué usas, o desmarca \"Solo lo que usan mis recetas\".")
@@ -594,25 +690,87 @@ local function buildCatalog(page, mode)
     end
     local profs = rec and rec.profs or {}
     local pk = (state.pk and profs[state.pk]) and state.pk or Data.SingleProfession(key) or next(profs)
-    local name, icon, link = ns.KeyInfo(key)
+    local name, icon, _, quality, minLevel, equipLoc = ns.KeyInfo(key)
     detail.iconTex:SetTexture(icon)
-    detail.name:SetText(link or name or ns.KeyName(key))
-    detail.fav:SetText(favorites()[key] and "- Favorito" or "+ Favorito")
+    detail.name:SetText(qualityColor(quality) .. (name or ns.KeyName(key)) .. "|r")
+    local isFav = favorites()[key] and true or false
+    detail.fav.tex:SetDesaturated(not isFav)
+    detail.fav.tex:SetAlpha(isFav and 1 or 0.45)
+
+    -- Línea gris: ranura o tipo · armadura/arma · nivel · para ti · profesiones.
+    local subParts = {}
+    if materials then
+      local _, groupLabel = materialGroup(key)
+      subParts[#subParts + 1] = groupLabel
+    else
+      local _, slotLabel = gearGroup(key)
+      if slotLabel ~= "Otros" and slotLabel ~= "Encantamientos" then subParts[#subParts + 1] = slotLabel end
+      subParts[#subParts + 1] = typeName(key)
+      if minLevel and minLevel > 1 then subParts[#subParts + 1] = "requiere nivel " .. minLevel end
+      local playerLevel = UnitLevel("player") or 60
+      if canUse(key, ns.Dungeons.MyClass(), playerLevel, minLevel) and not isLowGear(minLevel, equipLoc, playerLevel) then
+        subParts[#subParts + 1] = "|cff40ff40para ti|r"
+      end
+    end
     local profNames = {}
     for p in pairs(profs) do profNames[#profNames + 1] = ns.ProfessionName(p) end
-    local _, skill = Data.GatherersOf(key)
-    if materials and skill and #(Data.GatherersOf(key)) > 0 then profNames[#profNames + 1] = ns.ProfessionName(skill) end
+    local gatherers, skill = Data.GatherersOf(key)
+    if materials and skill and #gatherers > 0 then profNames[#profNames + 1] = ns.ProfessionName(skill) end
     table.sort(profNames)
-    detail.sub:SetText(table.concat(profNames, ", "))
+    if #profNames > 0 then subParts[#subParts + 1] = table.concat(profNames, ", ") end
+    detail.sub:SetText(table.concat(subParts, " · "))
+
+    -- Lo que tienes.
+    local y = -60
+    local total, bags, bank = haveInfo(key)
+    if total > 0 then
+      detail.haveTick:ClearAllPoints()
+      detail.haveTick:SetPoint("TOPLEFT", 12, y)
+      local where
+      if bank == 0 then
+        where = "en las bolsas"
+      elseif bags == 0 then
+        where = "en el banco"
+      else
+        where = string.format("(%d en las bolsas y %d en el banco)", bags, bank)
+      end
+      detail.haveText:SetText(string.format("Tienes %d %s", total, where))
+      detail.haveTick:Show()
+      detail.haveText:Show()
+      y = y - 24
+    end
+
+    -- Quién lo fabrica (o lo da), en línea primero.
+    local rows = ns.UI.CrafterRows(key, materials)
+    place(detail.craftersLabel, y)
+    detail.craftersLabel:SetText(materials and "Quién lo da" or "Quién lo fabrica", "(" .. #rows .. ")")
+    y = y - 24
+    if #rows > 0 then
+      local shown = math.min(3, #rows)
+      crafters:SetHeight(shown * 26)
+      place(crafters, y)
+      crafters:SetItems(rows)
+      y = y - shown * 26 - 8
+    else
+      crafters:Hide()
+      place(detail.noCrafters, y - 2, 12)
+      detail.noCrafters:Show()
+      y = y - 22
+    end
+
+    -- Materiales (equipo) o en qué recetas tuyas se usa (materiales).
+    place(detail.matsLabel, y)
+    y = y - 26
     local _, itemID = ns.ParseKey(key)
     local made = 1
     if materials then
-      -- En materiales: para qué recetas tuyas sirve.
       for _, slot in ipairs(detail.slots) do slot:Hide() end
-      detail.matsLabel:SetText("Lo usas en:")
+      detail.matsLabel:SetText("Lo usas en")
       local uses, names = myReagents()[itemID or 0], {}
       for k in pairs(uses or {}) do names[#names + 1] = ns.KeyName(k) end
       table.sort(names)
+      place(detail.matsNote, y, 12)
+      detail.matsNote:SetHeight(math.max(MAT_H, (BODY_H - 76) + y))
       detail.matsNote:SetText(#names > 0 and table.concat(names, "\n") or "Ninguna receta tuya conocida.")
       detail.matsNote:Show()
       state.step = 1
@@ -622,14 +780,9 @@ local function buildCatalog(page, mode)
         made = var and var.m or 1
       end
     else
-      detail.matsLabel:SetText("Materiales necesarios:")
-      made = showMaterials(key, pk)
+      made = showMaterials(key, pk, y)
     end
     if newSelection then setQuantity(made) end
-    local rows = crafterRows(key, materials)
-    crafters:SetItems(rows)
-    detail.craftersLabel:SetText((materials and "Quién lo da (" or "Quién lo fabrica (") .. #rows .. ")"
-      .. (#rows == 0 and " |cff999999- nadie lo tiene publicado aún, pero puedes pedirlo|r" or ""))
     page:RefreshButtons()
   end
 
@@ -642,6 +795,7 @@ local function buildCatalog(page, mode)
     local myClass = ns.Dungeons.MyClass()
     local mine = materials and myReagents() or nil
     local onlyMine = materials and ns.db.settings.onlyMyReagents
+    local onlyUsable = not materials and ns.db.settings.onlyUsable
     if onlyMine and not next(mine) then
       onlyMine = false -- no sabemos qué usan tus recetas: mejor enseñar todo que una lista vacía
       lowCheck.label:SetText("Solo lo que usan mis recetas |cffff8040(sin datos: se muestra todo)|r")
@@ -650,32 +804,73 @@ local function buildCatalog(page, mode)
     end
     wipe(state.gatherOnly)
 
+    -- Filtro de clase (en equipo): el aro dorado en la elegida.
+    if page.classButtons then
+      page.classAll:SetOn(state.class == nil)
+      for _, b in ipairs(page.classButtons) do
+        local on = b.class == state.class
+        if on then b.ring:SetVertexColor(1, 0.82, 0) else b.ring:SetVertexColor(0.55, 0.45, 0.25) end
+        b.icon:SetDesaturated(state.class ~= nil and not on)
+      end
+    end
+    -- Clase con la que se mira qué se puede llevar: la elegida o, con la casilla, la tuya.
+    local useClass = state.class or (onlyUsable and myClass) or nil
+
     local groupLabels = {}
 
-    -- Añade un objeto a un grupo (tipo de material en materiales, profesión en equipo).
+    -- Añade un objeto a un grupo (tipo de material en materiales, ranura en equipo).
     local function add(key, pk, rec, groupKey, groupLabel)
       local name, icon, _, quality, minLevel, equipLoc = ns.KeyInfo(key)
       local label = name or ns.KeyName(key)
       local lower = label:lower()
       if state.search ~= "" and not lower:find(state.search, 1, true) then return end
-      -- Equipo: solo lo que puede usar mi clase a mi nivel (y no lo de mucho menos nivel).
-      if not materials and ns.db.settings.onlyUsable
-        and (not canUse(key, myClass, playerLevel, minLevel) or isLowGear(minLevel, equipLoc, playerLevel)) then
-        return
+      -- Equipo: lo que puede llevar la clase elegida (y, con la casilla, a mi nivel y no lo de
+      -- mucho menos nivel).
+      if not materials then
+        if useClass and not canUse(key, useClass, onlyUsable and playerLevel or 60, onlyUsable and minLevel or nil) then
+          return
+        end
+        if onlyUsable and isLowGear(minLevel, equipLoc, playerLevel) then return end
       end
-      local seen, count, online = {}, 0, 0
-      local function countWho(who)
-        if not seen[who] then
-          seen[who] = true
-          count = count + 1
-          if Guild.IsOnline(who) then online = online + 1 end
+      local seen, makers, gather, online = {}, 0, 0, 0
+      local firstMaker, firstOnline
+      local function countWho(who, isGather)
+        if seen[who] then return end
+        seen[who] = true
+        if isGather then gather = gather + 1 else makers = makers + 1 end
+        firstMaker = firstMaker or who
+        if Guild.IsOnline(who) then
+          online = online + 1
+          firstOnline = firstOnline or who
         end
       end
       for _, cr in ipairs(rec and rec.crafters or {}) do
         if materials or cr.p == pk then countWho(cr.n) end
       end
       if materials or not rec then
-        for _, who in ipairs((Data.GatherersOf(key))) do countWho(who) end
+        for _, who in ipairs((Data.GatherersOf(key))) do countWho(who, true) end
+      end
+      -- Línea gris de la tarjeta.
+      local parts = {}
+      if materials then
+        parts[#parts + 1] = groupLabel
+      else
+        parts[#parts + 1] = typeName(key)
+        if minLevel and minLevel > 1 then parts[#parts + 1] = "nivel " .. minLevel end
+      end
+      local count = makers + gather
+      if count == 0 then
+        parts[#parts + 1] = "nadie lo tiene publicado"
+      elseif count == 1 then
+        parts[#parts + 1] = (gather == 1 and "solo lo recolecta " or "solo lo hace ") .. ns.ShortName(firstMaker)
+      else
+        if makers > 0 then parts[#parts + 1] = (makers == 1 and "lo hace 1" or ("lo hacen " .. makers)) end
+        if gather > 0 then parts[#parts + 1] = (gather == 1 and "lo recolecta 1" or ("lo recolectan " .. gather)) end
+      end
+      if online == 1 then
+        parts[#parts + 1] = "|cff40ff40" .. ns.ShortName(firstOnline) .. " en línea|r"
+      elseif online > 1 then
+        parts[#parts + 1] = "|cff40ff40" .. online .. " en línea|r"
       end
       groupKey = groupKey or pk
       groupLabels[groupKey] = groupLabel or ns.ProfessionName(pk)
@@ -683,6 +878,7 @@ local function buildCatalog(page, mode)
       table.insert(groups[groupKey], {
         id = tostring(groupKey) .. ":" .. key, key = key, pk = pk, sort = lower, icon = icon,
         count = count, online = online, label = qualityColor(quality) .. label .. "|r",
+        sub = table.concat(parts, " · "),
       })
     end
 
@@ -697,7 +893,7 @@ local function buildCatalog(page, mode)
             profSet[pk] = true
             profs[#profs + 1] = pk
           end
-          table.sort(profs, function(x, y) return tostring(x) < tostring(y) end)
+          table.sort(profs, function(x1, y1) return tostring(x1) < tostring(y1) end)
           if not state.prof or rec.profs[state.prof] then
             add(key, rec.profs[state.prof or false] and state.prof or profs[1], rec, groupKey, groupLabel)
           end
@@ -719,7 +915,7 @@ local function buildCatalog(page, mode)
         end
       end
     else
-      -- Equipo: una vez cada objeto, agrupado por tipo (como los materiales).
+      -- Equipo: una vez cada objeto, agrupado por ranura.
       for key, rec in pairs(index) do
         if isEquipment(key) then
           local profs = {}
@@ -727,7 +923,7 @@ local function buildCatalog(page, mode)
             profSet[pk] = true
             profs[#profs + 1] = pk
           end
-          table.sort(profs, function(x, y) return tostring(x) < tostring(y) end)
+          table.sort(profs, function(x1, y1) return tostring(x1) < tostring(y1) end)
           if not state.prof or rec.profs[state.prof] then
             local groupKey, groupLabel = gearGroup(key)
             add(key, rec.profs[state.prof or false] and state.prof or profs[1], rec, groupKey, groupLabel)
@@ -738,7 +934,7 @@ local function buildCatalog(page, mode)
 
     local profList = {}
     for pk in pairs(profSet) do profList[#profList + 1] = pk end
-    table.sort(profList, function(x, y) return ns.ProfessionName(x) < ns.ProfessionName(y) end)
+    table.sort(profList, function(a, b) return ns.ProfessionName(a) < ns.ProfessionName(b) end)
     page.profList = profList
     if state.prof and not profSet[state.prof] then state.prof = nil end
     profButton:SetText("Profesión: " .. (state.prof and ns.ProfessionName(state.prof) or "todas"))
@@ -746,7 +942,7 @@ local function buildCatalog(page, mode)
     -- Grupos ordenados por nombre.
     local groupKeys = {}
     for k in pairs(groups) do groupKeys[#groupKeys + 1] = k end
-    table.sort(groupKeys, function(x, y) return groupLabels[x] < groupLabels[y] end)
+    table.sort(groupKeys, function(a, b) return groupLabels[a] < groupLabels[b] end)
     page.groupKeys = groupKeys
 
     -- Cabecera de cada grupo y sus objetos debajo (si no está plegado).
@@ -763,13 +959,13 @@ local function buildCatalog(page, mode)
           item.fav = true
           favItems[#favItems + 1] = {
             id = "fav:" .. item.key, key = item.key, pk = item.pk, sort = item.sort, icon = item.icon,
-            count = item.count, online = item.online, label = item.label, fav = true,
+            count = item.count, online = item.online, label = item.label, sub = item.sub, fav = true,
           }
         end
       end
     end
     if #favItems > 0 then
-      table.sort(favItems, function(x, y) return x.sort < y.sort end)
+      table.sort(favItems, function(a, b) return a.sort < b.sort end)
       local collapsed = isCollapsed("fav", false)
       items[#items + 1] = { id = "h:fav", header = true, pk = "fav", label = "Favoritos", count = #favItems, collapsed = collapsed }
       if not collapsed then
@@ -778,7 +974,7 @@ local function buildCatalog(page, mode)
     end
     for _, k in ipairs(groupKeys) do
       local group = groups[k]
-      table.sort(group, function(x, y) return x.sort < y.sort end)
+      table.sort(group, function(a, b) return a.sort < b.sort end)
       -- abierto por defecto si tiene algo que usan tus recetas (en materiales)
       local useful = false
       if materials then
@@ -796,22 +992,9 @@ local function buildCatalog(page, mode)
         for _, item in ipairs(group) do items[#items + 1] = item end
       end
     end
-    -- Las cabeceras van en su línea; los objetos de cada grupo, en filas de COLS iconos.
-    local lines, run = {}, nil
-    for _, item in ipairs(items) do
-      if item.header then
-        run = nil
-        lines[#lines + 1] = item
-      else
-        if not run or #run.cells >= COLS then
-          run = { id = "l:" .. item.id, cells = {} }
-          lines[#lines + 1] = run
-        end
-        run.cells[#run.cells + 1] = item
-      end
-    end
     page.items = items
-    list:SetItems(lines)
+    list.selectedKey = state.key
+    list:SetItems(items)
     page:RefreshDetail()
   end
 end
@@ -953,6 +1136,7 @@ local function buildCraftOffer(page)
   local list = W.List(page, 430, 368, {
     rows = 8,
     rowHeight = 44,
+    card = true,
     keyOf = function(line) return line.key end,
     buildRow = function(row)
       row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
@@ -1165,9 +1349,15 @@ end
 function ns.UI.CrafterRows(key, withGatherers)
   local out, me = {}, ns.Me()
   for _, row in ipairs(crafterRows(key, withGatherers)) do
+    -- Recetas con tiempo de espera: cuánto le queda o si ya está lista.
+    local extra
+    if row.cdRecipe then
+      extra = row.cdLeft and ("|cffff8040cd " .. ns.FormatDuration(row.cdLeft) .. "|r") or "|cff40ff40cd listo|r"
+    end
     for _, p in ipairs(row.profs) do
       out[#out + 1] = { name = row.name, class = row.class, pk = p.pk, r = p.r, online = row.online,
-        seen = row.seen, unavailable = row.unavailable }
+        seen = row.seen, unavailable = row.unavailable, karma = row.karma, thanks = row.thanks,
+        level = row.level, extra = extra }
     end
   end
   -- Tú primero; los demás, en el orden de antes (disponibles, en línea, vistos hace poco).

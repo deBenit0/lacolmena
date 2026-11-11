@@ -202,8 +202,8 @@ local function createOfferDialog()
   d.title = W.Text(d, "GameFontNormal")
   d.title:SetPoint("TOP", 0, -18)
   d.title:SetText("Ofrecer a la hermandad")
-  local close = CreateFrame("Button", nil, d, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
+  local close = W.CloseButton(d)
+  close:SetPoint("TOPRIGHT", -10, -10)
 
   -- Objeto. Si no viene elegido (botón del Tablón), se elige arrastrándolo al cuadro o con
   -- mayús+clic en él con la caja de texto activa.

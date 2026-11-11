@@ -7,7 +7,19 @@ local _, ns = ...
 local W, Data, Guild = ns.W, ns.Data, ns.Guild
 
 local LIST_W, DETAIL_W, BODY_H = 444, 334, 372
-local ROWS, ROW_H = 7, 52
+local ROWS, ROW_H, HEADER_H = 7, 48, 24
+
+-- Con el orden «lo tuyo primero», la lista va por secciones.
+local SECTIONS = {
+  { id = "need", label = "Para la hermandad" },
+  { id = "serve", label = "Puedes hacerlo" },
+  { id = "rest", label = "El resto" },
+}
+
+-- Nombre de un enlace sin los corchetes (el color se queda).
+local function noBrackets(text)
+  return (tostring(text or ""):gsub("|h%[(.-)%]|h", "|h%1|h"))
+end
 
 -- Filtros rápidos.
 local CHIPS = {
@@ -334,11 +346,18 @@ ns.UI.RegisterPage("market", function(page)
   local list = W.List(page, LIST_W, BODY_H, {
     rows = ROWS,
     rowHeight = ROW_H,
+    card = true,
+    heightOf = function(item) return item.kind == "header" and HEADER_H or ROW_H end,
+    isHeader = function(item) return item.kind == "header" end,
     keyOf = function(item) return item.id end,
     buildRow = function(row)
-      row.pin = row:CreateTexture(nil, "BACKGROUND")
-      row.pin:SetPoint("TOPLEFT")
-      row.pin:SetPoint("BOTTOMLEFT")
+      row.header = W.Header(row)
+      row.header:SetPoint("TOPLEFT", 2, 0)
+      row.header:SetPoint("BOTTOMRIGHT", -2, 2)
+      row.header:Hide()
+      row.pin = row:CreateTexture(nil, "ARTWORK")
+      row.pin:SetPoint("TOPLEFT", 0, -2)
+      row.pin:SetPoint("BOTTOMLEFT", 0, 2)
       row.pin:SetWidth(3)
       row.pin:SetColorTexture(1, 0.5, 0.1, 0.9)
       row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -383,13 +402,27 @@ ns.UI.RegisterPage("market", function(page)
       row.arrow = W.Text(row, "GameFontNormal")
       row.arrow:SetPoint("RIGHT", -6, 0)
       W.KeyTooltip(row, function(self) return self.item and self.item.k end)
+      row.parts = { row.icon, row.qty, row.title, row.sub, row.arrow }
     end,
     updateRow = function(row, item)
+      -- Título de sección: solo el rótulo.
+      local header = item.kind == "header"
+      row.header:SetShown(header)
+      for _, p in ipairs(row.parts) do p:SetShown(not header) end
+      if header then
+        row.header:SetText(item.label, item.count and ("(" .. item.count .. ")") or nil)
+        row.title:SetText("")
+        row.pin:Hide()
+        row.coin:Hide()
+        row.rush:Hide()
+        for _, tb in ipairs(row.tags) do tb:Hide() end
+        return
+      end
       local _, icon = ns.KeyInfo(item.k)
       row.icon:SetTexture(icon)
       local q = rowQty(item)
       row.qty:SetText(q and q > 1 and tostring(q) or "")
-      row.title:SetText(ns.KeyLabel(item.k))
+      row.title:SetText(noBrackets(ns.KeyLabel(item.k)))
       -- Iconos a la derecha del título: etiquetas, y propina y prisa en los pedidos.
       local tags = item.kind == "group" and {} or rowTags(item)
       local x = -4
@@ -430,6 +463,7 @@ ns.UI.RegisterPage("market", function(page)
       row.icon:SetPoint("LEFT", item.child and 22 or 8, 0)
     end,
     onSelect = function(item)
+      if item.kind == "header" then return end
       if item.kind == "group" then
         state.expanded[item.k] = not state.expanded[item.k]
         state.selected = state.expanded[item.k] and item.children[1].id or nil
@@ -455,7 +489,7 @@ ns.UI.RegisterPage("market", function(page)
   local fbox = W.Box(page, LIST_W, 196)
   fbox:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
   fbox:SetFrameLevel(list:GetFrameLevel() + 10)
-  if fbox.SetBackdropColor then fbox:SetBackdropColor(0.05, 0.045, 0.04, 0.97) end
+  if fbox.SetBackdropColor then fbox:SetBackdropColor(W.COLORS.BG[1], W.COLORS.BG[2], W.COLORS.BG[3], 1) end
   fbox:Hide()
   page.filterBox = fbox
   local function label(text, y)
@@ -506,7 +540,7 @@ ns.UI.RegisterPage("market", function(page)
   local menu = W.Box(page, LIST_W, 196)
   menu:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
   menu:SetFrameLevel(list:GetFrameLevel() + 12)
-  if menu.SetBackdropColor then menu:SetBackdropColor(0.05, 0.045, 0.04, 0.98) end
+  if menu.SetBackdropColor then menu:SetBackdropColor(W.COLORS.BG[1], W.COLORS.BG[2], W.COLORS.BG[3], 1) end
   menu:Hide()
   fbox.slotMenu = menu
   local function setAll(on)
@@ -578,7 +612,7 @@ ns.UI.RegisterPage("market", function(page)
   detail.iconTex = detail.icon:CreateTexture(nil, "ARTWORK")
   detail.iconTex:SetAllPoints()
   W.KeyTooltip(detail.icon, function() return detail.item and detail.item.k end)
-  detail.title = W.Text(detail, "GameFontNormal")
+  detail.title = W.Text(detail, "GameFontNormalLarge")
   detail.title:SetPoint("TOPLEFT", detail.icon, "TOPRIGHT", 8, -2)
   detail.title:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
   detail.title:SetWordWrap(false)
@@ -589,22 +623,31 @@ ns.UI.RegisterPage("market", function(page)
   detail.steps = W.Text(detail, "GameFontHighlightSmall")
   detail.steps:SetPoint("TOPLEFT", 12, -58)
   detail.steps:SetPoint("RIGHT", detail, "RIGHT", -10, 0)
+  -- Pedidos de la hermandad: barra dorada con lo aportado.
+  detail.progress = W.Progress(detail, DETAIL_W - 24, 16)
+  detail.progress:SetPoint("TOPLEFT", 12, -56)
+  detail.progress:Hide()
+  detail.infoHeader = W.Header(detail)
+  detail.infoHeader:SetPoint("TOPLEFT", 8, -78)
+  detail.infoHeader:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+  detail.infoHeader:Hide()
   detail.info = W.Text(detail, "GameFontHighlightSmall")
   detail.info:SetPoint("TOPLEFT", 12, -76)
   detail.info:SetSize(DETAIL_W - 24, 96)
   detail.info:SetJustifyV("TOP")
   detail.info:SetSpacing(1)
-  detail.whoLabel = W.Text(detail, "GameFontNormalSmall")
-  detail.whoLabel:SetPoint("TOPLEFT", 12, -174)
-  detail.crafters = W.Crafters(detail, DETAIL_W - 16, 4)
-  detail.crafters:SetPoint("TOPLEFT", 8, -188)
+  detail.whoLabel = W.Header(detail)
+  detail.whoLabel:SetPoint("TOPLEFT", 8, -170)
+  detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
+  detail.crafters = W.Crafters(detail, DETAIL_W - 16, 3, 26, true)
+  detail.crafters:SetPoint("TOPLEFT", 8, -194)
 
   -- b1 es la acción principal (grande, abajo); b2, b3, x1, x2 y x3, pequeñas, encima en filas de 3.
-  detail.b1 = W.Button(detail, "", DETAIL_W - 16, 28)
+  detail.b1 = W.Button(detail, "", DETAIL_W - 16, 30)
   detail.b1:SetPoint("BOTTOMLEFT", 8, 8)
-  if detail.b1.SetNormalFontObject then detail.b1:SetNormalFontObject("GameFontNormalLarge") end
-  if detail.b1.SetHighlightFontObject then detail.b1:SetHighlightFontObject("GameFontHighlightLarge") end
-  if detail.b1.SetDisabledFontObject then detail.b1:SetDisabledFontObject("GameFontDisableLarge") end
+  detail.b1:SetFontSize("large")
+  detail.b1:SetPrimary(true)
+  detail.b1.upper = true
   detail.small = {}
   for _, key in ipairs({ "b2", "b3", "x1", "x2", "x3" }) do
     detail[key] = W.Button(detail, "", 104, 20)
@@ -642,7 +685,7 @@ ns.UI.RegisterPage("market", function(page)
       b:Hide()
       return
     end
-    b:SetText(text)
+    b:SetText(b.upper and W.Upper(text) or text)
     b:SetEnabled(enabled and true or false)
     b:SetScript("OnClick", onClick)
     b.tip = tipText
@@ -651,7 +694,7 @@ ns.UI.RegisterPage("market", function(page)
 
   local function setWho(key, withGatherers, labelText)
     local rows = ns.UI.CrafterRows and ns.UI.CrafterRows(key, withGatherers) or {}
-    detail.whoLabel:SetText(#rows > 0 and labelText or (labelText .. ": |cffff8040nadie de la hermandad lo tiene publicado|r"))
+    detail.whoLabel:SetText(labelText, #rows == 0 and "|cffff8040nadie de la hermandad lo tiene publicado|r" or nil)
     detail.crafters:SetItems(rows)
     detail.whoLabel:Show()
     detail.crafters:Show()
@@ -662,7 +705,7 @@ ns.UI.RegisterPage("market", function(page)
     local r, now, me = item.r, ns.Now(), ns.Me()
     local info = Data.RequestInfo(r, now)
     local _, _, link = ns.KeyInfo(r.k)
-    detail.title:SetText(string.format("%dx %s", r.q, link or ns.KeyName(r.k)))
+    detail.title:SetText(string.format("%dx %s", r.q, noBrackets(link or ns.KeyName(r.k))))
     detail.sub:SetText("pide " .. ns.WhoColored(r.a) .. " |cffbbbbbb(karma " .. Data.KarmaText(r.a) .. ") · hace "
       .. ns.FormatDuration(now - (r.t or now)) .. "|r")
     detail.steps:SetText(stepsText(r, info))
@@ -766,7 +809,7 @@ ns.UI.RegisterPage("market", function(page)
   local function showOffer(item)
     local o, now = item.o, ns.Now()
     local _, _, link = ns.KeyInfo(item.k)
-    detail.title:SetText(string.format("%dx %s", o.q, link or ns.KeyName(item.k)))
+    detail.title:SetText(string.format("%dx %s", o.q, noBrackets(link or ns.KeyName(item.k))))
     detail.sub:SetText("ofrece " .. ns.WhoColored(o.owner) .. " |cffbbbbbb(karma " .. Data.KarmaText(o.owner) .. ") · hace "
       .. ns.FormatDuration(now - (o.t or now)) .. "|r")
     detail.steps:SetText("Precio: " .. ns.UI.PriceText(o.g) .. "   " .. (expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) or ""))
@@ -834,7 +877,7 @@ ns.UI.RegisterPage("market", function(page)
   local function showCraft(item)
     local grp, me, now = item.craft, ns.Me(), ns.Now()
     local _, _, link = ns.KeyInfo(item.k)
-    detail.title:SetText(link or ns.KeyName(item.k))
+    detail.title:SetText(noBrackets(link or ns.KeyName(item.k)))
     local n = #grp.crafters
     detail.sub:SetText(n == 1 and ("ofrece fabricarlo " .. ns.WhoColored(grp.crafters[1].name))
       or string.format("ofrecen fabricarlo |cffffffff%d|r personas", n))
@@ -891,16 +934,25 @@ ns.UI.RegisterPage("market", function(page)
   local function showNeed(item)
     local n = item.need
     local _, _, link = ns.KeyInfo(item.k)
-    detail.title:SetText(string.format("%dx %s", n.q, link or ns.KeyName(item.k)))
+    detail.title:SetText(string.format("%dx %s", n.q, noBrackets(link or ns.KeyName(item.k))))
     detail.sub:SetText("|cffff9933para la hermandad|r · lo pide " .. ns.WhoColored(n.owner))
-    detail.steps:SetText(string.format("Aportado |cffffffff%d|r de %d · faltan |cffffffff%d|r", n.given, n.q, n.left))
+    detail.steps:Hide()
+    detail.progress:SetValue(n.given, n.q, string.format("aportado %d de %d · faltan %d", n.given, n.q, n.left))
+    detail.progress:Show()
     local lines = {}
-    for i = 1, math.min(5, #n.donors) do
-      lines[#lines + 1] = "  " .. ns.WhoColored(n.donors[i].name) .. " " .. n.donors[i].n
+    for i = 1, math.min(3, #n.donors) do
+      lines[#lines + 1] = ns.WhoColored(n.donors[i].name) .. "  |cffffffff" .. n.donors[i].n .. "|r"
     end
-    if #lines > 0 then table.insert(lines, 1, "Aportan:") end
+    if #n.donors > 3 then lines[#lines + 1] = string.format("|cffbbbbbby %d más|r", #n.donors - 3) end
     local have = ns.ItemCount(n.id)
     if have > 0 and not item.mine then lines[#lines + 1] = string.format("|cff40ff40Tienes %d.|r", have) end
+    if #n.donors > 0 then
+      detail.infoHeader:SetText("Aportan")
+      detail.infoHeader:Show()
+      detail.info:ClearAllPoints()
+      detail.info:SetPoint("TOPLEFT", 12, -102)
+      detail.info:SetHeight(64)
+    end
     detail.info:SetText(table.concat(lines, "\n"))
     setWho(item.k, true, "Quién lo fabrica")
     if item.mine then
@@ -946,6 +998,11 @@ ns.UI.RegisterPage("market", function(page)
     local parts = { detail.icon, detail.title, detail.sub, detail.steps, detail.info, detail.whoLabel, detail.crafters,
       detail.b1, detail.b2, detail.b3, detail.x1, detail.x2, detail.x3 }
     for _, p in ipairs(parts) do p:SetShown(item ~= nil) end
+    detail.progress:Hide()
+    detail.infoHeader:Hide()
+    detail.info:ClearAllPoints()
+    detail.info:SetPoint("TOPLEFT", 12, -76)
+    detail.info:SetHeight(96)
     detail.empty:SetShown(item == nil)
     if not item then
       detail.empty:SetText(#list.items > 0 and "Pulsa una fila para ver el detalle." or "")
@@ -1130,9 +1187,12 @@ ns.UI.RegisterPage("market", function(page)
       it.child = nil
       if sideOf(it) == state.side and chipMatch(state.chip, it) and passes(it, m) then items[#items + 1] = it end
     end
-    sortItems(items, SORTS[m.sort] and SORTS[m.sort].id or "best")
+    local sortId = SORTS[m.sort] and SORTS[m.sort].id or "best"
+    sortItems(items, sortId)
     items = group(items)
-    list:SetItems(items)
+    local listed = items
+    if sortId == "best" then listed = page:Sections(items) end
+    list:SetItems(listed)
 
     -- Lo elegido: si ya no está en la lista, el primero.
     local selected
@@ -1181,6 +1241,42 @@ ns.UI.RegisterPage("market", function(page)
       page.emptyButton:SetText(button)
       page.emptyButton:SetScript("OnClick", fn)
     end
+  end
+
+  -- Reparte la lista en «Para la hermandad», «Puedes hacerlo» y «El resto» (cada parte en el orden
+  -- que traía). Los pedidos de dentro de un grupo abierto van con su grupo. Si todo cae en una
+  -- sola parte, sin títulos.
+  local function sectionOf(it)
+    if it.kind == "need" then return "need" end
+    if it.canServe or (it.pending or 0) > 0 then return "serve" end
+    if it.kind == "group" then
+      for _, c in ipairs(it.children) do
+        if c.canServe then return "serve" end
+      end
+    end
+    return "rest"
+  end
+  function page:Sections(items)
+    local buckets, last = { need = {}, serve = {}, rest = {} }, "rest"
+    for _, it in ipairs(items) do
+      local s = it.child and last or sectionOf(it)
+      if not it.child then last = s end
+      table.insert(buckets[s], it)
+    end
+    local used = 0
+    for _, s in ipairs(SECTIONS) do
+      if #buckets[s.id] > 0 then used = used + 1 end
+    end
+    if used < 2 then return items end
+    local out = {}
+    for _, s in ipairs(SECTIONS) do
+      local b = buckets[s.id]
+      if #b > 0 then
+        out[#out + 1] = { kind = "header", id = "hdr:" .. s.id, label = s.label }
+        for _, it in ipairs(b) do out[#out + 1] = it end
+      end
+    end
+    return out
   end
 
   function page:SetSide(side)
