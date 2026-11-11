@@ -278,7 +278,7 @@ function UI.Open(pageId, selectId, host)
   panel:ClearAllPoints()
   local pos = ns.db and ns.db.settings.panelPos
   if pos then
-    -- donde la dejó la última vez (sigue cerrándose con la ventana de hermandad)
+    -- donde la dejó la última vez
     panel.host = host and host:IsVisible() and host or nil
     panel:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
   elseif host and host:IsVisible() then
@@ -585,8 +585,15 @@ function UI.AttachHost(host)
     GameTooltip:Show()
   end)
   tab:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  -- Al cerrar la ventana de hermandad (J), la del addon se queda abierta donde estaba.
   host:HookScript("OnHide", function()
-    if panel and panel.host == host then panel:Hide() end
+    if not panel or panel.host ~= host then return end
+    panel.host = nil
+    local l, t = panel:GetLeft(), panel:GetTop()
+    if panel:IsShown() and l and t then
+      panel:ClearAllPoints()
+      panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    end
   end)
 end
 

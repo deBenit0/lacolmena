@@ -916,11 +916,200 @@ local function buildOffer(page)
   end
 end
 
+-- «Ofrecer fabricar»: tus recetas, con una casilla cada una (hasta 15). Las que no sabe hacer
+-- nadie más salen arriba. A la derecha, el precio y quién pone los materiales de la elegida.
+local CRAFT_PRICES = {
+  { label = "Gratis", copper = 0 },
+  { label = "50 plata", copper = 5000 },
+  { label = "1 oro", copper = 10000 },
+  { label = "5 oro", copper = 50000 },
+}
+local function buildCraftOffer(page)
+  local Offers = ns.Offers
+  local state = { search = "" }
+  page.search = W.Input(page, 180)
+  page.search:SetPoint("TOPLEFT", 8, -4)
+  W.Placeholder(page.search, "Buscar receta…")
+  page.search:HookScript("OnTextChanged", function(self)
+    state.search = (self:GetText() or ""):lower()
+    page:Refresh()
+  end)
+  local intro = W.Text(page, "GameFontHighlightSmall")
+  intro:SetPoint("LEFT", page.search, "RIGHT", 14, 0)
+  intro:SetText("Marca las recetas que quieres ofrecer fabricar: salen en «Se ofrece».")
+
+  local function toggle(line)
+    local ok, err
+    if Offers.MyCrafts()[line.key] then
+      ok, err = Offers.RemoveCraft(line.key)
+    else
+      ok, err = Offers.SetCraft(line.key, 0, false, ns.Now())
+    end
+    if not ok and err then ns.Print(err) end
+    state.selected = line.key
+    page:Refresh()
+  end
+
+  local list = W.List(page, 430, 368, {
+    rows = 8,
+    rowHeight = 44,
+    keyOf = function(line) return line.key end,
+    buildRow = function(row)
+      row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+      row.check:SetSize(24, 24)
+      row.check:SetPoint("LEFT", 2, 0)
+      row.check:SetScript("OnClick", function(self) toggle(self:GetParent().item) end)
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetSize(32, 32)
+      row.icon:SetPoint("LEFT", 30, 0)
+      row.title = W.ListText(row, "GameFontHighlight")
+      row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, -2)
+      row.title:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+      row.title:SetWordWrap(false)
+      row.sub = W.ListText(row, "GameFontHighlightSmall")
+      row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
+      row.sub:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+      row.sub:SetWordWrap(false)
+      W.KeyTooltip(row, function(self) return self.item and self.item.key end)
+    end,
+    updateRow = function(row, line)
+      local _, icon = ns.KeyInfo(line.key)
+      row.icon:SetTexture(icon or ns.QUESTION_ICON)
+      row.title:SetText(ns.KeyName(line.key))
+      row.check:SetChecked(line.offered)
+      local others = line.others == 0 and "|cff40ff40solo tú|r"
+        or string.format("|cffbbbbbblo hacen %d más|r", line.others)
+      local o = Offers.MyCrafts()[line.key]
+      row.sub:SetText(ns.ProfessionName(line.pk) .. " · " .. others
+        .. (o and (" · |cffffd100ofrecida|r " .. ns.UI.PriceText(o.g)) or ""))
+    end,
+    onSelect = function(line)
+      state.selected = line.key
+      page:Refresh()
+    end,
+  })
+  list:SetPoint("TOPLEFT", 0, -30)
+  page.list = list
+
+  -- Lado derecho: la receta elegida.
+  local side = W.Box(page, 350, 368)
+  side:SetPoint("TOPLEFT", list, "TOPRIGHT", 8, 0)
+  page.side = side
+  side.name = W.Text(side, "GameFontNormal")
+  side.name:SetPoint("TOPLEFT", 14, -14)
+  side.name:SetWidth(320)
+  side.name:SetWordWrap(false)
+  side.hint = W.Text(side, "GameFontHighlightSmall")
+  side.hint:SetPoint("TOPLEFT", 14, -36)
+  side.hint:SetWidth(320)
+  side.hint:SetJustifyV("TOP")
+  side.priceLabel = W.Text(side, "GameFontNormalSmall")
+  side.priceLabel:SetPoint("TOPLEFT", 14, -74)
+  side.priceLabel:SetText("Precio por fabricarlo")
+  side.prices = {}
+  local function current() return state.selected and Offers.MyCrafts()[state.selected] end
+  local function change(price, mats)
+    local o = current()
+    if not o then return end
+    if price == nil then price = o.g or 0 end
+    if mats == nil then mats = o.m == 1 end
+    Offers.SetCraft(state.selected, price, mats, o.t or ns.Now())
+    page:Refresh()
+  end
+  for i, p in ipairs(CRAFT_PRICES) do
+    local b = W.Button(side, p.label, 76, 22, function() change(p.copper, nil) end)
+    b:SetPoint("TOPLEFT", 12 + (i - 1) * 80, -90)
+    side.prices[i] = b
+  end
+  side.matsLabel = W.Text(side, "GameFontNormalSmall")
+  side.matsLabel:SetPoint("TOPLEFT", 14, -124)
+  side.matsLabel:SetText("Materiales")
+  side.mats = W.Button(side, "", 316, 22, function()
+    local o = current()
+    if o then change(nil, o.m ~= 1) end
+  end)
+  side.mats:SetPoint("TOPLEFT", 12, -140)
+  side.summary = W.Text(side, "GameFontHighlightSmall")
+  side.summary:SetPoint("TOPLEFT", 14, -186)
+  side.summary:SetWidth(320)
+  side.summary:SetJustifyV("TOP")
+  side.summary:SetSpacing(2)
+  side.renew = W.Button(side, "Renovar 30 días", 150, 22, function()
+    Offers.RenewCrafts(ns.Now())
+    ns.Print("tus recetas ofrecidas duran otros 30 días.")
+    page:Refresh()
+  end)
+  side.renew:SetPoint("BOTTOMLEFT", 12, 12)
+  side.market = W.Button(side, "Ver en el Mercado", 150, 22, function() ns.UI.OpenMarket("mine", "offer") end)
+  side.market:SetPoint("BOTTOMRIGHT", -12, 12)
+
+  page.empty = W.Text(page, "GameFontNormal", "CENTER")
+  page.empty:SetPoint("CENTER", list, "CENTER")
+  page.empty:SetWidth(380)
+  page.empty:SetTextColor(0.7, 0.7, 0.7)
+
+  function page:Refresh()
+    local c = ns.MyChar()
+    local index = Data.GetIndex()
+    local mineCrafts = Offers.MyCrafts()
+    local lines, seen, me = {}, {}, ns.Me()
+    for pk, prof in pairs(c and c.profs or {}) do
+      for k in pairs(prof.recipes or {}) do
+        if not seen[k] then
+          seen[k] = true
+          local name = ns.KeyName(k)
+          if state.search == "" or name:lower():find(state.search, 1, true) then
+            local others, names = 0, {}
+            for _, cr in ipairs(index[k] and index[k].crafters or {}) do
+              if cr.n ~= me and not names[cr.n] then
+                names[cr.n] = true
+                others = others + 1
+              end
+            end
+            lines[#lines + 1] = { key = k, pk = pk, name = name, others = others, offered = mineCrafts[k] ~= nil }
+          end
+        end
+      end
+    end
+    -- Las ofrecidas primero; luego las que sabe hacer menos gente; luego por nombre.
+    table.sort(lines, function(a, b)
+      if a.offered ~= b.offered then return a.offered end
+      if a.others ~= b.others then return a.others < b.others end
+      return a.name < b.name
+    end)
+    list.selectedKey = state.selected
+    list:SetItems(lines)
+    page.empty:SetShown(#lines == 0)
+    page.empty:SetText(state.search ~= "" and "Ninguna receta tuya con ese nombre."
+      or "Aún no se ha leído ninguna profesión tuya: abre su ventana una vez.")
+
+    local o = current()
+    side.name:SetText(state.selected and ns.KeyName(state.selected) or "Elige una receta")
+    side.hint:SetText(o and "|cff40ff40La ofreces.|r Quien la quiera te la pide desde el Mercado."
+      or (state.selected and "Márcala en la lista para ofrecerla." or "Pulsa una receta de la lista para ver sus opciones."))
+    for i, b in ipairs(side.prices) do
+      b:SetEnabled(o ~= nil)
+      local fs = b.GetFontString and b:GetFontString()
+      local on = o and (o.g or 0) == CRAFT_PRICES[i].copper
+      if on then b:LockHighlight() else b:UnlockHighlight() end
+      if fs then fs:SetTextColor(on and 1 or 1, on and 1 or 0.82, on and 1 or 0) end
+    end
+    side.mats:SetEnabled(o ~= nil)
+    side.mats:SetText(o and o.m == 1 and "Los pongo yo" or "Los pone quien lo pide")
+    local n = Offers.CountCrafts()
+    side.summary:SetText(string.format("Ofreces |cffffffff%d|r de %d recetas.\n", n, Offers.MAX_CRAFTS)
+      .. "Salen en «Se ofrece» del Mercado: una sola fila por objeto, con todos los que lo ofrecen.\n"
+      .. string.format("Duran %d días; «Renovar» vuelve a contarlos.", math.floor(Offers.CRAFT_TTL / 86400)))
+    side.renew:SetEnabled(n > 0)
+  end
+end
+
 -- Página «+ Pedir / + Ofrecer»: arriba se elige Materiales, Equipo u Ofrecer.
 local MODES = {
   { id = "materials", label = "Pedir materiales" },
   { id = "equipment", label = "Pedir equipo" },
   { id = "offer", label = "Ofrecer de tus bolsas" },
+  { id = "craft", label = "Ofrecer fabricar" },
 }
 ns.UI.RegisterPage("ask", function(page)
   page.back = W.Button(page, "< Mercado", 90, 22, function() ns.UI.ShowPage("market") end)
@@ -935,7 +1124,9 @@ ns.UI.RegisterPage("ask", function(page)
     f:SetPoint("BOTTOMRIGHT")
     f:SetSize(ns.UI.WIDTH - 32, ns.UI.HEIGHT - 120)
     f:Hide()
-    if m.id == "offer" then buildOffer(f) else buildCatalog(f, m.id) end
+    if m.id == "offer" then buildOffer(f)
+    elseif m.id == "craft" then buildCraftOffer(f)
+    else buildCatalog(f, m.id) end
     page.frames[m.id] = f
   end
   page.mode = "materials"
@@ -944,7 +1135,7 @@ ns.UI.RegisterPage("ask", function(page)
     if mode == "ask" then mode = page.lastAsk or "materials" end
     if not page.frames[mode] then mode = "materials" end
     page.mode = mode
-    if mode ~= "offer" then page.lastAsk = mode end
+    if mode ~= "offer" and mode ~= "craft" then page.lastAsk = mode end
     page:Refresh()
   end
 

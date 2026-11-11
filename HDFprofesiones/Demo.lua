@@ -292,8 +292,17 @@ local function buildEntry(name, pk, recipes, now, index)
   if pk == 333 then
     for _, id in ipairs(ENCHANTS) do enchants[#enchants + 1] = id end
   end
+  local class = CLASSES[(index % #CLASSES) + 1]
+  local tree = index % 3 + 1
+  local role = (index % 5 ~= 4) and ns.Dungeons.RoleFromTalents(class, { tree == 1 and 31 or 0,
+    tree == 2 and 31 or 0, tree == 3 and 31 or 0 }) or nil
   return {
-    n = full(name), v = now, c = CLASSES[(index % #CLASSES) + 1], l = 60, demo = true,
+    n = full(name), v = now, c = class, l = 60, demo = true, ro = role,
+    -- Algunos ofrecen fabricar sus primeras recetas (varios la misma: salen juntos).
+    fb = (index % 2 == 0 and items[1]) and {
+      ["i" .. items[1]] = { g = (index % 4 == 0) and 10000 or nil, m = (index % 3 == 0) and 1 or nil, t = now - index * 3600 },
+      [items[2] and ("i" .. items[2]) or ("i" .. items[1])] = { t = now - index * 7200 },
+    } or nil,
     u = (index % 7 == 3) or nil,
     p = { [pk] = {
       r = 300 - (index % 3) * 15, m = 300,

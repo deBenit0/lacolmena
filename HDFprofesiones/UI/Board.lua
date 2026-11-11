@@ -109,6 +109,18 @@ local function collect(seenAt)
     if item.new then stats.new = stats.new + 1 end
     items[#items + 1] = item
   end
+  -- Ofrezco fabricar: una fila por objeto con todos los que lo ofrecen.
+  for _, grp in ipairs(ns.Offers.CraftList(now)) do
+    local first = grp.crafters[1]
+    local item = {
+      kind = "craft", id = "f:" .. grp.key, k = grp.key, author = grp.mine and me or first.name, t = grp.t,
+      craft = grp, me = me, now = now, mine = grp.mine, pending = 0, karma = Data.KarmaFor(first.name),
+      new = not grp.mine and grp.t > (seenAt or 0),
+    }
+    if not grp.mine then stats.offers = stats.offers + 1 end
+    if item.new then stats.new = stats.new + 1 end
+    items[#items + 1] = item
+  end
   -- Pedidos de fabricación de hermandad hechos en la mesa de Blizzard (los cogen allí).
   for _, o in ipairs(ns.Orders.List(now)) do
     local mine = o.owner == me
@@ -214,7 +226,7 @@ local function createOfferDialog()
   W.KeyTooltip(d.itemButton, function() return d.id and ("i" .. d.id) end)
   d.itemName = W.Text(d, "GameFontHighlight")
   d.itemName:SetPoint("LEFT", d.itemButton, "RIGHT", 10, 0)
-  d.itemName:SetPoint("RIGHT", d, "RIGHT", -20, 0)
+  d.itemName:SetPoint("RIGHT", d, "TOPRIGHT", -20, -60)
   d.itemName:SetWordWrap(false)
   d.link = W.Input(d, 270)
   d.link.hdfLink = true
@@ -225,9 +237,25 @@ local function createOfferDialog()
     if id and id ~= d.id then d:SetItem(id) end
   end)
 
+  -- Qué se ofrece: lo que tengo o fabricarlo por encargo (si es una receta mía).
+  d.kindLabel = W.Text(d, "GameFontNormalSmall")
+  d.kindLabel:SetPoint("TOPLEFT", 24, -90)
+  d.kindLabel:SetText("Ofrecer:")
+  d.kindHave = W.Chip(d, "Lo que tengo", 110, function() d:SetKind("have") end)
+  d.kindHave:SetPoint("LEFT", d.kindLabel, "RIGHT", 10, 0)
+  d.kindCraft = W.Chip(d, "Fabricarlo por encargo", 170, function() d:SetKind("craft") end)
+  d.kindCraft:SetPoint("LEFT", d.kindHave, "RIGHT", 4, 0)
+  -- Materiales (solo al ofrecer fabricar).
+  d.mats = W.Button(d, "", 250, 22, function()
+    d.matsOn = not d.matsOn
+    d:SetKind(d.kind)
+  end)
+  d.mats:SetPoint("TOPLEFT", 24, -116)
+
   -- Cantidad con - y +.
   local qtyLabel = W.Text(d, "GameFontNormalSmall")
-  qtyLabel:SetPoint("TOPLEFT", 24, -94)
+  qtyLabel:SetPoint("TOPLEFT", 24, -120)
+  d.qtyLabel = qtyLabel
   qtyLabel:SetText("Cantidad")
   local function qtyValue() return math.max(1, tonumber(d.qty:GetText()) or 1) end
   d.minus = W.Button(d, "-", 24, 22, function() d.qty:SetText(tostring(math.max(1, qtyValue() - 1))) end)
@@ -243,7 +271,7 @@ local function createOfferDialog()
 
   -- Precio: gratis salvo que se cambie en "Más opciones".
   d.moreButton = W.Button(d, "Más opciones", 110, 20)
-  d.moreButton:SetPoint("TOPLEFT", 24, -124)
+  d.moreButton:SetPoint("TOPLEFT", 24, -150)
   d.summary = W.Text(d, "GameFontHighlightSmall")
   d.summary:SetPoint("LEFT", d.moreButton, "RIGHT", 10, 0)
   local more = CreateFrame("Frame", nil, d)
@@ -251,23 +279,24 @@ local function createOfferDialog()
   d.more = more
   function d:SetExpanded(expanded)
     more:SetShown(expanded)
-    self:SetHeight(expanded and 286 or 196)
+    self:SetHeight(expanded and 330 or 226)
     self.moreButton:SetText(expanded and "Menos opciones" or "Más opciones")
   end
   d.moreButton:SetScript("OnClick", function() d:SetExpanded(not more:IsShown()) end)
 
   local priceLabel = W.Text(more, "GameFontNormalSmall")
-  priceLabel:SetPoint("TOPLEFT", 24, -154)
+  d.priceLabel = priceLabel
+  priceLabel:SetPoint("TOPLEFT", 24, -180)
   priceLabel:SetText("Precio por unidad (se cobra con el correo)")
   d.prices = {}
   for i, p in ipairs(PRICES) do
     local b = W.Button(more, p.label, 76, 22)
-    if i == 1 then b:SetPoint("TOPLEFT", 24, -170) else b:SetPoint("LEFT", d.prices[i - 1], "RIGHT", 4, 0) end
+    if i == 1 then b:SetPoint("TOPLEFT", 24, -196) else b:SetPoint("LEFT", d.prices[i - 1], "RIGHT", 4, 0) end
     b:SetScript("OnClick", function() d:SetPrice(p.copper) end)
     d.prices[i] = b
   end
   local other = W.Text(more, "GameFontHighlightSmall")
-  other:SetPoint("TOPLEFT", 26, -204)
+  other:SetPoint("TOPLEFT", 26, -230)
   other:SetText("u otro:")
   d.gold = W.Input(more, 50, true)
   d.gold:SetPoint("LEFT", other, "RIGHT", 12, 0)
@@ -302,6 +331,25 @@ local function createOfferDialog()
   d.gold:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
   d.silver:HookScript("OnTextChanged", function() if not d.setting then d:MarkPrice() end end)
 
+  -- "have" = lo que tengo (cantidad); "craft" = fabricarlo por encargo (materiales).
+  function d:SetKind(kind)
+    local craftable = self.mode ~= "need" and self.id and ns.Offers.Knows("i" .. self.id)
+    if not craftable then kind = "have" end
+    self.kind = kind
+    for _, w in ipairs({ self.kindLabel, self.kindHave, self.kindCraft }) do w:SetShown(craftable and true or false) end
+    self.kindHave:SetOn(kind == "have")
+    self.kindCraft:SetOn(kind == "craft")
+    local craft = kind == "craft"
+    for _, w in ipairs({ self.qtyLabel, self.minus, self.qty, self.plus, self.have }) do w:SetShown(not craft) end
+    self.mats:SetShown(craft)
+    self.mats:SetText(self.matsOn and "Materiales: los pongo yo" or "Materiales: los pone quien lo pide")
+    self.priceLabel:SetText(craft and "Precio por fabricarlo" or "Precio por unidad (se cobra con el correo)")
+    if self.mode ~= "need" then
+      self.info:SetText(craft and "Sale en «Se ofrece»; quien lo quiera te lo pide y se lo fabricas."
+        or "Quien lo quiera te lo pide; se lo mandas por correo.")
+    end
+  end
+
   function d:SetItem(id)
     self.id = id
     local name, icon, link = ns.KeyInfo("i" .. id)
@@ -314,10 +362,12 @@ local function createOfferDialog()
     if (tonumber(self.qty:GetText()) or 0) < 1 then
       self.qty:SetText(tostring(self.mode == "need" and 20 or math.max(1, have)))
     end
+    self:SetKind(self.kind)
   end
 
   d.info = W.Text(d, "GameFontHighlightSmall")
-  d.info:SetPoint("BOTTOMLEFT", 24, 24)
+  d.info:SetPoint("BOTTOMLEFT", 24, 50)
+  d.info:SetWidth(330)
   d.info:SetTextColor(0.7, 0.7, 0.7)
   d.info:SetText("Quien lo quiera te lo pide; se lo mandas por correo.")
   local publish = W.Button(d, "Ofrecer", 96, 22, function() d:Publish() end)
@@ -330,6 +380,8 @@ local function createOfferDialog()
     local ok, err
     if self.mode == "need" then
       ok, err = ns.Social.AddNeed(self.id, tonumber(self.qty:GetText()), ns.Now())
+    elseif self.kind == "craft" then
+      ok, err = ns.Offers.SetCraft("i" .. tostring(self.id), self:Price(), self.matsOn, ns.Now())
     else
       ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
     end
@@ -340,6 +392,8 @@ local function createOfferDialog()
     self:Hide()
     if self.mode == "need" then
       ns.Print("añadido a lo que necesita la hermandad: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
+    elseif self.kind == "craft" then
+      ns.Print("ofreces fabricar %s: sale en «Se ofrece».", ns.KeyLabel("i" .. self.id))
     else
       ns.Print("ofrecido en el Mercado: %sx %s.", self.qty:GetText(), ns.KeyLabel("i" .. self.id))
     end
@@ -348,7 +402,9 @@ end
 
 -- Abre la ventana de ofrecer. Con "id", el objeto ya viene elegido (desde la profesión).
 -- mode = "need": la misma ventana para que un oficial añada lo que necesita la hermandad.
-function ns.UI.OpenOfferDialog(id, qty, mode)
+-- opts = { edit = cambiar una oferta mía, price, craft = ofrecer fabricarlo, mats }
+function ns.UI.OpenOfferDialog(id, qty, mode, opts)
+  opts = opts or {}
   if not ns.G() then
     ns.Print("no estás en ninguna hermandad.")
     return
@@ -362,17 +418,21 @@ function ns.UI.OpenOfferDialog(id, qty, mode)
   d.qty:SetText(qty and tostring(qty) or "")
   d.have:SetText("")
   d.iconTex:SetTexture(ns.QUESTION_ICON)
-  d:SetPrice(0)
-  d:SetExpanded(false)
+  d:SetPrice(opts.price or 0)
   d.mode = mode
   local need = mode == "need"
-  d.title:SetText(need and "Lo que necesita la hermandad" or "Ofrecer a la hermandad")
-  d.publishButton:SetText(need and "Añadir" or "Ofrecer")
-  d.moreButton:SetShown(not need)
-  d.summary:SetShown(not need)
+  -- El precio se ve siempre al ofrecer (antes estaba escondido en «Más opciones»).
+  d:SetExpanded(not need)
+  d.matsOn = opts.mats and true or false
+  -- Fabricar por encargo si lo piden, o si es una receta mía y no tengo ninguno.
+  d.kind = (opts.craft or (id and ns.ItemCount(id) == 0 and ns.Offers.Knows("i" .. id))) and "craft" or "have"
+  d.title:SetText(need and "Lo que necesita la hermandad" or (opts.edit and "Cambiar tu oferta" or "Ofrecer a la hermandad"))
+  d.publishButton:SetText(need and "Añadir" or (opts.edit and "Guardar" or "Ofrecer"))
+  d.moreButton:Hide()
+  d.summary:Hide()
   d.info:SetText(need and "Todos lo verán en Hermandad y podrán aportar por correo."
     or "Quien lo quiera te lo pide; se lo mandas por correo.")
-  if id then d:SetItem(id) end
+  if id then d:SetItem(id) else d:SetKind("have") end
   if need and not id then d.qty:SetText("") end
   d:Show()
 end

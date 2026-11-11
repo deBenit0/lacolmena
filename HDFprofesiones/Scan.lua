@@ -306,6 +306,54 @@ function Scan.Character()
   end
 end
 
+-- Puntos de talento en cada rama (nil si este cliente no los da o aún no hay ninguno).
+local function talentPoints()
+  if not GetNumTalentTabs then return nil end
+  local ok, n = pcall(GetNumTalentTabs)
+  n = ok and tonumber(n) or 0
+  if n < 1 then return nil end
+  local points, total = {}, 0
+  for tab = 1, n do
+    local p = 0
+    if GetNumTalents and GetTalentInfo then
+      local okN, num = pcall(GetNumTalents, tab)
+      for i = 1, (okN and tonumber(num) or 0) do
+        local okT, _, _, _, _, rank = pcall(GetTalentInfo, tab, i)
+        if okT and tonumber(rank) then p = p + tonumber(rank) end
+      end
+    end
+    if p == 0 and GetTalentTabInfo then
+      -- Clásico: nombre, icono, puntos...; clientes más nuevos: id, nombre, descripción, icono, puntos...
+      local okI, _, _, third, _, fifth = pcall(GetTalentTabInfo, tab)
+      if okI then p = (type(third) == "number" and third) or (type(fifth) == "number" and fifth) or 0 end
+    end
+    points[tab] = p
+    total = total + p
+  end
+  return total > 0 and points or nil
+end
+Scan.TalentPoints = talentPoints
+
+-- Mi rol según los talentos (si no se puede saber, según la especialización del cliente).
+local SPEC_ROLES = { TANK = 1, HEALER = 2, DAMAGER = 4 }
+function Scan.Role()
+  local c = ns.MyChar()
+  if not c then return end
+  local _, class = UnitClass("player")
+  local role = ns.Dungeons.RoleFromTalents(class, talentPoints())
+  if not role and GetSpecialization and GetSpecializationRole then
+    local ok, spec = pcall(GetSpecialization)
+    if ok and spec then
+      local ok2, r = pcall(GetSpecializationRole, spec)
+      role = ok2 and SPEC_ROLES[r] or nil
+    end
+  end
+  if c.roleAuto ~= role then
+    c.roleAuto = role
+    mineChanged()
+  end
+end
+
 ---------------------------------------------------------------------------
 -- Banco (solo se puede leer con el banco abierto: guardamos una foto)
 ---------------------------------------------------------------------------
@@ -405,6 +453,9 @@ ns.On("CRAFT_SHOW", function() ns.After(0.5, Scan.Craft) end)
 ns.On("CRAFT_UPDATE", function() ns.Coalesce("scanCraft", 1, Scan.Craft) end)
 ns.On("SKILL_LINES_CHANGED", function() ns.Coalesce("skillLines", 2, Scan.SkillLines) end)
 ns.On("PLAYER_LEVEL_UP", function() ns.After(1, Scan.Character) end)
+for _, event in ipairs({ "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "ACTIVE_TALENT_GROUP_CHANGED" }) do
+  ns.On(event, function() ns.Coalesce("role", 2, Scan.Role) end)
+end
 ns.On("BANKFRAME_OPENED", function()
   bankOpen = true
   ns.After(0.5, Scan.Bank)
@@ -418,4 +469,5 @@ ns.On("BAG_UPDATE_DELAYED", function() ns.Fire("BAGS_CHANGED") end)
 ns.Listen("LOGIN", function()
   Scan.Character()
   ns.After(5, Scan.SkillLines)
+  ns.After(6, Scan.Role)
 end)

@@ -50,6 +50,8 @@ local PROF_FILTER = { 164, 165, 197, 171, 202, 333, 185, 186, 393, 182 }
 local COIN_ICON = "Interface\\Icons\\INV_Misc_Coin_01"
 -- Etiquetas de las filas (de izquierda a derecha).
 local TAGS = {
+  { icon = "Interface\\Icons\\Trade_BlackSmithing", title = "Ofrecen fabricarlo",
+    text = "Lo hacen por encargo: pídeselo.", test = function(it) return it.kind == "craft" end },
   { icon = "Interface\\GossipFrame\\TabardGossipIcon", title = "Pedido de la hermandad",
     text = "Lo ha puesto un oficial y pueden aportar varios.", test = function(it) return it.kind == "need" end },
   { icon = "Interface\\GossipFrame\\AvailableQuestIcon", title = "Prioridad",
@@ -231,7 +233,8 @@ ns.UI.RegisterPage("market", function(page)
     if id then ns.UI.AskFor("i" .. id) end
   end)
   ns.UI.Tip(page.addAsk, "+ Pedir", "Elige qué pedir en el catálogo, o arrastra aquí un objeto de tus bolsas.")
-  ns.UI.Tip(page.addOffer, "+ Ofrecer", "Elige qué ofrecer de tus bolsas, o arrastra aquí el objeto.")
+  ns.UI.Tip(page.addOffer, "+ Ofrecer", "Elige qué ofrecer de tus bolsas (o arrastra aquí el objeto), o qué recetas "
+    .. "tuyas ofreces fabricar.")
 
   -----------------------------------------------------------------------
   -- Fila 2: filtros rápidos, «Filtros ▾» y ordenar.
@@ -302,6 +305,15 @@ ns.UI.RegisterPage("market", function(page)
         parts[#parts + 1] = "|cffff9933todo pedido|r"
       end
       if item.mine then parts[#parts + 1] = expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) end
+    elseif item.kind == "craft" then
+      local cr, names, cheapest = item.craft.crafters, {}, nil
+      for i = 1, math.min(2, #cr) do names[i] = cr[i].name == item.me and "|cffffd100tú|r" or ns.WhoColored(cr[i].name) end
+      for _, c in ipairs(cr) do
+        if not cheapest or (c.g or 0) < cheapest then cheapest = c.g or 0 end
+      end
+      parts = { "lo fabrica" .. (#cr > 1 and "n " or " ") .. table.concat(names, ", ")
+        .. (#cr > 2 and string.format(" y %d más", #cr - 2) or ""), ns.UI.PriceText(cheapest) }
+      if item.mine then parts[#parts + 1] = expiresText((item.craft.myT or 0) + ns.Offers.CRAFT_TTL, now) end
     elseif item.kind == "need" then
       local n = item.need
       parts[#parts + 1] = string.format("aportado %d de %d", n.given, n.q)
@@ -483,12 +495,54 @@ ns.UI.RegisterPage("market", function(page)
     fbox.profs[i] = b
   end
   label("Equipo", -122)
+  -- Ranuras: se pueden marcar varias a la vez (como el filtro de la ventana de profesión).
+  -- m.slots = nil son todas; si no, las marcadas.
   fbox.slot = W.Button(fbox, "", 140, 22, function()
-    local m = settings()
-    m.slot = m.slot % #SLOTS + 1
+    state.slotMenu = true
     page:Refresh()
   end)
   fbox.slot:SetPoint("TOPLEFT", 10, -136)
+  -- Ocupa el sitio del cuadro de filtros mientras se eligen (así no tapa nada); «‹ Volver» regresa.
+  local menu = W.Box(page, LIST_W, 196)
+  menu:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
+  menu:SetFrameLevel(list:GetFrameLevel() + 12)
+  if menu.SetBackdropColor then menu:SetBackdropColor(0.05, 0.045, 0.04, 0.98) end
+  menu:Hide()
+  fbox.slotMenu = menu
+  local function setAll(on)
+    settings().slots = (not on) and {} or nil
+    page:Refresh()
+  end
+  menu.all = W.Button(menu, "Marcar todo", 136, 20, function() setAll(true) end)
+  menu.all:SetPoint("TOPLEFT", 10, -8)
+  menu.none = W.Button(menu, "Desmarcar todo", 136, 20, function() setAll(false) end)
+  menu.none:SetPoint("LEFT", menu.all, "RIGHT", 6, 0)
+  menu.back = W.Button(menu, "‹ Volver", 90, 20, function()
+    state.slotMenu = nil
+    page:Refresh()
+  end)
+  menu.back:SetPoint("TOPRIGHT", -8, -8)
+  menu.checks = {}
+  for i = 2, #SLOTS do
+    local s = SLOTS[i]
+    local n = i - 2
+    local cb = W.Check(menu, s.label, function(on)
+      local m = settings()
+      local set = m.slots
+      if not set then
+        set = {}
+        for j = 2, #SLOTS do set[SLOTS[j].id] = true end
+      end
+      set[s.id] = on or nil
+      local all = true
+      for j = 2, #SLOTS do if not set[SLOTS[j].id] then all = false end end
+      m.slots = (not all) and set or nil
+      page:Refresh()
+    end)
+    cb:SetPoint("TOPLEFT", 8 + math.floor(n / 5) * 146, -36 - (n % 5) * 22)
+    cb.slotId = s.id
+    menu.checks[#menu.checks + 1] = cb
+  end
   fbox.armor = W.Button(fbox, "", 130, 22, function()
     local m = settings()
     m.armor = m.armor % #ARMOR + 1
@@ -506,6 +560,7 @@ ns.UI.RegisterPage("market", function(page)
   fbox.clear = W.Button(fbox, "Quitar filtros", 100, 20, function()
     local m = settings()
     m.type, m.armor, m.slot, m.prof, m.myLevel, m.tip, m.rush = 1, 1, 1, nil, nil, nil, nil
+    m.slots = nil
     state.ended = nil
     page:Refresh()
   end)
@@ -749,7 +804,9 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.b2, "Quitar oferta", true, function()
         W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
       end)
-      setButton(detail.b3, nil)
+      setButton(detail.b3, "Editar", true, function()
+        ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g })
+      end, "Cambiar la cantidad o el precio.")
     elseif item.claimed then
       setButton(detail.b1, "Ya no lo quiero", true, function() ns.Offers.Unclaim(o.key) end)
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
@@ -766,6 +823,63 @@ ns.UI.RegisterPage("market", function(page)
         end
       end)
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
+      setButton(detail.b3, nil)
+    end
+    setButton(detail.x1, nil)
+    setButton(detail.x2, nil)
+    setButton(detail.x3, nil)
+  end
+
+  -- Ofrecen fabricarlo (una fila con todos los que lo ofrecen).
+  local function showCraft(item)
+    local grp, me, now = item.craft, ns.Me(), ns.Now()
+    local _, _, link = ns.KeyInfo(item.k)
+    detail.title:SetText(link or ns.KeyName(item.k))
+    local n = #grp.crafters
+    detail.sub:SetText(n == 1 and ("ofrece fabricarlo " .. ns.WhoColored(grp.crafters[1].name))
+      or string.format("ofrecen fabricarlo |cffffffff%d|r personas", n))
+    detail.steps:SetText(grp.mine and (expiresText((grp.myT or 0) + ns.Offers.CRAFT_TTL, now) or "")
+      or "Pídeselo y te lo fabrican.")
+    local lines = {}
+    for i = 1, math.min(4, n) do
+      local c = grp.crafters[i]
+      local who = c.name == me and "|cffffd100Tú|r" or ns.WhoColored(c.name)
+      lines[#lines + 1] = string.format("%s: %s · %s", who, ns.UI.PriceText(c.g),
+        c.m and "pone los materiales" or "|cffbbbbbbmateriales de quien lo pide|r")
+    end
+    if n > 4 then lines[#lines + 1] = string.format("|cffbbbbbby %d más|r", n - 4) end
+    detail.info:SetText(table.concat(lines, "\n"))
+    local offering, rows = {}, {}
+    for _, c in ipairs(grp.crafters) do offering[c.name] = true end
+    for _, r in ipairs(ns.UI.CrafterRows and ns.UI.CrafterRows(item.k) or {}) do
+      if offering[r.name] then rows[#rows + 1] = r end
+    end
+    detail.whoLabel:SetText("Quién lo ofrece")
+    detail.crafters:SetItems(rows)
+    detail.whoLabel:Show()
+    detail.crafters:Show()
+    if grp.mine then
+      setButton(detail.b1, "Renovar 30 días", true, function()
+        ns.Offers.RenewCrafts(ns.Now())
+        ns.Print("tus recetas ofrecidas duran otros 30 días.")
+      end)
+      setButton(detail.b2, "Dejar de ofrecer", true, function() ns.Offers.RemoveCraft(item.k) end)
+      setButton(detail.b3, "Editar", true, function()
+        local kind, id = ns.ParseKey(item.k)
+        local o = ns.Offers.MyCrafts()[item.k]
+        if kind == "i" and o then
+          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1 })
+        else
+          ns.UI.OpenAsk("craft")
+        end
+      end, "Cambiar el precio o quién pone los materiales.")
+    else
+      setButton(detail.b1, "Pedírselo", true, function()
+        ns.UI.OpenRequestDialog({ k = item.k, pk = Data.SingleProfession(item.k), q = 1 })
+      end)
+      local first = grp.crafters[1]
+      setButton(detail.b2, "Susurrar", true, function() ns.SendTell(first.name) end,
+        "Susurrar a " .. ns.ShortName(first.name) .. ".")
       setButton(detail.b3, nil)
     end
     setButton(detail.x1, nil)
@@ -840,6 +954,7 @@ ns.UI.RegisterPage("market", function(page)
     local _, icon = ns.KeyInfo(item.k)
     detail.iconTex:SetTexture(icon)
     if item.kind == "offer" then showOffer(item)
+    elseif item.kind == "craft" then showCraft(item)
     elseif item.kind == "need" then showNeed(item)
     elseif item.kind == "co" then showOrder(item)
     else showRequest(item) end
@@ -864,13 +979,13 @@ ns.UI.RegisterPage("market", function(page)
       local rec = Data.GetIndex()[item.k]
       if not (rec and rec.profs and rec.profs[m.prof]) then return false end
     end
-    local slot, armor = SLOTS[m.slot] and SLOTS[m.slot].id, ARMOR[m.armor] and ARMOR[m.armor].id
-    if slot or armor or m.myLevel then
+    local slots, armor = m.slots, ARMOR[m.armor] and ARMOR[m.armor].id
+    if slots or armor or m.myLevel then
       local kind, id = ns.ParseKey(item.k)
       if kind ~= "i" then return false end
-      if slot then
+      if slots then
         local _, label = ns.UI.GearGroup(item.k)
-        if label ~= slot then return false end
+        if not (label and slots[label]) then return false end
       end
       if armor then
         local _, classID, subclassID = ns.ItemInstant(id)
@@ -951,7 +1066,7 @@ ns.UI.RegisterPage("market", function(page)
   end
 
   local function sideOf(item)
-    return item.kind == "offer" and "offer" or "want"
+    return (item.kind == "offer" or item.kind == "craft") and "offer" or "want"
   end
 
   function page:Refresh()
@@ -983,16 +1098,27 @@ ns.UI.RegisterPage("market", function(page)
       b:SetText(c.label .. " |cffffffff" .. (chipCounts[c.id] or 0) .. "|r")
       b:SetOn(state.chip == c.id)
     end
-    local active = (m.type ~= 1 or m.armor ~= 1 or m.slot ~= 1 or m.prof or m.myLevel or m.tip or m.rush or state.ended)
+    local active = (m.type ~= 1 or m.armor ~= 1 or m.slots ~= nil or m.prof or m.myLevel or m.tip or m.rush or state.ended)
     page.filtersButton:SetText(active and "Filtros » |cff40ff40•|r" or "Filtros »")
     page.filtersButton:SetOn(state.showFilters)
     page.sortButton:SetText(SORTS[m.sort] and SORTS[m.sort].label or SORTS[1].label)
 
     -- Filtros ▾
-    fbox:SetShown(state.showFilters)
+    if not state.showFilters then state.slotMenu = nil end
+    fbox:SetShown(state.showFilters and not state.slotMenu)
+    fbox.slotMenu:SetShown(state.showFilters and state.slotMenu == true)
     for i, b in ipairs(fbox.types) do b:SetOn(m.type == i) end
     for _, b in ipairs(fbox.profs) do b.tex:SetDesaturated(m.prof ~= nil and m.prof ~= b.pk) end
-    fbox.slot:SetText(SLOTS[m.slot].label)
+    local nSlots, oneLabel = 0, nil
+    for i = 2, #SLOTS do
+      if m.slots and m.slots[SLOTS[i].id] then
+        nSlots = nSlots + 1
+        oneLabel = SLOTS[i].label
+      end
+    end
+    fbox.slot:SetText(not m.slots and "Ranuras: todas" or nSlots == 1 and oneLabel
+      or string.format("Ranuras: %d", nSlots))
+    for _, cb in ipairs(fbox.slotMenu.checks) do cb:SetChecked(not m.slots or m.slots[cb.slotId] == true) end
     fbox.armor:SetText(ARMOR[m.armor].label)
     fbox.level:SetChecked(m.myLevel and true or false)
     fbox.tip:SetChecked(m.tip and true or false)

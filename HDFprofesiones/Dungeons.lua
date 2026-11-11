@@ -29,6 +29,60 @@ Dungeons.CLASS_ROLES = {
   HUNTER = 4, ROGUE = 4, MAGE = 4, WARLOCK = 4,
 }
 
+-- Rol de cada personaje, para el recuento de la Hermandad. Sale de la rama de talentos con más
+-- puntos (ramas en el orden del juego); las clases que solo pueden ser DPS lo son siempre.
+Dungeons.TALENT_ROLES = {
+  WARRIOR = { 4, 4, 1 }, PALADIN = { 2, 1, 4 }, PRIEST = { 2, 2, 4 },
+  SHAMAN = { 4, 4, 2 }, DRUID = { 4, 4, 2 },
+}
+function Dungeons.RoleFromTalents(class, points)
+  if Dungeons.CLASS_ROLES[class] == Dungeons.DPS then return Dungeons.DPS end
+  local map = Dungeons.TALENT_ROLES[class]
+  if not map or type(points) ~= "table" then return nil end
+  local best, bestPoints = nil, 0
+  for i, role in ipairs(map) do
+    local p = tonumber(points[i]) or 0
+    if p > bestPoints then best, bestPoints = role, p end
+  end
+  return best
+end
+
+-- Rol válido (1 tanque, 2 sanador, 4 DPS) o nil.
+function Dungeons.CleanRole(role)
+  role = tonumber(role)
+  if role == 1 or role == 2 or role == 4 then return role end
+  return nil
+end
+
+function Dungeons.RoleLabel(role, plural)
+  for _, r in ipairs(Dungeons.ROLES) do
+    if r.bit == role then return plural and r.plural or r.label end
+  end
+  return nil
+end
+
+-- Cuántos tanques, sanadores y DPS hay: cada personaje cuenta aparte (también los alts), desde
+-- el nivel 10 (antes no hay talentos). Los que tienen el addon dicen su rol; del resto, las clases
+-- que solo pueden ser DPS cuentan como DPS y las demás quedan «sin saber».
+Dungeons.ROLE_MIN_LEVEL = 10
+function Dungeons.RoleCounts(entries, roster)
+  local out = { [1] = 0, [2] = 0, [4] = 0, unknown = 0 }
+  local seen = {}
+  local function add(name, role, level, class)
+    if seen[name] then return end
+    seen[name] = true
+    if (tonumber(level) or 0) < Dungeons.ROLE_MIN_LEVEL then return end
+    role = Dungeons.CleanRole(role) or (Dungeons.CLASS_ROLES[class] == Dungeons.DPS and Dungeons.DPS) or nil
+    if role then out[role] = out[role] + 1 else out.unknown = out.unknown + 1 end
+  end
+  for name, e in pairs(entries or {}) do
+    local r = roster and roster[name]
+    add(name, e.ro, (r and r.level) or e.l, e.c or (r and r.class))
+  end
+  for name, r in pairs(roster or {}) do add(name, nil, r.level, r.class) end
+  return out
+end
+
 -- Mazmorras con su rango de niveles recomendado, ordenadas por nivel. Cada una tiene un
 -- número fijo (id) que es lo que se guarda y se envía: no cambiarlos nunca.
 -- Las de WoW Forever (new = true) usan nombres en español provisionales.
