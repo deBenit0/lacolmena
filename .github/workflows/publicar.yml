@@ -32,6 +32,7 @@ jobs:
           echo "tag=v$v" >> "$GITHUB_OUTPUT"
 
       - name: Crear la release (o completarla)
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -46,6 +47,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "La release $TAG ya existe: le pongo el ZIP para WowUp y el release.json."
             gh release upload "$TAG" "$ZIP" release.json --clobber
+            echo "nueva=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           cat > notas.md <<'NOTAS'
@@ -67,12 +69,14 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Los hijos del Fundillo $TAG" \
             --notes-file notas.md
+          echo "nueva=si" >> "$GITHUB_OUTPUT"
 
       # CurseForge (opcional): solo si el repositorio tiene el secreto CF_API_KEY y la variable
       # CF_PROJECT_ID (Settings → Secrets and variables → Actions). Sube el mismo ZIP marcado
-      # para WoW Forever. Si la versión ya está subida, CurseForge la rechaza y no pasa nada.
+      # para WoW Forever. Solo cuando se crea la release (una vez por versión).
       - name: Subir a CurseForge
-        if: ${{ env.CF_API_KEY != '' && vars.CF_PROJECT_ID != '' }}
+        # Solo con una versión nueva: si se vuelve a lanzar a mano, no se sube repetida.
+        if: ${{ env.CF_API_KEY != '' && vars.CF_PROJECT_ID != '' && steps.release.outputs.nueva == 'si' }}
         continue-on-error: true
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
