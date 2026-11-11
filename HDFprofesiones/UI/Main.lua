@@ -53,16 +53,9 @@ function UI.RegisterPage(id, create)
   UI.pages[id] = create
 end
 
+-- La pestaña activa se une al contenido (relleno dorado oscuro y letras blancas).
 local function setActive(b, active)
-  local fs = b.GetFontString and b:GetFontString()
-  -- La activa se queda con el brillo encendido (no gris, que parece bloqueada).
-  if active then
-    b:LockHighlight()
-    if fs then fs:SetTextColor(1, 1, 1) end
-  else
-    b:UnlockHighlight()
-    if fs then fs:SetTextColor(1, 0.82, 0) end
-  end
+  b:SetOn(active)
 end
 
 local function tip(frame, title, text)
@@ -157,31 +150,32 @@ local function createPanel()
   panel.logo:SetSize(14, 28)
   panel.logo:SetPoint("TOPLEFT", 20, -9)
   panel.logo:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
-  panel.title = W.Text(panel, "GameFontNormal")
-  panel.title:SetPoint("TOPLEFT", 40, -18)
+  panel.title = W.Text(panel, "GameFontNormalLarge")
+  panel.title:SetPoint("TOPLEFT", 40, -16)
   panel.motto = W.Text(panel, "GameFontNormal", "RIGHT")
-  panel.motto:SetPoint("TOPRIGHT", -62, -18)
+  panel.motto:SetPoint("TOPRIGHT", -66, -18)
   panel.motto:SetTextColor(1, 0.45, 0.1)
   panel.motto:SetText("\194\171" .. ns.MOTTO .. "\194\187")
-  local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
+  local close = W.CloseButton(panel)
+  close:SetPoint("TOPRIGHT", -12, -12)
+  panel.close = close
   local shrink = W.Button(panel, "_", 22, 20, function() UI.SetMini(true) end)
-  shrink:SetPoint("RIGHT", close, "LEFT", 2, 0)
+  shrink:SetPoint("RIGHT", close, "LEFT", -4, 0)
   tip(shrink, "Encoger", "Deja solo una tira pequeña con tus avisos. Púlsala para volver.")
   panel.shrink = shrink
 
   -- Pestañas (Inicio, Mercado, Agenda, Hermandad) y la rueda de Opciones.
   panel.sections = {}
   for i, s in ipairs(SECTIONS) do
-    local b = W.Button(panel, s.label, 124, 26, function() UI.ShowPage(s.page) end)
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 128, -40)
+    local b = W.Tab(panel, W.Upper(s.label), 124, 30, function() UI.ShowPage(s.page) end)
+    b:SetPoint("TOPLEFT", 16 + (i - 1) * 128, -40)
     b.badge = UI.Badge(b)
     b.badge:SetPoint("TOPRIGHT", 4, 6)
     panel.sections[s.id] = b
   end
   local gear = CreateFrame("Button", nil, panel)
   gear:SetSize(26, 26)
-  gear:SetPoint("TOPRIGHT", -24, -40)
+  gear:SetPoint("TOPRIGHT", -18, -41)
   local gearIcon = gear:CreateTexture(nil, "ARTWORK")
   gearIcon:SetAllPoints()
   gearIcon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
@@ -190,10 +184,10 @@ local function createPanel()
   tip(gear, "Opciones", "Tu personaje, los avisos y lo demás.")
   panel.gear = gear
   local line = panel:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(1, 0.82, 0, 0.35)
+  line:SetColorTexture(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 1)
   line:SetHeight(1)
-  line:SetPoint("TOPLEFT", 20, -70)
-  line:SetPoint("TOPRIGHT", -20, -70)
+  line:SetPoint("TOPLEFT", 16, -70)
+  line:SetPoint("TOPRIGHT", -16, -70)
 
   panel.content = CreateFrame("Frame", nil, panel)
   panel.content:SetPoint("TOPLEFT", 16, -76)
@@ -229,7 +223,7 @@ end
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
   UI.UpdateBadges()
-  panel.title:SetText(ns.TITLE .. "  |cff999999v" .. ns.VERSION .. "|r"
+  panel.title:SetText(W.Upper(ns.TITLE) .. "  |cff999999v" .. ns.VERSION .. "|r"
     .. (ns.db and ns.db.settings.demo and "  |cffff8040(DEMOSTRACIÓN)|r" or ""))
   local inGuild = ns.G() ~= nil
   local free = UI.current == "home" or UI.current == "mine"
@@ -278,7 +272,7 @@ function UI.Open(pageId, selectId, host)
   panel:ClearAllPoints()
   local pos = ns.db and ns.db.settings.panelPos
   if pos then
-    -- donde la dejó la última vez (sigue cerrándose con la ventana de hermandad)
+    -- donde la dejó la última vez
     panel.host = host and host:IsVisible() and host or nil
     panel:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
   elseif host and host:IsVisible() then
@@ -348,14 +342,9 @@ local function createMini()
   mini:SetMovable(true)
   mini:RegisterForDrag("LeftButton")
   if mini.SetBackdrop then
-    mini:SetBackdrop({
-      bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-      tile = true, tileSize = 16, edgeSize = 14,
-      insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    mini:SetBackdropColor(0.05, 0.045, 0.04, 0.95)
-    mini:SetBackdropBorderColor(1, 0.82, 0, 0.8)
+    mini:SetBackdrop(W.BOX_BACKDROP)
+    mini:SetBackdropColor(W.COLORS.BG[1], W.COLORS.BG[2], W.COLORS.BG[3], 0.96)
+    mini:SetBackdropBorderColor(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 1)
   end
   -- El icono del addon: vuelve a la ventana entera donde estabas.
   local icon = mini:CreateTexture(nil, "ARTWORK")
@@ -585,8 +574,15 @@ function UI.AttachHost(host)
     GameTooltip:Show()
   end)
   tab:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  -- Al cerrar la ventana de hermandad (J), la del addon se queda abierta donde estaba.
   host:HookScript("OnHide", function()
-    if panel and panel.host == host then panel:Hide() end
+    if not panel or panel.host ~= host then return end
+    panel.host = nil
+    local l, t = panel:GetLeft(), panel:GetTop()
+    if panel:IsShown() and l and t then
+      panel:ClearAllPoints()
+      panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    end
   end)
 end
 

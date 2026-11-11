@@ -193,8 +193,8 @@ local function createDialog()
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
   title:SetText("Proponer quedada")
-  local close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
+  local close = W.CloseButton(dialog)
+  close:SetPoint("TOPRIGHT", -10, -10)
 
   -- Mazmorra: botón con menú desplegable.
   local dLabel = W.Text(dialog, "GameFontNormalSmall")
@@ -506,6 +506,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   local list = W.List(page, 430, 368, {
     rows = 5,
     rowHeight = 70,
+    card = true,
     keyOf = function(item) return item.r.id end,
     buildRow = function(row)
       row.icon = row:CreateTexture(nil, "ARTWORK")

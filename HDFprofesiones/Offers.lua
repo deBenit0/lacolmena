@@ -17,6 +17,31 @@ Offers.MAX_OFFERS = 20
 
 local floor, max, min = math.floor, math.max, math.min
 
+-- Ofrecer fabricar: cada uno marca unas pocas recetas suyas y salen en «Se ofrece», una sola fila
+-- por objeto con todos los que lo ofrecen (así no se llena de ofertas repetidas). En la ficha:
+--   fb = { [receta "i123"/"e456"] = { g = precio en cobre, m = 1 si pone él los materiales, t = cuándo } }
+Offers.CRAFT_TTL = 30 * 86400 -- se renuevan con un clic
+Offers.MAX_CRAFTS = 15
+
+local function cleanCrafts(fb)
+  if type(fb) ~= "table" then return nil end
+  local out, n = {}, 0
+  for k, o in pairs(fb) do
+    if n >= Offers.MAX_CRAFTS then break end
+    if type(k) == "string" and k:match("^[ie]%d+$") and type(o) == "table" then
+      local g = tonumber(o.g)
+      out[k] = { g = (g and g > 0) and floor(g) or nil, m = (o.m == 1) and 1 or nil, t = tonumber(o.t) or 0 }
+      n = n + 1
+    end
+  end
+  return n > 0 and out or nil
+end
+
+local function publish()
+  ns.Sync.PublishMine()
+  ns.Fire("DATA_CHANGED", "offer")
+end
+
 local function key(owner, id)
   return owner .. ":" .. id
 end
@@ -31,6 +56,7 @@ end
 -- Validación (para la ficha)
 ---------------------------------------------------------------------------
 function Offers.SanitizeInto(out, e)
+  out.fb = cleanCrafts(e.fb)
   if type(e.of) == "table" then
     local of, any = {}, false
     for id, o in pairs(e.of) do
@@ -82,7 +108,16 @@ local function mine()
   c.offers = c.offers or {}
   c.claims = c.claims or {}
   c.sent = c.sent or {}
+  c.crafts = c.crafts or {}
   return c
+end
+
+-- ¿Sé todavía hacer esta receta?
+local function knows(c, k)
+  for _, prof in pairs(c.profs or {}) do
+    if prof.recipes and prof.recipes[k] then return true end
+  end
+  return false
 end
 
 -- Enviado por "owner" a "who" de un objeto (lo que dice la ficha del dueño).
@@ -139,6 +174,16 @@ function Offers.BuildInto(e, now)
     if not next(items) then c.sent[who] = nil end
   end
   if next(od) then e.od = od end
+  local fb, n = {}, 0
+  for k, o in pairs(c.crafts) do
+    if now <= (o.t or 0) + Offers.CRAFT_TTL and knows(c, k) and n < Offers.MAX_CRAFTS then
+      fb[k] = { g = o.g, m = o.m, t = o.t }
+      n = n + 1
+    else
+      c.crafts[k] = nil
+    end
+  end
+  if n > 0 then e.fb = fb end
 end
 
 ---------------------------------------------------------------------------
@@ -190,6 +235,91 @@ function Offers.List(now)
   return list
 end
 
+-- Recetas que se ofrecen fabricar, juntas por objeto:
+--   { key, t (la más reciente), mine, crafters = { { name, g, m, t } } (en línea y baratos primero) }
+function Offers.CraftList(now)
+  local g, me, groups, list = ns.G(), ns.Me(), {}, {}
+  if not g then return list end
+  for owner, e in pairs(g.entries) do
+    local fb = e.fb
+    if owner == me then
+      local c = mine()
+      fb = c and c.crafts
+    end
+    for k, o in pairs(fb or {}) do
+      if now <= (o.t or 0) + Offers.CRAFT_TTL then
+        local grp = groups[k]
+        if not grp then
+          grp = { key = k, crafters = {}, t = 0 }
+          groups[k] = grp
+          list[#list + 1] = grp
+        end
+        grp.crafters[#grp.crafters + 1] = { name = owner, g = o.g, m = o.m, t = o.t or 0 }
+        if (o.t or 0) > grp.t then grp.t = o.t or 0 end
+        if owner == me then grp.mine, grp.myT = true, o.t or 0 end
+      end
+    end
+  end
+  for _, grp in ipairs(list) do
+    table.sort(grp.crafters, function(a, b)
+      local ao, bo = ns.Guild.IsOnline(a.name) and 1 or 0, ns.Guild.IsOnline(b.name) and 1 or 0
+      if ao ~= bo then return ao > bo end
+      if (a.g or 0) ~= (b.g or 0) then return (a.g or 0) < (b.g or 0) end
+      return a.name < b.name
+    end)
+  end
+  return list
+end
+
+function Offers.Knows(k)
+  local c = mine()
+  return c and knows(c, k) or false
+end
+
+function Offers.MyCrafts()
+  local c = mine()
+  return c and c.crafts or {}
+end
+
+function Offers.CountCrafts()
+  local n = 0
+  for _ in pairs(Offers.MyCrafts()) do n = n + 1 end
+  return n
+end
+
+-- Ofrecer fabricar una receta mía (o cambiar su precio y quién pone los materiales).
+function Offers.SetCraft(k, price, mats, now)
+  local c = mine()
+  if not c or not ns.G() then return nil, "No estás en una hermandad." end
+  if type(k) ~= "string" or not k:match("^[ie]%d+$") or not knows(c, k) then
+    return nil, "No conozco esa receta tuya."
+  end
+  if not c.crafts[k] and Offers.CountCrafts() >= Offers.MAX_CRAFTS then
+    return nil, "Ya ofreces " .. Offers.MAX_CRAFTS .. " recetas: quita alguna antes."
+  end
+  price = tonumber(price)
+  c.crafts[k] = { g = (price and price > 0) and floor(price) or nil, m = mats and 1 or nil, t = now }
+  publish()
+  return true
+end
+
+function Offers.RemoveCraft(k)
+  local c = mine()
+  if not c or not c.crafts[k] then return nil, "No ofreces esa receta." end
+  c.crafts[k] = nil
+  publish()
+  return true
+end
+
+-- Vuelve a contar los 30 días de todas mis recetas ofrecidas.
+function Offers.RenewCrafts(now)
+  local c = mine()
+  if not c then return nil end
+  for _, o in pairs(c.crafts) do o.t = now end
+  publish()
+  return true
+end
+
 function Offers.CountMine()
   local c = mine()
   local n = 0
@@ -200,11 +330,6 @@ end
 ---------------------------------------------------------------------------
 -- Acciones (devuelven true o nil y un error)
 ---------------------------------------------------------------------------
-local function publish()
-  ns.Sync.PublishMine()
-  ns.Fire("DATA_CHANGED", "offer")
-end
-
 -- Ofrecer "q" unidades de un objeto, con precio por unidad (0 o nil = gratis).
 function Offers.Create(id, q, price, now)
   local c = mine()

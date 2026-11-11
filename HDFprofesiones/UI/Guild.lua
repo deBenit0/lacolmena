@@ -41,6 +41,28 @@ local function peopleWith(pk)
 end
 ns.UI.PeopleWith = peopleWith
 
+-- Cuántos personajes tienen alguna profesión de fabricar y cuántos de recolectar (cada personaje
+-- aparte, como los roles). Cocina, primeros auxilios y pesca no cuentan.
+local CRAFT_PROFS = { [164] = true, [165] = true, [197] = true, [171] = true, [202] = true, [333] = true,
+  [755] = true, [773] = true }
+local GATHER_PROFS = { [182] = true, [186] = true, [393] = true }
+function ns.UI.TradeCounts(entries)
+  local crafters, gatherers = 0, 0
+  for _, e in pairs(entries or {}) do
+    local craft, gather = false, false
+    for pk in pairs(type(e.p) == "table" and e.p or {}) do
+      if CRAFT_PROFS[pk] then craft = true end
+      if GATHER_PROFS[pk] then gather = true end
+    end
+    for pk in pairs(type(e.ga) == "table" and e.ga or {}) do
+      if GATHER_PROFS[tonumber(pk)] then gather = true end
+    end
+    if craft then crafters = crafters + 1 end
+    if gather then gatherers = gatherers + 1 end
+  end
+  return crafters, gatherers
+end
+
 -- Karma de cada persona (su principal), de más a menos.
 local function karmaRanking()
   local g = ns.G()
@@ -96,7 +118,7 @@ ns.UI.RegisterPage("guild", function(page)
   karmaHint:SetPoint("TOPLEFT", COL1 + 60, -120)
   karmaHint:SetText("+1 por dar, -1 por recibir")
   page.bars = {}
-  for i = 1, 9 do
+  for i = 1, 6 do
     local bar = CreateFrame("Frame", nil, page)
     bar:SetSize(250, 28)
     bar:SetPoint("TOPLEFT", COL1, -136 - (i - 1) * 30)
@@ -116,6 +138,47 @@ ns.UI.RegisterPage("guild", function(page)
   page.noKarma:SetPoint("TOPLEFT", COL1 + 6, -140)
   page.noKarma:SetTextColor(0.6, 0.6, 0.6)
   page.noKarma:SetText("Aún nadie tiene karma.")
+
+  -- Debajo del karma: cuántos tanques, sanadores y DPS hay (cada personaje, desde el nivel 10).
+  title("Roles", COL1 + 4, -322)
+  local rolesHint = W.Text(page, "GameFontDisableSmall")
+  rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324)
+  rolesHint:SetText("cada personaje, desde nivel 10")
+  local ROLE_SLOTS = {
+    { key = 1, icon = "Interface\\Icons\\Ability_Defend", tip = "Tanques" },
+    { key = 2, icon = "Interface\\Icons\\Spell_Holy_FlashHeal", tip = "Sanadores" },
+    { key = 4, icon = "Interface\\Icons\\INV_Sword_04", tip = "DPS" },
+    { key = "unknown", icon = "Interface\\Icons\\INV_Misc_QuestionMark", tip = "Sin saber",
+      text = "Sin el addon y de una clase que puede hacer varios roles (o sin talentos todavía)." },
+    -- Segunda fila: oficios (de los que tienen el addon: las profesiones solo se saben por él).
+    { key = "crafters", row = 2, icon = "Interface\\Icons\\Trade_BlackSmithing", tip = "Artesanos",
+      text = "Personajes con alguna profesión de fabricar (herrería, alquimia, sastrería…). Solo cuenta a los que tienen el addon." },
+    { key = "gatherers", row = 2, icon = "Interface\\Icons\\Trade_Herbalism", tip = "Recolectores",
+      text = "Personajes con herboristería, minería o desuello. Solo cuenta a los que tienen el addon." },
+  }
+  page.roleSlots = {}
+  for i, s in ipairs(ROLE_SLOTS) do
+    local b = CreateFrame("Button", nil, page)
+    local col = s.row == 2 and (s.key == "crafters" and 0 or 2) or (i - 1)
+    b:SetSize(s.row == 2 and 120 or 58, 26)
+    b:SetPoint("TOPLEFT", COL1 + 4 + col * 62, s.row == 2 and -374 or -342)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(24, 24)
+    b.icon:SetPoint("LEFT", 0, 0)
+    b.icon:SetTexture(s.icon)
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.count = W.Text(b, "GameFontNormalLarge")
+    b.count:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+    if s.row == 2 then
+      b.label = W.Text(b, "GameFontHighlightSmall")
+      b.label:SetPoint("LEFT", b.count, "RIGHT", 5, 0)
+      b.label:SetText(s.key == "crafters" and "artesanos" or "recolectores")
+    end
+    if s.key == "unknown" then b.count:SetTextColor(0.6, 0.6, 0.6) end
+    ns.UI.Tip(b, s.tip, s.text or "Los que tienen el addon lo sacan de sus talentos (o lo eligen en Opciones).")
+    b.key = s.key
+    page.roleSlots[i] = b
+  end
 
   -- Columna 2: quién fabrica qué.
   title("Quién fabrica qué", COL2 + 4, -6)
@@ -207,6 +270,12 @@ ns.UI.RegisterPage("guild", function(page)
     end
     page.noKarma:SetShown(#ranking == 0)
 
+    -- Roles.
+    local g = ns.G()
+    local rc = ns.Dungeons.RoleCounts(g and g.entries, ns.Guild.roster)
+    rc.crafters, rc.gatherers = ns.UI.TradeCounts(g and g.entries)
+    for _, b in ipairs(page.roleSlots) do b.count:SetText(rc[b.key] or 0) end
+
     -- Quién fabrica qué: la profesión elegida (o la primera que tenga alguien).
     local counts = {}
     for _, pk in ipairs(WHO_PROFS) do counts[pk] = #peopleWith(pk) end
@@ -266,8 +335,8 @@ function ns.UI.ShowMissingRecipes()
     f.title = W.Text(f, "GameFontNormal")
     f.title:SetPoint("TOP", 0, -16)
     f.title:SetText("Lo que se pide y nadie sabe hacer")
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -6, -6)
+    local close = W.CloseButton(f)
+    close:SetPoint("TOPRIGHT", -10, -10)
     f.text = W.Text(f, "GameFontHighlightSmall")
     f.text:SetPoint("TOPLEFT", 20, -42)
     f.text:SetWidth(380)

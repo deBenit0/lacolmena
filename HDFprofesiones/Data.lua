@@ -111,6 +111,7 @@ function Data.SanitizeEntry(e)
     ga = cleanNumberMap(e.ga, "number"),
     kc = cleanNumberMap(e.kc, "string"),
     kd = tonumber(e.kd),
+    ro = (e.ro == 1 or e.ro == 2 or e.ro == 4) and e.ro or nil,
   }
   if type(e.p) == "table" then
     local profs, any = {}, false
@@ -209,7 +210,7 @@ end
 function Data.BuildMyEntry(now)
   local me, c, g = ns.Me(), ns.MyChar(), ns.G()
   if not me or not c or not g then return nil end
-  local e = { n = me, c = c.class, l = c.level, u = c.u or nil, av = ns.VERSION }
+  local e = { n = me, c = c.class, l = c.level, u = c.u or nil, av = ns.VERSION, ro = c.roleSet or c.roleAuto }
   local th = g.thanks[me]
   if th and next(th) then e.th = deepCopy(th) end
   if c.gather and next(c.gather) then e.ga = deepCopy(c.gather) end

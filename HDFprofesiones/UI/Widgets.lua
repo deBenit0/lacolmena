@@ -6,42 +6,108 @@ ns.W = W
 local BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
 local listCounter = 0
 
-local BOX = {
-  bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-  tile = true, tileSize = 16, edgeSize = 16,
-  insets = { left = 4, right = 4, top = 4, bottom = 4 },
+-- Estilo «Armory»: fondo casi negro, tarjetas oscuras y bordes finos dorados.
+local WHITE = "Interface\\Buttons\\WHITE8X8"
+W.WHITE = WHITE
+W.COLORS = {
+  BG = { 0.047, 0.043, 0.039 },        -- fondo de la ventana
+  BOX = { 0.063, 0.059, 0.055 },       -- fondo de los recuadros
+  CARD = { 0.094, 0.086, 0.078 },      -- tarjetas y botones
+  CARD_SEL = { 0.173, 0.141, 0.071 },  -- tarjeta elegida
+  ON = { 0.275, 0.204, 0.047 },        -- botón encendido
+  GOLD = { 1, 0.82, 0 },               -- borde vivo y letras doradas
+  HEAD = { 0.9, 0.706, 0.275 },        -- títulos de sección
+  LINE = { 0.588, 0.431, 0.157 },      -- bordes finos
+  EDGE = { 0.3, 0.24, 0.13 },          -- borde apagado de las tarjetas
+  DIM = { 0.6, 0.6, 0.6 },             -- texto gris
 }
-local PANEL = {
-  bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-  edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-  tile = true, tileSize = 32, edgeSize = 32,
-  insets = { left = 11, right = 12, top = 12, bottom = 11 },
-}
+local C = W.COLORS
 
--- Ventana opaca, como las del juego: el fondo de diálogo de Blizzard es medio transparente,
--- así que debajo va un color sólido oscuro (el backdrop solo pone el borde).
-local PANEL_EDGE = {
-  edgeFile = PANEL.edgeFile, tile = true, tileSize = 32, edgeSize = 32,
-  insets = PANEL.insets,
+-- Mayúsculas también para las letras con tilde (string.upper solo cambia las de siempre).
+local UPPER = {
+  ["\195\161"] = "\195\129", ["\195\169"] = "\195\137", ["\195\173"] = "\195\141", ["\195\179"] = "\195\147",
+  ["\195\186"] = "\195\154", ["\195\177"] = "\195\145", ["\195\188"] = "\195\156",
 }
+function W.Upper(s)
+  return (tostring(s or ""):upper():gsub("\195[\161\169\173\179\186\177\188]", UPPER))
+end
+
+-- Borde de 1 px hecho con cuatro texturas. l, t, r, b: cuánto se mete hacia dentro cada lado.
+function W.Border(f, color, layer, l, t, r, b)
+  l, t, r, b = l or 0, t or 0, r or 0, b or 0
+  local border = {}
+  local function line()
+    local tex = f:CreateTexture(nil, layer or "BORDER")
+    tex:SetColorTexture(1, 1, 1, 1)
+    return tex
+  end
+  border.top = line()
+  border.top:SetPoint("TOPLEFT", l, -t)
+  border.top:SetPoint("TOPRIGHT", -r, -t)
+  border.top:SetHeight(1)
+  border.bottom = line()
+  border.bottom:SetPoint("BOTTOMLEFT", l, b)
+  border.bottom:SetPoint("BOTTOMRIGHT", -r, b)
+  border.bottom:SetHeight(1)
+  border.left = line()
+  border.left:SetPoint("TOPLEFT", l, -t)
+  border.left:SetPoint("BOTTOMLEFT", l, b)
+  border.left:SetWidth(1)
+  border.right = line()
+  border.right:SetPoint("TOPRIGHT", -r, -t)
+  border.right:SetPoint("BOTTOMRIGHT", -r, b)
+  border.right:SetWidth(1)
+  border.lines = { border.top, border.bottom, border.left, border.right }
+  function border:SetColor(cr, cg, cb, ca)
+    for _, tex in ipairs(self.lines) do tex:SetColorTexture(cr, cg, cb, ca or 1) end
+  end
+  function border:SetShown(v)
+    for _, tex in ipairs(self.lines) do tex:SetShown(v) end
+  end
+  border:SetColor(color[1], color[2], color[3], color[4])
+  return border
+end
+
+-- Fondo plano con borde de 1 px (el backdrop de siempre, para que SetBackdropColor siga valiendo).
+local BOX = {
+  bgFile = WHITE, edgeFile = WHITE, tile = false, edgeSize = 1,
+  insets = { left = 1, right = 1, top = 1, bottom = 1 },
+}
+W.BOX_BACKDROP = BOX
+
+-- Esquinas doradas de la ventana (rayitas cortas encima del borde).
+local function cornerAccents(f, size)
+  size = size or 22
+  local function bar(point, x, y, w, h)
+    local tex = f:CreateTexture(nil, "OVERLAY")
+    tex:SetColorTexture(C.GOLD[1], C.GOLD[2], C.GOLD[3], 1)
+    tex:SetSize(w, h)
+    tex:SetPoint(point, x, y)
+    return tex
+  end
+  f.accents = {
+    bar("TOPLEFT", -1, 1, size, 2), bar("TOPLEFT", -1, 1, 2, size),
+    bar("TOPRIGHT", 1, 1, size, 2), bar("TOPRIGHT", 1, 1, 2, size),
+    bar("BOTTOMLEFT", -1, -1, size, 2), bar("BOTTOMLEFT", -1, -1, 2, size),
+    bar("BOTTOMRIGHT", 1, -1, size, 2), bar("BOTTOMRIGHT", 1, -1, 2, size),
+  }
+end
+W.CornerAccents = cornerAccents
 
 function W.Panel(name, parent, width, height)
   local f = CreateFrame("Frame", name, parent or UIParent, BACKDROP_TEMPLATE)
   f:SetSize(width, height)
-  local solid = f:CreateTexture(nil, "BACKGROUND", nil, -8)
-  solid:SetColorTexture(0.05, 0.045, 0.04, 1)
-  solid:SetPoint("TOPLEFT", 11, -12)
-  solid:SetPoint("BOTTOMRIGHT", -12, 11)
-  local tex = f:CreateTexture(nil, "BACKGROUND", nil, -7)
-  tex:SetTexture(PANEL.bgFile, "REPEAT", "REPEAT")
-  if tex.SetHorizTile then
-    tex:SetHorizTile(true)
-    tex:SetVertTile(true)
+  if f.SetBackdrop then
+    f:SetBackdrop(BOX)
+    f:SetBackdropColor(C.BG[1], C.BG[2], C.BG[3], 0.98)
+    f:SetBackdropBorderColor(C.LINE[1], C.LINE[2], C.LINE[3], 1)
+  else
+    local solid = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+    solid:SetColorTexture(C.BG[1], C.BG[2], C.BG[3], 0.98)
+    solid:SetAllPoints()
+    f.bgSolid = solid
   end
-  tex:SetAllPoints(solid)
-  f.bgSolid, f.bgTex = solid, tex
-  if f.SetBackdrop then f:SetBackdrop(PANEL_EDGE) end
+  cornerAccents(f)
   f:EnableMouse(true)
   return f
 end
@@ -51,10 +117,85 @@ function W.Box(parent, width, height)
   f:SetSize(width, height)
   if f.SetBackdrop then
     f:SetBackdrop(BOX)
-    f:SetBackdropColor(0, 0, 0, 0.55)
-    f:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.9)
+    f:SetBackdropColor(C.BOX[1], C.BOX[2], C.BOX[3], 0.96)
+    f:SetBackdropBorderColor(C.LINE[1], C.LINE[2], C.LINE[3], 0.75)
   end
   return f
+end
+
+-- Tarjeta: fondo oscuro con borde de 1 px. f:SetSelected(true) la marca con borde dorado.
+-- inset: hueco arriba y abajo (para que las tarjetas de una lista no se toquen).
+function W.Card(f, inset)
+  inset = inset or 0
+  f.cardBg = f:CreateTexture(nil, "BACKGROUND", nil, -6)
+  f.cardBg:SetPoint("TOPLEFT", 0, -inset)
+  f.cardBg:SetPoint("BOTTOMRIGHT", 0, inset)
+  f.cardBorder = W.Border(f, C.EDGE, "BORDER", 0, inset, 0, inset)
+  function f:SetSelected(on)
+    self.cardSelected = on and true or false
+    local bg = on and C.CARD_SEL or C.CARD
+    self.cardBg:SetColorTexture(bg[1], bg[2], bg[3], 0.95)
+    local e = on and C.GOLD or C.EDGE
+    self.cardBorder:SetColor(e[1], e[2], e[3], 1)
+  end
+  function f:SetCardShown(v)
+    self.cardBg:SetShown(v)
+    self.cardBorder:SetShown(v)
+  end
+  f:SetSelected(false)
+  return f
+end
+
+-- Título de sección: letras doradas en mayúsculas y una raya fina debajo.
+-- h:SetText(título, nota) — la nota va al lado, en gris y sin mayúsculas.
+function W.Header(parent, text, note)
+  local h = CreateFrame("Frame", nil, parent)
+  h:SetHeight(20)
+  h.text = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  h.text:SetPoint("BOTTOMLEFT", 2, 4)
+  h.text:SetJustifyH("LEFT")
+  h.text:SetTextColor(C.HEAD[1], C.HEAD[2], C.HEAD[3])
+  h.note = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  h.note:SetPoint("BOTTOMLEFT", h.text, "BOTTOMRIGHT", 6, 1)
+  h.note:SetPoint("RIGHT", h, "RIGHT", -2, 0)
+  h.note:SetJustifyH("LEFT")
+  h.note:SetWordWrap(false)
+  h.note:SetTextColor(C.DIM[1], C.DIM[2], C.DIM[3])
+  h.line = h:CreateTexture(nil, "ARTWORK")
+  h.line:SetColorTexture(C.LINE[1], C.LINE[2], C.LINE[3], 0.9)
+  h.line:SetPoint("BOTTOMLEFT", 0, 0)
+  h.line:SetPoint("BOTTOMRIGHT", 0, 0)
+  h.line:SetHeight(1)
+  function h:SetText(title, n)
+    self.text:SetText(W.Upper(title))
+    self.note:SetText(n or "")
+  end
+  function h:GetText() return self.text:GetText() end
+  h:SetText(text or "", note)
+  return h
+end
+
+-- Barra de progreso dorada con el texto encima ("aportado 3 de 10").
+function W.Progress(parent, width, height)
+  local p = CreateFrame("Frame", nil, parent)
+  p:SetSize(width, height or 16)
+  p.bg = p:CreateTexture(nil, "BACKGROUND")
+  p.bg:SetAllPoints()
+  p.bg:SetColorTexture(C.CARD[1], C.CARD[2], C.CARD[3], 1)
+  p.fill = p:CreateTexture(nil, "ARTWORK")
+  p.fill:SetPoint("TOPLEFT", 1, -1)
+  p.fill:SetPoint("BOTTOMLEFT", 1, 1)
+  p.fill:SetColorTexture(0.78, 0.58, 0.12, 1)
+  p.border = W.Border(p, C.LINE, "OVERLAY")
+  p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  p.text:SetPoint("CENTER", 0, 0)
+  function p:SetValue(cur, max, text)
+    local frac = (max and max > 0) and math.max(0, math.min(1, (cur or 0) / max)) or 0
+    self.fill:SetWidth(math.max(1, (width - 2) * frac))
+    self.fill:SetShown(frac > 0)
+    self.text:SetText(text or "")
+  end
+  return p
 end
 
 function W.Text(parent, font, justify)
@@ -63,17 +204,139 @@ function W.Text(parent, font, justify)
   return fs
 end
 
+-- Cómo se ve un botón: oscuro con borde y letras doradas; encendido (LockHighlight, SetOn o el
+-- principal), relleno dorado oscuro con letras blancas; apagado, gris.
+local function buttonLook(b)
+  local enabled = b:IsEnabled()
+  local on = b.hdfOn or b.hdfPrimary
+  local bg = on and C.ON or C.CARD
+  local edge = (on or b.hdfPrimary) and C.GOLD or C.LINE
+  local tr, tg, tb = C.GOLD[1], C.GOLD[2], C.GOLD[3]
+  if on then tr, tg, tb = 1, 1, 1 end
+  if not enabled then
+    bg, edge = C.CARD, { 0.3, 0.28, 0.25 }
+    tr, tg, tb = 0.5, 0.5, 0.5
+  end
+  b.bg:SetColorTexture(bg[1], bg[2], bg[3], 1)
+  b.border:SetColor(edge[1], edge[2], edge[3], 1)
+  local fs = b.fs
+  if fs then fs:SetTextColor(tr, tg, tb) end
+end
+W.ButtonLook = buttonLook
+
 function W.Button(parent, text, width, height, onClick)
-  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  local b = CreateFrame("Button", nil, parent)
   b:SetSize(width, height or 22)
+  b.bg = b:CreateTexture(nil, "BACKGROUND")
+  b.bg:SetAllPoints()
+  b.border = W.Border(b, C.LINE)
+  b.hover = b:CreateTexture(nil, "HIGHLIGHT")
+  b.hover:SetPoint("TOPLEFT", 1, -1)
+  b.hover:SetPoint("BOTTOMRIGHT", -1, 1)
+  b.hover:SetColorTexture(1, 0.82, 0, 0.14)
+  b.fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  b.fs:SetPoint("LEFT", 4, 0)
+  b.fs:SetPoint("RIGHT", -4, 0)
+  b.fs:SetJustifyH("CENTER")
+  b.fs:SetWordWrap(false)
+  b:SetFontString(b.fs)
   b:SetText(text)
   if onClick then b:SetScript("OnClick", onClick) end
+  -- Encendido, apagado y bloqueado cambian el aspecto (los demás archivos usan estas funciones).
+  local lock, unlock = b.LockHighlight, b.UnlockHighlight
+  local setEnabled, enable, disable = b.SetEnabled, b.Enable, b.Disable
+  function b:LockHighlight()
+    self.hdfOn = true
+    lock(self)
+    buttonLook(self)
+  end
+  function b:UnlockHighlight()
+    self.hdfOn = false
+    unlock(self)
+    buttonLook(self)
+  end
+  function b:SetEnabled(v)
+    setEnabled(self, v)
+    buttonLook(self)
+  end
+  function b:Enable()
+    enable(self)
+    buttonLook(self)
+  end
+  function b:Disable()
+    disable(self)
+    buttonLook(self)
+  end
+  -- Botón principal: siempre relleno (PEDIR, APORTAR...).
+  function b:SetPrimary(v)
+    self.hdfPrimary = v and true or false
+    buttonLook(self)
+  end
+  -- Letra: "small", "normal" o "large".
+  function b:SetFontSize(size)
+    self.fs:SetFontObject(size == "small" and "GameFontNormalSmall" or size == "large" and "GameFontNormalLarge"
+      or "GameFontNormal")
+    buttonLook(self)
+  end
+  buttonLook(b)
+  return b
+end
+
+-- Botón de cerrar (una X en un botón del mismo estilo): esconde la ventana donde está.
+function W.CloseButton(parent)
+  local b = W.Button(parent, "X", 22, 20, function(self) self:GetParent():Hide() end)
+  return b
+end
+
+-- Pestaña de arriba, como las de un navegador: la elegida se une al contenido de debajo.
+function W.Tab(parent, text, width, height, onClick)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(width, height or 28)
+  b.bg = b:CreateTexture(nil, "BACKGROUND")
+  b.bg:SetPoint("TOPLEFT", 0, 0)
+  b.bg:SetPoint("BOTTOMRIGHT", 0, 0)
+  b.border = W.Border(b, C.LINE)
+  b.hover = b:CreateTexture(nil, "HIGHLIGHT")
+  b.hover:SetPoint("TOPLEFT", 1, -1)
+  b.hover:SetPoint("BOTTOMRIGHT", -1, 1)
+  b.hover:SetColorTexture(1, 0.82, 0, 0.12)
+  b.fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  b.fs:SetPoint("LEFT", 4, 0)
+  b.fs:SetPoint("RIGHT", -4, 0)
+  b.fs:SetWordWrap(false)
+  b:SetFontString(b.fs)
+  b:SetText(text)
+  if onClick then b:SetScript("OnClick", onClick) end
+  function b:SetOn(on)
+    self.on = on and true or false
+    local bg = on and C.CARD_SEL or C.CARD
+    self.bg:SetColorTexture(bg[1], bg[2], bg[3], 1)
+    -- La elegida baja 1 px más para tapar la raya de debajo y no tiene borde abajo.
+    self.bg:SetPoint("BOTTOMRIGHT", 0, on and -1 or 0)
+    local e = on and C.GOLD or C.LINE
+    self.border:SetColor(e[1], e[2], e[3], 1)
+    self.border.bottom:SetShown(not on)
+    self.border.left:SetPoint("BOTTOMLEFT", 0, on and -1 or 0)
+    self.border.right:SetPoint("BOTTOMRIGHT", 0, on and -1 or 0)
+    if on then self.fs:SetTextColor(1, 1, 1) else self.fs:SetTextColor(C.GOLD[1], C.GOLD[2], C.GOLD[3]) end
+  end
+  b:SetOn(false)
   return b
 end
 
 function W.Input(parent, width, numeric)
   local e = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
   e:SetSize(width, 20)
+  -- Caja oscura con borde fino (se esconden las piezas de la plantilla del juego).
+  for _, key in ipairs({ "Left", "Middle", "Right", "Mid" }) do
+    local tex = e[key]
+    if type(tex) == "table" and tex.Hide then tex:Hide() end
+  end
+  e.bg = e:CreateTexture(nil, "BACKGROUND")
+  e.bg:SetPoint("TOPLEFT", -5, 0)
+  e.bg:SetPoint("BOTTOMRIGHT", 0, 0)
+  e.bg:SetColorTexture(C.CARD[1], C.CARD[2], C.CARD[3], 1)
+  e.border = W.Border(e, C.LINE, "BORDER", -5, 0, 0, 0)
   e:SetAutoFocus(false)
   if numeric then e:SetNumeric(true) end
   e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -119,11 +382,19 @@ end
 
 -- Lista desplazable con filas fijas.
 --   opts = { rows, rowHeight, buildRow(row), updateRow(row, item, selected), onSelect(item), keyOf(item) }
+-- Opcional:
+--   card = true        cada fila es una tarjeta (W.Card) y la elegida lleva borde dorado
+--   bare = true        sin recuadro alrededor (listas dentro de otro recuadro)
+--   heightOf(item)     alto de cada fila (p. ej. títulos de sección más bajos que las tarjetas);
+--                      se ven las que quepan en el alto de la lista
+--   isHeader(item)     filas que no se eligen (títulos de sección): al pulsarlas solo se llama a onSelect
 function W.List(parent, width, height, opts)
   listCounter = listCounter + 1
   local box = W.Box(parent, width, height)
+  if opts.bare and box.SetBackdrop then box:SetBackdrop(nil) end
   box.items = {}
   local keyOf = opts.keyOf or function(item) return item end
+  local pad = opts.bare and 0 or 6
 
   local scroll = CreateFrame("ScrollFrame", "HDFProfList" .. listCounter, box, "FauxScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 4, -5)
@@ -131,19 +402,34 @@ function W.List(parent, width, height, opts)
   box.scroll = scroll
 
   local rows = {}
-  for i = 1, opts.rows do
+  local nFrames = opts.heightOf and (opts.maxRows or opts.rows * 2) or opts.rows
+  for i = 1, nFrames do
     local row = CreateFrame("Button", nil, box)
     row:SetHeight(opts.rowHeight)
-    row:SetPoint("TOPLEFT", 6, -6 - (i - 1) * opts.rowHeight)
+    row:SetPoint("TOPLEFT", pad, -pad - (i - 1) * opts.rowHeight)
     row:SetPoint("RIGHT", box, "RIGHT", -28, 0)
-    row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    if opts.card then
+      W.Card(row, 2)
+      local hl = row:CreateTexture(nil, "HIGHLIGHT")
+      hl:SetPoint("TOPLEFT", 1, -3)
+      hl:SetPoint("BOTTOMRIGHT", -1, 3)
+      hl:SetColorTexture(1, 0.82, 0, 0.07)
+      row.hl = hl
+    else
+      row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    end
     row.selectedTex = row:CreateTexture(nil, "BACKGROUND")
     row.selectedTex:SetAllPoints()
     row.selectedTex:SetColorTexture(1, 0.82, 0, 0.18)
     row.selectedTex:Hide()
+    if opts.card then row.selectedTex:SetAlpha(0) end
     opts.buildRow(row)
     row:SetScript("OnClick", function(self)
       if not self.item then return end
+      if opts.isHeader and opts.isHeader(self.item) then
+        if opts.onSelect then opts.onSelect(self.item) end
+        return
+      end
       box.selectedKey = keyOf(self.item)
       box:Refresh()
       if opts.onSelect then opts.onSelect(self.item) end
@@ -156,12 +442,31 @@ function W.List(parent, width, height, opts)
     local items = self.items
     FauxScrollFrame_Update(scroll, #items, opts.rows, opts.rowHeight)
     local offset = FauxScrollFrame_GetOffset(scroll)
+    -- Sin barra (cabe todo), las filas llegan hasta el borde.
+    local right = scroll:IsShown() and -28 or -(pad + 2)
+    local y, room = -pad, (self:GetHeight() or height) - 2 * pad
+    local full = false
     for i, row in ipairs(rows) do
-      local item = items[offset + i]
+      local item = not full and items[offset + i] or nil
+      local h = item and opts.heightOf and opts.heightOf(item) or opts.rowHeight
+      if item and opts.heightOf and (-y - pad) + h > room + 0.5 then
+        item, full = nil, true
+      end
       row.item = item
       if item then
-        local selected = self.selectedKey ~= nil and keyOf(item) == self.selectedKey
+        row:SetHeight(h)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", pad, y)
+        row:SetPoint("RIGHT", box, "RIGHT", right, 0)
+        y = y - h
+        local header = opts.isHeader and opts.isHeader(item)
+        local selected = not header and self.selectedKey ~= nil and keyOf(item) == self.selectedKey
         row.selectedTex:SetShown(selected)
+        if opts.card then
+          row:SetCardShown(not header)
+          row:SetSelected(selected)
+          row.hl:SetShown(not header)
+        end
         opts.updateRow(row, item, selected)
         row:Show()
       else
@@ -429,52 +734,68 @@ end
 function W.Chip(parent, text, width, onClick)
   local b = W.Button(parent, text, width, 22, onClick)
   function b:SetOn(on)
-    local fs = self:GetFontString()
-    if on then
-      self:LockHighlight()
-      if fs then fs:SetTextColor(1, 1, 1) end
-    else
-      self:UnlockHighlight()
-      if fs then fs:SetTextColor(1, 0.82, 0) end
-    end
+    if on then self:LockHighlight() else self:UnlockHighlight() end
     self.on = on and true or false
   end
   return b
 end
 
 -- Lista de quién fabrica algo: icono de la profesión, nombre con su color, nivel, si está en
--- línea y un botón para susurrarle. La usan el Mercado y Hermandad.
---   rows = { { name, class, pk, r (nivel), online, seen, unavailable, gather }, ... }
-function W.Crafters(parent, width, nrows)
-  local list = W.List(parent, width, nrows * 22 + 12, {
+-- línea y un botón para susurrarle. Cada uno en su tarjeta. La usan el Mercado, el catálogo y
+-- Hermandad.
+--   rows = { { name, class, pk, r (nivel), online, seen, unavailable, gather, extra, karma, level }, ... }
+--   rowHeight: alto de cada fila (22 si no se dice); bare: sin recuadro alrededor.
+function W.Crafters(parent, width, nrows, rowHeight, bare)
+  rowHeight = rowHeight or 22
+  -- Con sitio, el estado (en línea, visto hace...) va en su columna; si no, junto al nivel.
+  local wide = width >= 380
+  local list = W.List(parent, width, nrows * rowHeight + (bare and 0 or 12), {
     rows = nrows,
-    rowHeight = 22,
+    rowHeight = rowHeight,
+    card = true,
+    bare = bare,
     keyOf = function(c) return c.name .. ":" .. tostring(c.pk) end,
     buildRow = function(row)
+      local iconSize = math.min(20, rowHeight - 6)
       row.icon = row:CreateTexture(nil, "ARTWORK")
-      row.icon:SetSize(18, 18)
-      row.icon:SetPoint("LEFT", 2, 0)
+      row.icon:SetSize(iconSize, iconSize)
+      row.icon:SetPoint("LEFT", 4, 0)
       row.name = W.ListText(row, "GameFontHighlightSmall")
       row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-      row.name:SetWidth(width * 0.28)
+      row.name:SetWidth(math.floor(width * (wide and 0.24 or 0.28)))
       row.name:SetWordWrap(false)
       row.level = W.ListText(row, "GameFontHighlightSmall")
       row.level:SetPoint("LEFT", row.name, "RIGHT", 4, 0)
-      row.level:SetPoint("RIGHT", row, "RIGHT", -62, 0)
       row.level:SetWordWrap(false)
-      row.tell = W.Button(row, "Susurrar", 58, 18)
-      if row.tell.SetNormalFontObject then
-        row.tell:SetNormalFontObject("GameFontNormalSmall")
-        row.tell:SetHighlightFontObject("GameFontHighlightSmall")
+      if wide then
+        row.level:SetWidth(math.floor(width * 0.24))
+        row.state = W.ListText(row, "GameFontHighlightSmall")
+        row.state:SetPoint("LEFT", row.level, "RIGHT", 4, 0)
+        row.state:SetPoint("RIGHT", row, "RIGHT", -64, 0)
+        row.state:SetWordWrap(false)
+      else
+        row.level:SetPoint("RIGHT", row, "RIGHT", -62, 0)
       end
-      row.tell:SetPoint("RIGHT", -2, 0)
+      row.tell = W.Button(row, "Susurrar", 56, math.min(20, rowHeight - 6))
+      row.tell:SetFontSize("small")
+      row.tell:SetPoint("RIGHT", -4, 0)
       row.tell:SetScript("OnClick", function(self) ns.SendTell(self:GetParent().item.name) end)
+      row:SetScript("OnEnter", function(self)
+        local c = self.item
+        if not c then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(ns.ColoredName(c.name, c.class) .. (c.level and (" (nivel " .. c.level .. ")") or ""))
+        GameTooltip:AddLine(ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or ""), 1, 1, 1)
+        if c.karma then GameTooltip:AddLine("Karma: " .. c.karma .. "   Encargos completados: " .. (c.thanks or 0), 0.8, 0.8, 0.8) end
+        GameTooltip:Show()
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end,
     updateRow = function(row, c)
       row.icon:SetTexture(ns.ProfessionIcon(c.pk))
       local me = c.name == ns.Me()
       row.name:SetText(me and "|cffffd100Tú|r" or ns.ColoredName(c.name, c.class))
-      local lv = ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or "")
+      row.level:SetText("|cffbbbbbb" .. ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or "") .. "|r")
       local state
       if c.unavailable then
         state = "|cff999999no disponible|r"
@@ -483,7 +804,13 @@ function W.Crafters(parent, width, nrows)
       elseif c.seen then
         state = "|cff999999visto hace " .. ns.FormatDuration(ns.Now() - c.seen) .. "|r"
       end
-      row.level:SetText("|cffbbbbbb" .. lv .. "|r" .. (state and ("  " .. state) or ""))
+      if c.extra then state = (state and (state .. "  ") or "") .. c.extra end
+      if me then state = nil end
+      if row.state then
+        row.state:SetText(state or "")
+      elseif state then
+        row.level:SetText(row.level:GetText() .. "  " .. state)
+      end
       row.tell:SetShown(not me)
     end,
   })

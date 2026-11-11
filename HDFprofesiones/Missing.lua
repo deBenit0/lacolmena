@@ -524,11 +524,14 @@ function Missing.LayoutModern(form)
     slot.hdfAsk:SetShown(id ~= nil)
     slot.hdfAsk:SetScript("OnClick", function() ns.SafeCall(Missing.AskModernReagent, id, need) end)
   end
-  -- "Ofrecer" junto al objeto que fabrica la receta.
+  -- "Ofrecer" sobre la parte de abajo del objeto que fabrica la receta. Debajo del icono
+  -- tapaba la descripción de la receta.
   if form.OutputIcon then
     if not form.hdfOffer then
-      form.hdfOffer = smallButton(form, "Ofrecer", 64)
-      form.hdfOffer:SetPoint("TOP", form.OutputIcon, "BOTTOM", 0, -2)
+      local w = form.OutputIcon.GetWidth and tonumber(form.OutputIcon:GetWidth()) or 0
+      form.hdfOffer = smallButton(form, "Ofrecer", math.max(44, w))
+      form.hdfOffer:SetHeight(14)
+      form.hdfOffer:SetPoint("BOTTOM", form.OutputIcon, "BOTTOM", 0, 1)
       form.hdfOffer:SetFrameLevel(form.OutputIcon:GetFrameLevel() + 10)
     end
     local info = form.GetRecipeInfo and form:GetRecipeInfo()

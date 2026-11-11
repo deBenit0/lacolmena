@@ -235,8 +235,8 @@ local function createWindow()
   tinsert(UISpecialFrames, "HDFProfReport")
   window.title = W.Text(window, "GameFontNormal")
   window.title:SetPoint("TOP", 0, -16)
-  local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
+  local close = W.CloseButton(window)
+  close:SetPoint("TOPRIGHT", -10, -10)
 
   -- Resultado de la autocomprobación, con colores.
   window.checks = W.Text(window, "GameFontHighlightSmall")

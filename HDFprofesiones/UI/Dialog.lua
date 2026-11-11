@@ -53,8 +53,8 @@ local function create()
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
   title:SetText("Pedir a la hermandad")
-  local close = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
+  local close = W.CloseButton(dialog)
+  close:SetPoint("TOPRIGHT", -10, -10)
 
   -- Objeto
   dialog.itemButton = CreateFrame("Button", nil, dialog)
