@@ -180,6 +180,30 @@ local function checkedMask(checks)
   return mask
 end
 
+-- Roles de partida: los de mi última vez (si mi clase aún puede hacerlos). La primera vez, nada:
+-- hay que elegir antes de apuntarse. Si mi clase solo puede hacer uno, ese.
+local function lastRoles()
+  local allowed = D.RolesFor(D.MyClass())
+  local c = ns.MyChar()
+  local last = c and D.CleanRole(c.runRoles)
+  local mask = 0
+  for _, role in ipairs(D.ROLES) do
+    if last and D.HasRole(last, role.bit) and D.HasRole(allowed, role.bit) then mask = mask + role.bit end
+  end
+  if mask == 0 and (allowed == D.TANK or allowed == D.HEAL or allowed == D.DPS) then mask = allowed end
+  return mask
+end
+
+local function rememberRoles(mask)
+  local c = ns.MyChar()
+  if c and mask and mask > 0 then c.runRoles = mask end
+end
+
+-- El botón (Apuntarme / Proponer) solo se enciende con algún rol marcado.
+local function watchChecks(checks, onChange)
+  for _, c in ipairs(checks) do c:HookScript("OnClick", onChange) end
+end
+
 -- Horas fijas al proponer (nil = ahora).
 local HOURS = { "now", 18, 20, 21, 22, 23 }
 
@@ -344,13 +368,24 @@ local function createDialog()
   dialog.chat = W.Check(dialog, "Avisar en el chat de hermandad")
   dialog.chat:SetPoint("BOTTOMLEFT", 20, 16)
   local publish = W.Button(dialog, "Proponer", 96, 22, function() dialog:Publish() end)
+  dialog.publish = publish
+  function dialog:UpdatePublish()
+    self.publish:SetEnabled(checkedMask(self.checks) > 0)
+  end
+  watchChecks(dialog.checks, function() dialog:UpdatePublish() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(dialog, "Cancelar", 86, 22, function() dialog:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
   cancel:Hide() -- con la casilla del chat no cabe: se cierra con la X o con Esc
 
   function dialog:Publish()
-    local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = checkedMask(self.checks) })
+    local mask = checkedMask(self.checks)
+    if mask == 0 then
+      ns.Print("elige primero con qué rol vas.")
+      return
+    end
+    rememberRoles(mask)
+    local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = mask })
     if r then
       self:Hide()
       if self.chat:GetChecked() then ns.Extras.Announce("run", r, r.id) end
@@ -368,8 +403,8 @@ function ns.UI.OpenDungeonDialog()
   dialog:SetDungeon(D.Recommended(D.MyLevel()))
   dialog:SetSlot(0)
   dialog.chat:SetChecked(true)
-  local allowed = D.RolesFor(D.MyClass())
-  setupChecks(dialog.checks, D.HasRole(allowed, D.DPS) and D.DPS or allowed)
+  setupChecks(dialog.checks, lastRoles())
+  dialog:UpdatePublish()
   dialog.menu:Hide()
   dialog:Show()
 end
@@ -604,6 +639,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   rolesLabel:SetText("Me apunto de:")
   detail.rolesLabel = rolesLabel
   detail.checks = roleChecks(detail, 10, -276)
+  watchChecks(detail.checks, function() if detail.updateJoin then detail.updateJoin() end end)
   detail.join = W.Button(detail, "Apuntarme", 110, 22)
   detail.join:SetPoint("TOPLEFT", 12, -304)
   detail.leave = W.Button(detail, "Desapuntarme", 110, 22)
@@ -692,15 +728,24 @@ ns.UI.RegisterPage("dungeons", function(page)
     local joined = su and not su.o
     if not page.checksFor or page.checksFor ~= r.id then
       page.checksFor = r.id
-      local allowed = D.RolesFor(D.MyClass())
-      setupChecks(detail.checks, joined and su.r or (D.HasRole(allowed, D.DPS) and D.DPS or allowed))
+      setupChecks(detail.checks, joined and su.r or lastRoles())
     end
     for _, c in ipairs(detail.checks) do
       if not open then c:SetEnabled(false) end
     end
     detail.join:SetText(joined and "Cambiar roles" or "Apuntarme")
-    detail.join:SetEnabled(open)
-    detail.join:SetScript("OnClick", function() ns.Sync.SignUpRun(r.id, checkedMask(detail.checks)) end)
+    detail.updateJoin = function()
+      local none = checkedMask(detail.checks) == 0
+      detail.join:SetEnabled(open and not none)
+      detail.rolesLabel:SetText((open and none) and "Me apunto de: |cffff8040(elige tu rol)|r" or "Me apunto de:")
+    end
+    detail.updateJoin()
+    detail.join:SetScript("OnClick", function()
+      local mask = checkedMask(detail.checks)
+      if mask == 0 then return end
+      rememberRoles(mask)
+      ns.Sync.SignUpRun(r.id, mask)
+    end)
     detail.leave:SetEnabled(open and joined or false)
     detail.leave:SetScript("OnClick", function() ns.Sync.LeaveRun(r.id) end)
 

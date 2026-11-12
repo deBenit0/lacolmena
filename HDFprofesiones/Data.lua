@@ -609,10 +609,19 @@ function Data.SanitizeRequest(r)
   return out
 end
 
--- Elige el bloque con mayor versión; si empatan, el mismo para todos (orden del texto).
+-- Elige el bloque con mayor versión. Si empatan: el que trae más datos (una versión vieja del addon
+-- borra los campos que no conoce, como rj o nt, pero deja la misma versión) y, si no, el mismo para
+-- todos (orden del texto).
+local function fieldCount(t)
+  local n = 0
+  for _ in pairs(t) do n = n + 1 end
+  return n
+end
 local function pickBlock(a, b, verField)
   local va, vb = a[verField] or 0, b[verField] or 0
   if va ~= vb then return va > vb and a or b end
+  local na, nb = fieldCount(a), fieldCount(b)
+  if na ~= nb then return na > nb and a or b end
   return Codec.Serialize(a) >= Codec.Serialize(b) and a or b
 end
 

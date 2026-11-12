@@ -142,10 +142,12 @@ local function create()
   rushLabel:SetPoint("TOPLEFT", 24, -238)
   rushLabel:SetText("¿Qué prisa tienes?")
   dialog.rush = {}
+  -- Sin prisa, Ya, Antes de 2 horas, Hoy, En 24 horas: caben en los 420 de la ventana.
+  local RUSH_W = { 66, 40, 100, 48, 86 }
   local rushLabels = { "Sin prisa" }
   for _, w in ipairs(Data.WHEN) do rushLabels[#rushLabels + 1] = w.ask end
   for i, label in ipairs(rushLabels) do
-    local b = W.Button(more, label, i == 3 and 110 or 86, 22)
+    local b = W.Button(more, label, RUSH_W[i] or 86, 22)
     if i == 1 then
       b:SetPoint("TOPLEFT", 24, -254)
     else
