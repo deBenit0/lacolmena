@@ -567,6 +567,10 @@ function Sync.Release(id)
   return afterRequestAction(Data.Release(id, ns.Now()))
 end
 
+function Sync.Reject(id, crafter)
+  return afterRequestAction(Data.Reject(id, crafter, ns.Now()))
+end
+
 function Sync.ConfirmDelivery(id, crafter, amount)
   local r, thanksChanged = Data.ConfirmDelivery(id, crafter, amount, ns.Now())
   if r and thanksChanged == true then

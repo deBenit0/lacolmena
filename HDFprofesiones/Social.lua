@@ -8,6 +8,7 @@
 -- Y solo cuentan si lo publica un oficial (rango 0 o 1 en la hermandad):
 --   an = { x = anuncio, t }    mc = { [petición] = cerrada por moderación (hora) }
 --   mp = { [petición] = prioridad (hora) }    nd = { [objeto] = { q = cuántos hacen falta, t } }
+--   mo = { ["Dueño-Reino:objeto"] o ["Dueño-Reino:i<objeto>"] = oferta quitada por un oficial (hora) }
 local _, ns = ...
 local Social = {}
 ns.Social = Social
@@ -77,6 +78,7 @@ function Social.SanitizeInto(out, e)
   end
   out.mc = cleanTimeMap(e.mc)
   out.mp = cleanTimeMap(e.mp)
+  out.mo = cleanTimeMap(e.mo)
   if type(e.nd) == "table" then
     local nd, any = {}, false
     for id, need in pairs(e.nd) do
@@ -97,6 +99,7 @@ local function mine()
   c.donated = c.donated or {}
   c.mc = c.mc or {}
   c.mp = c.mp or {}
+  c.mo = c.mo or {}
   c.needs = c.needs or {}
   return c
 end
@@ -150,6 +153,7 @@ function Social.BuildInto(e, now)
   end
   e.mc = times(c.mc, ns.Data.REQUEST_TTL * 2)
   e.mp = times(c.mp, ns.Data.REQUEST_TTL * 2)
+  e.mo = times(c.mo, ns.Offers.CRAFT_TTL * 2)
   local nd
   for id, need in pairs(c.needs) do
     if now - need.t <= Social.NEED_TTL then
@@ -228,18 +232,19 @@ end
 local cache
 local function officerData()
   if cache then return cache end
-  cache = { mc = {}, mp = {}, announcements = {} }
+  cache = { mc = {}, mp = {}, mo = {}, announcements = {} }
   local g = ns.G()
   if not g then return cache end
   for name, e in pairs(g.entries) do
     local src = e
     if name == ns.Me() then
       local c = mine()
-      src = { mc = c and c.mc, mp = c and c.mp, an = c and c.announce }
+      src = { mc = c and c.mc, mp = c and c.mp, mo = c and c.mo, an = c and c.announce }
     end
     if Social.IsOfficer(name) then
       for id, t in pairs(src.mc or {}) do cache.mc[id] = t end
       for id, t in pairs(src.mp or {}) do cache.mp[id] = t end
+      for k, t in pairs(src.mo or {}) do cache.mo[k] = math.max(cache.mo[k] or 0, t) end
       if src.an and src.an.x and src.an.x ~= "" then
         cache.announcements[#cache.announcements + 1] = { name = name, x = src.an.x, t = src.an.t or 0 }
       end
@@ -254,6 +259,12 @@ ns.Listen("ROSTER_UPDATED", Social.Invalidate)
 
 function Social.IsModClosed(id) return officerData().mc[id] end
 function Social.IsPriority(id) return officerData().mp[id] ~= nil end
+-- ¿Un oficial ha quitado esta oferta? Solo si la quitó después de ponerla: si el dueño la vuelve
+-- a poner, sale otra vez.
+function Social.IsOfferRemoved(k, t)
+  local at = officerData().mo[k]
+  return at ~= nil and at >= (t or 0)
+end
 function Social.Announcement() return officerData().announcements[1] end
 
 -- Acciones de oficial.
@@ -275,6 +286,15 @@ end
 function Social.ModClose(id, now)
   if not Social.AmOfficer() then return nil, "Solo los oficiales pueden cerrar pedidos de otros." end
   mine().mc[id] = now
+  publish()
+  return true
+end
+
+-- Quitar una oferta de otro: k = Offers.Key(dueño, objeto) para «de sus bolsas» o
+-- "Dueño-Reino:i123" para «ofrece fabricarlo».
+function Social.ModRemoveOffer(k, now)
+  if not Social.AmOfficer() then return nil, "Solo los oficiales pueden quitar ofertas de otros." end
+  mine().mo[k] = now
   publish()
   return true
 end

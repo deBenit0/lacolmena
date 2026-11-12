@@ -38,7 +38,7 @@ local function markSelected(buttons, selected)
 end
 
 local function create()
-  dialog = W.Panel("HDFProfRequestDialog", UIParent, 420, 196)
+  dialog = W.Panel("HDFProfRequestDialog", UIParent, 420, 252)
   dialog:SetFrameStrata("DIALOG")
   dialog:SetToplevel(true)
   dialog:SetPoint("CENTER", 0, 60)
@@ -85,8 +85,8 @@ local function create()
   dialog.plus:SetPoint("LEFT", dialog.qty, "RIGHT", 4, 0)
 
   -- Solo oficiales: pedido de la hermandad (lo abastecen entre varios, cada uno lo que pueda).
-  -- Propina: a la derecha de la cantidad. Cada clic pasa a la siguiente (sin propina, 50 plata,
-  -- 1, 2 y 5 oro). Escribir otra cantidad está desactivado por ahora.
+  -- Propina: a la derecha de la cantidad, escrita a mano (oro y plata) para dar un precio justo.
+  -- (el botón que iba pasando por cantidades fijas queda escondido)
   dialog.tipButton = W.Button(dialog, "Sin propina", 120, 22, function()
     local copper, nextIdx = dialog:Tip(), 1
     for i, tip in ipairs(TIPS) do
@@ -102,10 +102,11 @@ local function create()
     GameTooltip:Show()
   end)
   dialog.tipButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  dialog.tipButton:Hide()
 
   -- Más opciones (materiales, prisa y propina): ocultas para que pedir sea directo.
   dialog.moreButton = W.Button(dialog, "Más opciones", 110, 20)
-  dialog.moreButton:SetPoint("TOPLEFT", 24, -124)
+  dialog.moreButton:SetPoint("TOPLEFT", 24, -180)
   local more = CreateFrame("Frame", nil, dialog)
   more:SetAllPoints()
   dialog.more = more
@@ -114,7 +115,7 @@ local function create()
   dialog.summary:SetTextColor(0.7, 0.7, 0.7)
   function dialog:SetExpanded(expanded)
     more:SetShown(expanded)
-    self:SetHeight(expanded and 260 or 196)
+    self:SetHeight(expanded and 316 or 252)
     self.moreButton:SetText(expanded and "Menos opciones" or "Más opciones")
     self:UpdateSummary()
   end
@@ -131,14 +132,14 @@ local function create()
   end
 
   dialog.mats = W.Check(more, "Aporto yo los materiales")
-  dialog.mats:SetPoint("TOPLEFT", 20, -150)
+  dialog.mats:SetPoint("TOPLEFT", 20, -206)
   -- Solo oficiales: pedido de la hermandad (lo abastecen entre varios, cada uno lo que pueda).
   dialog.guild = W.Check(more, "Para la hermandad")
-  dialog.guild:SetPoint("TOPLEFT", 220, -150)
+  dialog.guild:SetPoint("TOPLEFT", 220, -206)
 
   -- Prisa: los mismos botones que verá el que lo acepte.
   local rushLabel = W.Text(more, "GameFontNormalSmall")
-  rushLabel:SetPoint("TOPLEFT", 24, -182)
+  rushLabel:SetPoint("TOPLEFT", 24, -238)
   rushLabel:SetText("¿Qué prisa tienes?")
   dialog.rush = {}
   local rushLabels = { "Sin prisa" }
@@ -146,7 +147,7 @@ local function create()
   for i, label in ipairs(rushLabels) do
     local b = W.Button(more, label, i == 3 and 110 or 86, 22)
     if i == 1 then
-      b:SetPoint("TOPLEFT", 24, -198)
+      b:SetPoint("TOPLEFT", 24, -254)
     else
       b:SetPoint("LEFT", dialog.rush[i - 1], "RIGHT", 4, 0)
     end
@@ -174,21 +175,54 @@ local function create()
     b:SetScript("OnClick", function() dialog:SetTip(tip.copper) end)
     dialog.tips[i] = b
   end
-  local otherLabel = W.Text(hidden, "GameFontHighlightSmall")
-  otherLabel:SetPoint("TOPLEFT", 26, -280)
-  otherLabel:SetText("u otra:")
-  dialog.gold = W.Input(hidden, 50, true)
-  dialog.gold:SetPoint("LEFT", otherLabel, "RIGHT", 12, 0)
-  dialog.gold:SetMaxLetters(5)
-  local goldLabel = W.Text(hidden, "GameFontHighlightSmall")
-  goldLabel:SetPoint("LEFT", dialog.gold, "RIGHT", 4, 0)
+  -- Propina a la vista, junto a la cantidad: «Propina [  ] oro [  ] plata».
+  local otherLabel = W.Text(dialog, "GameFontNormalSmall")
+  otherLabel:SetPoint("TOPLEFT", 24, -124)
+  otherLabel:SetText("Propina")
+  -- - y + suman o restan 10 de plata; también se puede escribir la cantidad.
+  dialog.tipMinus = W.Button(dialog, "-", 24, 22, function()
+    dialog:SetTip(math.max(0, dialog:Tip() - 1000))
+  end)
+  dialog.tipMinus:SetPoint("LEFT", otherLabel, "RIGHT", 14, 0)
+  dialog.gold = W.Input(dialog, 40, true)
+  dialog.gold:SetPoint("LEFT", dialog.tipMinus, "RIGHT", 8, 0)
+  dialog.gold:SetMaxLetters(4)
+  local goldLabel = W.Text(dialog, "GameFontHighlightSmall")
+  goldLabel:SetPoint("LEFT", dialog.gold, "RIGHT", 3, 0)
   goldLabel:SetText("oro")
-  dialog.silver = W.Input(hidden, 30, true)
-  dialog.silver:SetPoint("LEFT", goldLabel, "RIGHT", 14, 0)
+  dialog.silver = W.Input(dialog, 26, true)
+  dialog.silver:SetPoint("LEFT", goldLabel, "RIGHT", 8, 0)
   dialog.silver:SetMaxLetters(2)
-  local silverLabel = W.Text(hidden, "GameFontHighlightSmall")
-  silverLabel:SetPoint("LEFT", dialog.silver, "RIGHT", 4, 0)
+  local silverLabel = W.Text(dialog, "GameFontHighlightSmall")
+  silverLabel:SetPoint("LEFT", dialog.silver, "RIGHT", 3, 0)
   silverLabel:SetText("plata")
+  dialog.tipPlus = W.Button(dialog, "+", 24, 22, function()
+    dialog:SetTip(math.min(99999 * 10000, dialog:Tip() + 1000))
+  end)
+  dialog.tipPlus:SetPoint("LEFT", silverLabel, "RIGHT", 8, 0)
+  -- Nota libre (trueque, precio a convenir, por Discord...).
+  local noteLabel = W.Text(dialog, "GameFontNormalSmall")
+  noteLabel:SetPoint("TOPLEFT", 24, -152)
+  noteLabel:SetText("Nota")
+  dialog.note = W.Input(dialog, 316)
+  dialog.note:SetPoint("LEFT", noteLabel, "RIGHT", 14, 0)
+  dialog.note:SetMaxLetters(ns.NOTE_MAX)
+  W.Placeholder(dialog.note, "opcional: trueque, precio a convenir, por Discord...")
+  ns.UI.Tip(dialog.note, "Nota", "Por ejemplo: «hago trueque», «precio a convenir», «escríbeme por Discord», «mándamelo por correo»... Lo verán todos en el Mercado y en el anuncio.")
+  local tipNote = W.Text(dialog, "GameFontHighlightSmall")
+  tipNote:SetPoint("LEFT", dialog.tipPlus, "RIGHT", 8, 0)
+  tipNote:SetTextColor(0.6, 0.6, 0.6)
+  tipNote:SetText("(de 10 en 10 plata)")
+  for _, box in ipairs({ dialog.gold, dialog.silver }) do
+    box:HookScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+      GameTooltip:SetText("Propina")
+      GameTooltip:AddLine("Lo que quieras pagar a quien lo haga: un precio justo, ni de más ni regalado. "
+        .. "Se cobra con el correo (contra reembolso). Vacío: sin propina.", 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    box:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  end
   local codNote = W.Text(hidden, "GameFontHighlightSmall")
   codNote:SetPoint("LEFT", silverLabel, "RIGHT", 10, 0)
   codNote:SetTextColor(0.7, 0.7, 0.7)
@@ -245,7 +279,7 @@ local function create()
     local copper = self:Tip()
     local r = ns.Sync.CreateRequest({
       k = self.key, pk = self.pk, q = q, m = self.mats:GetChecked() and true or false,
-      g = copper > 0 and copper or nil, pr = self.pr,
+      g = copper > 0 and copper or nil, pr = self.pr, nt = ns.CleanNote(self.note:GetText()),
     })
     if r then
       self:Hide()
@@ -271,6 +305,7 @@ function ns.UI.OpenRequestDialog(opts)
   dialog.mats:SetChecked(true)
   dialog:SetRush(nil)
   dialog:SetTip(0)
+  dialog.note:SetText("")
   dialog:SetExpanded(false)
   dialog.guild:SetShown(ns.Social.AmOfficer())
   dialog.guild:SetChecked(false)

@@ -267,13 +267,18 @@ local function visibleHost()
   end
 end
 
-function UI.Open(pageId, selectId, host)
+-- beside: pegada a la ventana del juego aunque la hayas movido antes (al abrir con la J).
+function UI.Open(pageId, selectId, host, beside)
   if not panel then createPanel() end
   if mini and mini:IsShown() then mini:Hide() end
   host = host or visibleHost()
   panel:ClearAllPoints()
+  panel.withHost = nil
   local pos = ns.db and ns.db.settings.panelPos
-  if pos then
+  if beside and host and host:IsVisible() then
+    panel.host = host
+    panel:SetPoint("TOPLEFT", host, "TOPRIGHT", hostOffset(host) + 50, 0)
+  elseif pos then
     -- donde la dejó la última vez
     panel.host = host and host:IsVisible() and host or nil
     panel:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
@@ -549,6 +554,8 @@ function UI.AttachHost(host)
     place()
     ns.After(0.1, place)
     ns.After(0.5, place)
+    -- la J: las dos ventanas a la vez (cuando ya está dibujada, para pegarse bien)
+    ns.After(0, function() if host:IsVisible() then UI.OpenWithHost(host) end end)
   end)
   -- Número de peticiones que puedo atender, en la esquina de la pestaña.
   tab.badge = CreateFrame("Frame", nil, tab)
@@ -578,7 +585,15 @@ function UI.AttachHost(host)
   tab:SetScript("OnLeave", function() GameTooltip:Hide() end)
   -- Al cerrar la ventana de hermandad (J), la del addon se queda abierta donde estaba.
   host:HookScript("OnHide", function()
-    if not panel or panel.host ~= host then return end
+    if not panel then return end
+    -- abiertas juntas con la J: se cierran juntas
+    if panel.withHost == host then
+      panel.withHost = nil
+      panel.host = nil
+      panel:Hide()
+      return
+    end
+    if panel.host ~= host then return end
     panel.host = nil
     local l, t = panel:GetLeft(), panel:GetTop()
     if panel:IsShown() and l and t then
@@ -586,6 +601,34 @@ function UI.AttachHost(host)
       panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
     end
   end)
+end
+
+---------------------------------------------------------------------------
+-- La ventana de hermandad del juego (la J) abre también el addon, pegado a su lado en la
+-- página Hermandad; al cerrarla se cierran las dos. Se puede apagar en la página Hermandad.
+---------------------------------------------------------------------------
+-- La ventana de hermandad del juego, la de siempre.
+function UI.OpenGameGuild()
+  if ToggleGuildFrame and pcall(ToggleGuildFrame) then return true end
+  if ToggleCommunitiesFrame and pcall(ToggleCommunitiesFrame) then return true end
+  if ToggleFriendsFrame and pcall(ToggleFriendsFrame, 3) then return true end
+  return false
+end
+
+function UI.GuildKeyOn()
+  return not ns.db or ns.db.settings.guildKey ~= false
+end
+
+function UI.SetGuildKey(on)
+  if ns.db then ns.db.settings.guildKey = on and true or false end
+end
+
+-- Al abrirse la ventana del juego: el addon a su lado (si no estaba ya abierto por su cuenta).
+function UI.OpenWithHost(host)
+  if not UI.GuildKeyOn() or not (IsInGuild and IsInGuild()) then return end
+  if panel and panel:IsShown() and not panel.withHost then return end
+  UI.Open("guild", nil, host, true)
+  if panel then panel.withHost = host end
 end
 
 local function attachHosts()

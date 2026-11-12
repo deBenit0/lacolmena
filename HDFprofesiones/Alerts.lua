@@ -296,6 +296,13 @@ function Alerts.OnRequestUpdated(old, new, retry)
     end
   end
 
+  -- El autor me ha quitado el encargo.
+  if new.a ~= me and old and new.c and new.c[me] and Data.Rejected(new, me) and not Data.Rejected(old, me) then
+    Alerts.Push({ id = new.id, icon = icon,
+      text = string.format("%s te ha quitado el encargo: %s", ns.ShortName(new.a), ns.KeyLabel(new.k)) })
+    return
+  end
+
   -- Lo acepté a la vez que otro y él lo hizo antes: me quedo sin él.
   if new.a ~= me and old and new.c and new.c[me] then
     local mineBefore = old.c and old.c[me] and Data.CommitActive(old.c[me], now, old)

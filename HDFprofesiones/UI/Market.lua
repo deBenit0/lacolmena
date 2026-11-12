@@ -761,6 +761,7 @@ ns.UI.RegisterPage("market", function(page)
     if needed then lines[#lines + 1] = "|cffbbbbbbHace falta: " .. needed .. "|r" end
     lines[#lines + 1] = "Propina: " .. (payText(r) or "|cffbbbbbbninguna|r")
     lines[#lines + 1] = "Prisa: " .. (r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. "|r") or "sin prisa")
+    if r.nt then lines[#lines + 1] = "Nota: |cffffffff" .. r.nt .. "|r" end
     if info.owner then
       local cm = r.c[info.owner]
       local w = cm.w and Data.WHEN[cm.w]
@@ -791,7 +792,9 @@ ns.UI.RegisterPage("market", function(page)
           target = c
         end
       end
-      setButton(detail.b1, "Recibido", active and target ~= nil, function()
+      -- Se le pasó el plazo sin entregar del todo: aún se puede apuntar lo que llegue.
+      if not target and info.late then target = info.late end
+      setButton(detail.b1, "Recibido", (active or info.state == "expired") and target ~= nil, function()
         local left = math.max(1, (target.pending > 0) and target.pending or (r.q - info.delivered))
         local byMail = target.mailed or 0
         local text = byMail > 0
@@ -844,6 +847,16 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.x2, nil)
       setButton(detail.x3, nil)
     end
+    -- Mi pedido con encargado que no lo envía: quitárselo para que lo coja otro.
+    if r.a == me and active and info.owner then
+      local who = info.owner
+      setButton(detail.x3, "Quitar encargado", true, function()
+        W.Confirm(string.format("¿Quitarle el encargo a %s? Volverá al Mercado para que lo coja otro "
+          .. "(lo que ya te haya enviado se queda contado).", ns.ShortName(who)), function()
+          ns.Sync.Reject(r.id, who)
+        end)
+      end, "Si no te lo envía, para que lo pueda aceptar otro.")
+    end
   end
 
   -- Oferta.
@@ -855,6 +868,7 @@ ns.UI.RegisterPage("market", function(page)
       .. ns.FormatDuration(now - (o.t or now)) .. "|r")
     detail.steps:SetText("Precio: " .. ns.UI.PriceText(o.g) .. "   " .. (expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) or ""))
     local lines = {}
+    if o.nt then lines[#lines + 1] = "Nota: |cffffffff" .. o.nt .. "|r" end
     lines[#lines + 1] = o.free > 0 and string.format("Quedan |cffffffff%d|r libres de %d.", o.free, o.q)
       or "|cffff9933Ya está todo pedido.|r"
     if item.mine then
@@ -920,7 +934,7 @@ ns.UI.RegisterPage("market", function(page)
           .. "desde aquí, se apunta solo.")
       else
         setButton(detail.b3, "Editar", true, function()
-          ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g })
+          ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g, note = o.nt })
         end, "Cambiar la cantidad o el precio.")
       end
     elseif item.claimed then
@@ -943,7 +957,14 @@ ns.UI.RegisterPage("market", function(page)
     end
     setButton(detail.x1, nil)
     setButton(detail.x2, nil)
-    setButton(detail.x3, nil)
+    if not item.mine and ns.Social.AmOfficer() then
+      setButton(detail.x3, "Quitar (oficial)", true, function()
+        W.Confirm("¿Quitar esta oferta de " .. ns.ShortName(o.owner) .. " como oficial? Desaparecerá del Mercado de todos.",
+          function() ns.Social.ModRemoveOffer(o.key, ns.Now()) end)
+      end, "Solo oficiales.")
+    else
+      setButton(detail.x3, nil)
+    end
   end
 
   -- Ofrecen fabricarlo (una fila con todos los que lo ofrecen).
@@ -960,6 +981,7 @@ ns.UI.RegisterPage("market", function(page)
     for i = 1, math.min(2, n) do
       local c = grp.crafters[i]
       local who = c.name == me and "|cffffd100Tú|r" or ns.WhoColored(c.name)
+      if c.nt then lines[#lines + 1] = string.format("%s dice: |cffffffff%s|r", who, c.nt) end
       lines[#lines + 1] = string.format("%s: %s · %s", who, ns.UI.PriceText(c.g),
         c.m and "pone los materiales" or "|cffbbbbbbmateriales de quien lo pide|r")
     end
@@ -994,7 +1016,7 @@ ns.UI.RegisterPage("market", function(page)
         local kind, id = ns.ParseKey(item.k)
         local o = ns.Offers.MyCrafts()[item.k]
         if kind == "i" and o then
-          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1 })
+          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1, note = o.nt })
         else
           ns.UI.OpenAsk("craft")
         end
@@ -1010,7 +1032,25 @@ ns.UI.RegisterPage("market", function(page)
     end
     setButton(detail.x1, nil)
     setButton(detail.x2, nil)
-    setButton(detail.x3, nil)
+    -- Oficial: quitar lo que ofrece otro (si lo ofrecen varios, se elige quién).
+    local others = {}
+    for _, c in ipairs(grp.crafters) do if c.name ~= me then others[#others + 1] = c end end
+    if #others > 0 and ns.Social.AmOfficer() then
+      setButton(detail.x3, "Quitar (oficial)", true, function()
+        local function remove(c) ns.Social.ModRemoveOffer(c.name .. ":" .. item.k, ns.Now()) end
+        if #others == 1 then
+          W.Confirm("¿Quitar la oferta de " .. ns.ShortName(others[1].name) .. " como oficial? Desaparecerá del Mercado de todos.",
+            function() remove(others[1]) end)
+        else
+          local labels = {}
+          for i = 1, math.min(4, #others) do labels[i] = ns.ShortName(others[i].name) end
+          W.Choose("¿De quién quitas la oferta?", "Como oficial: desaparecerá del Mercado de todos.", labels,
+            function(i) if others[i] then remove(others[i]) end end)
+        end
+      end, "Solo oficiales.")
+    else
+      setButton(detail.x3, nil)
+    end
   end
 
   -- Pedido de la hermandad (aportan varios).

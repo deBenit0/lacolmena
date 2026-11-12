@@ -34,6 +34,8 @@ Data.WHEN = {
   { id = 1, label = "Lo hago ya", need = "Lo necesita ya", ask = "Ya", secs = 3600 },
   { id = 2, label = "Antes de 2 horas", need = "Lo necesita antes de 2 h", ask = "Antes de 2 horas", secs = 7200 },
   { id = 3, label = "Lo hago hoy", need = "Lo necesita hoy", ask = "Hoy", today = true },
+  -- el correo entre jugadores tarda y a veces no coincides con quien lo pidió
+  { id = 4, label = "Antes de 24 horas", need = "Lo necesita antes de 24 h", ask = "En 24 horas", secs = 24 * 3600 },
 }
 
 -- Plazo (en el reloj del addon) para la opción elegida.
@@ -111,7 +113,7 @@ function Data.SanitizeEntry(e)
     ga = cleanNumberMap(e.ga, "number"),
     kc = cleanNumberMap(e.kc, "string"),
     kd = tonumber(e.kd),
-    ro = (e.ro == 1 or e.ro == 2 or e.ro == 4) and e.ro or nil,
+    ro = (type(e.ro) == "number" and e.ro >= 1 and e.ro <= 7 and e.ro % 1 == 0) and e.ro or nil, -- 1+2+4: varios roles
   }
   if type(e.p) == "table" then
     local profs, any = {}, false
@@ -173,6 +175,7 @@ local function restoreRest(e, c)
   fill("needs", e.nd)
   fill("mc", e.mc)
   fill("mp", e.mp)
+  fill("mo", e.mo)
   fill("guildOrders", e.go)
   fill("hist", e.hi)
   if e.an and not c.announce then c.announce = deepCopy(e.an) end
@@ -525,7 +528,7 @@ end
 ---------------------------------------------------------------------------
 -- Peticiones
 ---------------------------------------------------------------------------
-local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu", "pr" }
+local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu", "pr", "rj", "nt" }
 
 function Data.SanitizeRequest(r)
   if type(r) ~= "table" then return nil end
@@ -563,6 +566,18 @@ function Data.SanitizeRequest(r)
   if vu and vu >= 1 then out.vu = floor(vu) end
   local pr = tonumber(r.pr)
   if pr and Data.WHEN[pr] then out.pr = pr end
+  out.nt = ns.CleanNote(r.nt) -- nota del que pide
+  -- rj = { [fabricante] = hora }: el autor le quitó el encargo (vuelve al Mercado)
+  if type(r.rj) == "table" then
+    local rj, any = {}, false
+    for name, t in pairs(r.rj) do
+      if type(name) == "string" and tonumber(t) then
+        rj[name] = tonumber(t)
+        any = true
+      end
+    end
+    if any then out.rj = rj end
+  end
   if type(r.c) == "table" then
     local c, any = {}, false
     for name, cm in pairs(r.c) do
@@ -669,12 +684,19 @@ local function commitAlive(cm, now)
   return now <= commitDeadline(cm)
 end
 
+-- ¿Le quitó el autor el encargo? (solo cuenta si se lo quitó después de aceptarlo)
+local function rejected(r, name, cm)
+  local t = r and r.rj and r.rj[name]
+  return t ~= nil and t >= (cm.at or cm.cv or 0)
+end
+Data.Rejected = function(r, name) return r and r.c and r.c[name] and rejected(r, name, r.c[name]) or false end
+
 -- El pedido es de uno solo: el primero que lo aceptó (si dos lo aceptan a la vez sin verse,
 -- gana el que lo hizo antes; todos llegan a la misma conclusión).
 function Data.OwnerOf(r, now)
   local owner, ocm
   for name, cm in pairs(r and r.c or {}) do
-    if commitAlive(cm, now) then
+    if commitAlive(cm, now) and not rejected(r, name, cm) then
       -- la hora en que lo aceptó (ampliar el plazo no cambia quién lo tiene)
       local cv, ocv = cm.at or cm.cv or 0, ocm and (ocm.at or ocm.cv or 0)
       if not owner or cv < ocv or (cv == ocv and name < owner) then owner, ocm = name, cm end
@@ -717,6 +739,18 @@ function Data.RequestInfo(r, now)
     end
   end
   table.sort(info.commits, function(x, y) return x.name < y.name end)
+  -- Sin encargado, el último que lo aceptó y se le pasó el plazo (sin soltarlo ni que se lo
+  -- quitaran): el autor aún puede darle a «Recibido» (el correo tarda y a veces no coincidís).
+  if not info.owner then
+    local best, bestAt
+    for name, cm in pairs(r.c or {}) do
+      if cm.n and not cm.rl and not rejected(r, name, cm) and deliveredOf(cm) < cm.n then
+        local at = cm.at or cm.cv or 0
+        if not bestAt or at > bestAt then best, bestAt = name, at end
+      end
+    end
+    if best then info.late = { name = best, pending = 0, mailed = r.c[best].s or 0 } end
+  end
   info.expires = max(r.t or 0, r.rn or 0) + Data.REQUEST_TTL
   info.remaining = max(0, r.q - info.delivered - info.pending)
   local modClosed = ns.Social and ns.Social.IsModClosed(r.id)
@@ -863,6 +897,7 @@ function Data.CreateRequest(opts, now)
   local g, me = ns.G(), ns.Me()
   if not g or not me then return nil, "No estás en una hermandad." end
   if not ns.ParseKey(opts.k) then return nil, "Elige un objeto o encantamiento." end
+  if ns.IsSoulbound(opts.k) then return nil, "Ese objeto se liga al recogerlo: quien lo fabrique no te lo puede dar." end
   if Data.CountOpenBy(me, now) >= Data.MAX_OPEN then
     return nil, "Ya tienes " .. Data.MAX_OPEN .. " peticiones abiertas."
   end
@@ -870,7 +905,7 @@ function Data.CreateRequest(opts, now)
   local id = me .. ":" .. Codec.EncodeUInt(now) .. Codec.EncodeUInt(g.reqSeq % 1024)
   local r = Data.SanitizeRequest({
     id = id, a = me, t = now, k = opts.k, pk = opts.pk, q = opts.q or 1, av = now,
-    m = opts.m and true or nil, g = opts.g, pr = opts.pr,
+    m = opts.m and true or nil, g = opts.g, pr = opts.pr, nt = opts.nt,
   })
   g.requests[id] = r
   return r
@@ -892,6 +927,7 @@ function Data.Commit(id, when, now)
     return nil, "Ya lo ha aceptado " .. ns.ShortName(info.owner) .. "."
   end
   if info.state ~= "open" then return nil, "La petición ya no está abierta." end
+  if r.rj and r.rj[me] then return nil, ns.ShortName(r.a) .. " te quitó este encargo: no puedes volver a cogerlo." end
   when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}
@@ -1038,6 +1074,18 @@ function Data.SetQuantity(id, q, now)
   q = min(Data.MAX_QTY, max(1, floor(tonumber(q) or 1)))
   if q == r.q then return r end
   r.q = q
+  r.av = bump(r.av, now)
+  return r
+end
+
+-- El autor le quita el encargo a quien lo aceptó (no lo envía): vuelve al Mercado para otro.
+function Data.Reject(id, crafter, now)
+  local r, me = getRequest(id), ns.Me()
+  if not r then return nil, "La petición ya no existe." end
+  if r.a ~= me then return nil, "Solo el autor puede quitar el encargo." end
+  if not (r.c and r.c[crafter]) then return nil, "Esa persona no tiene el encargo." end
+  r.rj = r.rj or {}
+  r.rj[crafter] = now
   r.av = bump(r.av, now)
   return r
 end

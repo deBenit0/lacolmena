@@ -48,15 +48,29 @@ function Dungeons.RoleFromTalents(class, points)
 end
 
 -- Rol válido (1 tanque, 2 sanador, 4 DPS) o nil.
+-- Rol de un personaje: uno o varios a la vez (suma de 1 tanque, 2 sanador y 4 DPS: de 1 a 7).
 function Dungeons.CleanRole(role)
   role = tonumber(role)
-  if role == 1 or role == 2 or role == 4 then return role end
+  if role and role >= 1 and role <= 7 and role % 1 == 0 then return role end
   return nil
+end
+
+function Dungeons.HasRole(mask, bit)
+  mask = tonumber(mask)
+  return mask ~= nil and math.floor(mask / bit) % 2 == 1
 end
 
 function Dungeons.RoleLabel(role, plural)
   for _, r in ipairs(Dungeons.ROLES) do
     if r.bit == role then return plural and r.plural or r.label end
+  end
+  -- varios a la vez: «Tanque/DPS»
+  if Dungeons.CleanRole(role) then
+    local parts = {}
+    for _, r in ipairs(Dungeons.ROLES) do
+      if Dungeons.HasRole(role, r.bit) then parts[#parts + 1] = r.label end
+    end
+    return table.concat(parts, "/")
   end
   return nil
 end
@@ -75,9 +89,18 @@ function Dungeons.RoleCounts(entries, roster)
     seen[name] = true
     if (tonumber(level) or 0) < Dungeons.ROLE_MIN_LEVEL then return end
     role = Dungeons.CleanRole(role) or (Dungeons.CLASS_ROLES[class] == Dungeons.DPS and Dungeons.DPS) or nil
-    local key = role or "unknown"
-    out[key] = out[key] + 1
-    table.insert(out.names[key], name)
+    if not role then
+      out.unknown = out.unknown + 1
+      table.insert(out.names.unknown, name)
+      return
+    end
+    -- con varios roles, cuenta en cada uno
+    for _, r in ipairs(Dungeons.ROLES) do
+      if Dungeons.HasRole(role, r.bit) then
+        out[r.bit] = out[r.bit] + 1
+        table.insert(out.names[r.bit], name)
+      end
+    end
   end
   for name, e in pairs(entries or {}) do
     local r = roster and roster[name]

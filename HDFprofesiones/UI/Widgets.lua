@@ -554,6 +554,9 @@ function W.Choose(title, sub, labels, callback)
   end
   local n = #labels
   local width = n * 132 - 8
+  choice:SetWidth(math.max(430, width + 36)) -- con 4 botones no cabían
+  choice.title:SetWidth(choice:GetWidth() - 30)
+  choice.sub:SetWidth(choice:GetWidth() - 30)
   for i, b in ipairs(choice.buttons) do
     b:ClearAllPoints()
     b:SetPoint("BOTTOMLEFT", choice, "BOTTOM", -width / 2 + (i - 1) * 132, 40)

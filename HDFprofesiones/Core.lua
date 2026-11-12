@@ -153,6 +153,36 @@ function ns.FormatDuration(seconds)
   return "menos de 1 min"
 end
 
+-- Nota de un pedido u oferta («trueque», «precio a convenir», «escríbeme por Discord»...):
+-- texto corto, sin códigos del juego (la barra | abre colores y enlaces) ni saltos de línea.
+ns.NOTE_MAX = 80
+function ns.CleanNote(text)
+  if type(text) ~= "string" then return nil end
+  text = text:gsub("|", ""):gsub("[%c]", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  if text == "" then return nil end
+  if #text > ns.NOTE_MAX then
+    -- cortar sin partir una letra con tilde
+    local out = ""
+    for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+      if #out + #ch > ns.NOTE_MAX then break end
+      out = out .. ch
+    end
+    text = out
+  end
+  return text
+end
+
+-- Dinero en palabras, para el chat («1 oro 50 plata», «50 plata»): sin iconos.
+function ns.MoneyWords(copper)
+  copper = floor(copper or 0)
+  local gold, silver, cop = floor(copper / 10000), floor(copper / 100) % 100, copper % 100
+  local parts = {}
+  if gold > 0 then parts[#parts + 1] = gold .. " oro" end
+  if silver > 0 then parts[#parts + 1] = silver .. " plata" end
+  if cop > 0 or #parts == 0 then parts[#parts + 1] = cop .. " cobre" end
+  return table.concat(parts, " ")
+end
+
 function ns.FormatMoney(copper)
   copper = floor(copper or 0)
   if GetCoinTextureString then return GetCoinTextureString(copper) end
@@ -325,6 +355,16 @@ function ns.KeyInfo(key)
     return name, icon or ns.QUESTION_ICON, link
   end
   return nil, ns.QUESTION_ICON
+end
+
+-- ¿Se liga al recogerlo (o es de misión)? Entonces no se puede dar a nadie: quien lo fabrica
+-- se lo queda. true/false; nil si el juego aún no tiene los datos del objeto.
+function ns.IsSoulbound(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return false end
+  local name, _, _, _, _, _, _, _, _, _, _, _, _, bindType = getItemInfo(id)
+  if not name then return nil end
+  return bindType == 1 or bindType == 4
 end
 
 function ns.KeyName(key)

@@ -936,6 +936,7 @@ local function buildCatalog(page, mode)
     -- Añade un objeto a un grupo (tipo de material en materiales, ranura en equipo).
     local function add(key, pk, rec, groupKey, groupLabel)
       local name, icon, _, quality, minLevel, equipLoc = ns.KeyInfo(key)
+      if ns.IsSoulbound(key) then return end -- se liga al recogerlo: no se puede pedir
       local label = name or ns.KeyName(key)
       local lower = label:lower()
       if state.search ~= "" and not lower:find(state.search, 1, true) then return end
@@ -1370,16 +1371,65 @@ local function buildCraftOffer(page)
     b:SetPoint("TOPLEFT", 12 + (i - 1) * 80, -90)
     side.prices[i] = b
   end
+  -- O el precio exacto, escrito a mano (para cobrar lo justo).
+  local exact = W.Text(side, "GameFontHighlightSmall")
+  exact:SetPoint("TOPLEFT", 14, -124)
+  exact:SetText("o escribe:")
+  side.gold = W.Input(side, 44, true)
+  side.gold:SetPoint("LEFT", exact, "RIGHT", 10, 0)
+  side.gold:SetMaxLetters(4)
+  local goldLabel = W.Text(side, "GameFontHighlightSmall")
+  goldLabel:SetPoint("LEFT", side.gold, "RIGHT", 3, 0)
+  goldLabel:SetText("oro")
+  side.silver = W.Input(side, 28, true)
+  side.silver:SetPoint("LEFT", goldLabel, "RIGHT", 8, 0)
+  side.silver:SetMaxLetters(2)
+  local silverLabel = W.Text(side, "GameFontHighlightSmall")
+  silverLabel:SetPoint("LEFT", side.silver, "RIGHT", 3, 0)
+  silverLabel:SetText("plata")
+  local function exactPrice()
+    return (tonumber(side.gold:GetText()) or 0) * 10000 + (tonumber(side.silver:GetText()) or 0) * 100
+  end
+  side.setPrice = W.Button(side, "Poner", 60, 22, function()
+    side.gold:ClearFocus()
+    side.silver:ClearFocus()
+    change(exactPrice(), nil)
+  end)
+  side.setPrice:SetPoint("LEFT", silverLabel, "RIGHT", 10, 0)
+  for _, box in ipairs({ side.gold, side.silver }) do
+    box:SetScript("OnEnterPressed", function(self)
+      self:ClearFocus()
+      change(exactPrice(), nil)
+    end)
+  end
   side.matsLabel = W.Text(side, "GameFontNormalSmall")
-  side.matsLabel:SetPoint("TOPLEFT", 14, -124)
+  side.matsLabel:SetPoint("TOPLEFT", 14, -156)
   side.matsLabel:SetText("Materiales")
   side.mats = W.Button(side, "", 316, 22, function()
     local o = current()
     if o then change(nil, o.m ~= 1) end
   end)
-  side.mats:SetPoint("TOPLEFT", 12, -140)
+  side.mats:SetPoint("TOPLEFT", 12, -172)
+  local noteLabel = W.Text(side, "GameFontNormalSmall")
+  noteLabel:SetPoint("TOPLEFT", 14, -206)
+  noteLabel:SetText("Nota")
+  side.note = W.Input(side, 220)
+  side.note:SetPoint("LEFT", noteLabel, "RIGHT", 10, 0)
+  side.note:SetMaxLetters(ns.NOTE_MAX)
+  W.Placeholder(side.note, "trueque, a convenir...")
+  ns.UI.Tip(side.note, "Nota", "Por ejemplo: «hago trueque», «precio a convenir», «escríbeme por Discord», «mándamelo por correo»... Lo verán todos en el Mercado y en el anuncio.")
+  local function saveNote()
+    local o = current()
+    side.note:ClearFocus()
+    if not o then return end
+    Offers.SetCraft(state.selected, o.g or 0, o.m == 1, o.t or ns.Now(), side.note:GetText() or "")
+    page:Refresh()
+  end
+  side.note:SetScript("OnEnterPressed", saveNote)
+  side.saveNote = W.Button(side, "Guardar", 64, 22, saveNote)
+  side.saveNote:SetPoint("LEFT", side.note, "RIGHT", 6, 0)
   side.summary = W.Text(side, "GameFontHighlightSmall")
-  side.summary:SetPoint("TOPLEFT", 14, -186)
+  side.summary:SetPoint("TOPLEFT", 14, -238)
   side.summary:SetWidth(320)
   side.summary:SetJustifyV("TOP")
   side.summary:SetSpacing(2)
@@ -1404,7 +1454,7 @@ local function buildCraftOffer(page)
     local all, seen, me = {}, {}, ns.Me()
     for pk, prof in pairs(c and c.profs or {}) do
       for k in pairs(prof.recipes or {}) do
-        if not seen[k] then
+        if not seen[k] and not ns.IsSoulbound(k) then -- lo que se liga al recogerlo no se puede dar
           seen[k] = true
           local name = ns.KeyName(k)
           if state.search == "" or name:lower():find(state.search, 1, true) then
@@ -1474,6 +1524,16 @@ local function buildCraftOffer(page)
       if fs then fs:SetTextColor(on and 1 or 1, on and 1 or 0.82, on and 1 or 0) end
     end
     side.mats:SetEnabled(o ~= nil)
+    side.saveNote:SetEnabled(o ~= nil)
+    if not side.note:HasFocus() then side.note:SetText(o and o.nt or "") end
+    -- el precio de la receta elegida, en las casillas (si no las está escribiendo)
+    side.setPrice:SetEnabled(o ~= nil)
+    if not side.gold:HasFocus() and not side.silver:HasFocus() then
+      local copper = o and o.g or 0
+      local g, sv = math.floor(copper / 10000), math.floor(copper / 100) % 100
+      side.gold:SetText(g > 0 and tostring(g) or "")
+      side.silver:SetText(sv > 0 and tostring(sv) or "")
+    end
     side.mats:SetText(o and o.m == 1 and "Los pongo yo" or "Los pone quien lo pide")
     local n = Offers.CountCrafts()
     side.summary:SetText(string.format("Ofreces |cffffffff%d|r de %d recetas.\n", n, Offers.MAX_CRAFTS)

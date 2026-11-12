@@ -279,7 +279,7 @@ local function createOfferDialog()
   d.more = more
   function d:SetExpanded(expanded)
     more:SetShown(expanded)
-    self:SetHeight(expanded and 330 or 226)
+    self:SetHeight(expanded and 362 or 226)
     self.moreButton:SetText(expanded and "Menos opciones" or "Más opciones")
   end
   d.moreButton:SetScript("OnClick", function() d:SetExpanded(not more:IsShown()) end)
@@ -297,7 +297,7 @@ local function createOfferDialog()
   end
   local other = W.Text(more, "GameFontHighlightSmall")
   other:SetPoint("TOPLEFT", 26, -230)
-  other:SetText("u otro:")
+  other:SetText("o escribe:")
   d.gold = W.Input(more, 50, true)
   d.gold:SetPoint("LEFT", other, "RIGHT", 12, 0)
   d.gold:SetMaxLetters(5)
@@ -310,6 +310,16 @@ local function createOfferDialog()
   local silverLabel = W.Text(more, "GameFontHighlightSmall")
   silverLabel:SetPoint("LEFT", d.silver, "RIGHT", 4, 0)
   silverLabel:SetText("plata")
+
+  -- Nota libre (trueque, precio a convenir, por Discord...).
+  local noteLabel = W.Text(more, "GameFontNormalSmall")
+  noteLabel:SetPoint("TOPLEFT", 24, -262)
+  noteLabel:SetText("Nota")
+  d.note = W.Input(more, 290)
+  d.note:SetPoint("LEFT", noteLabel, "RIGHT", 14, 0)
+  d.note:SetMaxLetters(ns.NOTE_MAX)
+  W.Placeholder(d.note, "opcional: trueque, a convenir, por Discord...")
+  ns.UI.Tip(d.note, "Nota", "Por ejemplo: «hago trueque», «precio a convenir», «escríbeme por Discord», «mándamelo por correo»... Lo verán todos en el Mercado y en el anuncio.")
 
   function d:Price()
     return (tonumber(self.gold:GetText()) or 0) * 10000 + (tonumber(self.silver:GetText()) or 0) * 100
@@ -382,11 +392,11 @@ local function createOfferDialog()
     if self.mode == "need" then
       ok, err = ns.Social.AddNeed(self.id, tonumber(self.qty:GetText()), ns.Now())
     elseif self.kind == "craft" then
-      ok, err = ns.Offers.SetCraft("i" .. tostring(self.id), self:Price(), self.matsOn, ns.Now())
+      ok, err = ns.Offers.SetCraft("i" .. tostring(self.id), self:Price(), self.matsOn, ns.Now(), self.note:GetText() or "")
     elseif self.id and ns.ItemCount(self.id) < 1 then
       ok, err = nil, "No llevas ninguno: para ofrecer fabricarlo, hazlo desde tu ventana de profesión."
     else
-      ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now())
+      ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now(), self.note:GetText() or "")
     end
     if not ok then
       ns.Print(err)
@@ -426,6 +436,7 @@ function ns.UI.OpenOfferDialog(id, qty, mode, opts)
   d.have:SetText("")
   d.iconTex:SetTexture(ns.QUESTION_ICON)
   d:SetPrice(opts.price or 0)
+  d.note:SetText(opts.note or "")
   d.mode = mode
   local need = mode == "need"
   -- El precio se ve siempre al ofrecer (antes estaba escondido en «Más opciones»).

@@ -53,6 +53,7 @@ function ChatLog.Text(r)
   local w = r.pr and Data.WHEN[r.pr]
   if w then extra[#extra + 1] = w.need:lower() end
   if r.m then extra[#extra + 1] = "pongo los materiales" end
+  if r.nt then extra[#extra + 1] = r.nt end
   if #extra > 0 then text = text .. " (" .. table.concat(extra, ", ") .. ")" end
   text = text .. ". "
   -- la marca siempre entera: si no cabe, se acorta el enlace a solo el nombre

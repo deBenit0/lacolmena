@@ -19,7 +19,7 @@ function ns.UI.ContributeNeed(item)
 end
 
 -- Profesiones que salen en «Quién fabrica qué», en este orden.
-local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182, 755, 773, 40 }
+local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182 }
 
 -- Todos los de la hermandad con una profesión, con su nivel (de más a menos) o, con byKarma, por
 -- el karma de la persona (su principal) y luego por nivel.
@@ -98,7 +98,85 @@ local function karmaRanking()
   return out
 end
 
+-- Ventana para elegir el rol (o los roles) de este personaje. Con "force" no se puede cerrar
+-- sin elegir: sale la primera vez que se abre la Hermandad.
+local rolesFrame
+function ns.UI.ChooseRoles(force)
+  local D = ns.Dungeons
+  local c = ns.MyChar()
+  if not c then return end
+  if not rolesFrame then
+    local f = W.Panel("HDFProfRoles", UIParent, 380, 176)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 80)
+    f:Hide()
+    f.title = W.Text(f, "GameFontNormalLarge", "CENTER")
+    f.title:SetPoint("TOP", 0, -16)
+    f.title:SetText("¿Qué rol haces con este personaje?")
+    f.sub = W.Text(f, "GameFontHighlightSmall", "CENTER")
+    f.sub:SetPoint("TOP", f.title, "BOTTOM", 0, -6)
+    f.sub:SetWidth(350)
+    f.sub:SetText("Puedes marcar varios. Sirve para saber cuántos tanques, sanadores y DPS tiene la hermandad.")
+    local ICONS = { [1] = "Interface\\Icons\\Ability_Defend", [2] = "Interface\\Icons\\Spell_Holy_FlashHeal",
+      [4] = "Interface\\Icons\\INV_Sword_04" }
+    f.buttons = {}
+    for i, r in ipairs(D.ROLES) do
+      local b = W.Chip(f, "      " .. r.label, 108, function()
+        f.mask = D.HasRole(f.mask, r.bit) and (f.mask - r.bit) or (f.mask + r.bit)
+        f:Update()
+      end)
+      b:SetHeight(30)
+      b:SetPoint("TOPLEFT", 16 + (i - 1) * 118, -74)
+      b.icon = b:CreateTexture(nil, "OVERLAY")
+      b.icon:SetSize(20, 20)
+      b.icon:SetPoint("LEFT", 8, 0)
+      b.icon:SetTexture(ICONS[r.bit])
+      b.bit = r.bit
+      f.buttons[i] = b
+    end
+    f.ok = W.Button(f, "Aceptar", 110, 24, function()
+      local me = ns.MyChar()
+      if not me or f.mask == 0 then return end
+      me.roleSet = f.mask
+      f:Hide()
+      ns.Sync.PublishMine()
+      ns.Fire("DATA_CHANGED", "role")
+    end)
+    f.ok:SetPoint("BOTTOM", 0, 16)
+    f.close = W.CloseButton(f)
+    f.close:SetPoint("TOPRIGHT", -2, -2)
+    function f:Update()
+      local me = ns.MyChar()
+      local allowed = D.CLASS_ROLES[(me and me.class) or D.MyClass()] or 7
+      for _, b in ipairs(self.buttons) do
+        local can = D.HasRole(allowed, b.bit)
+        b:SetEnabled(can)
+        b.icon:SetDesaturated(not can)
+        b:SetOn(D.HasRole(self.mask, b.bit))
+      end
+      self.ok:SetEnabled(self.mask > 0)
+    end
+    rolesFrame = f
+  end
+  local allowed = D.CLASS_ROLES[c.class or D.MyClass()] or 7
+  local mask = D.CleanRole(c.roleSet) or 0
+  -- solo los roles que puede hacer su clase
+  for _, r in ipairs(D.ROLES) do
+    if D.HasRole(mask, r.bit) and not D.HasRole(allowed, r.bit) then mask = mask - r.bit end
+  end
+  rolesFrame.mask = mask
+  rolesFrame.close:SetShown(not force)
+  rolesFrame:Update()
+  rolesFrame:Show()
+end
+
 ns.UI.RegisterPage("guild", function(page)
+  -- La primera vez (sin rol elegido) hay que decir qué rol haces.
+  page:HookScript("OnShow", function()
+    local c = ns.MyChar()
+    if c and not c.roleSet then ns.UI.ChooseRoles(true) end
+  end)
   -- Columnas: karma (izquierda), «Quién fabrica qué» (centro) y oficiales (derecha, solo si lo eres).
   -- Si no eres oficial, «Quién fabrica qué» se queda también con el sitio de los oficiales.
   local COL1, COL2, COL3 = 0, 262, 604
@@ -162,23 +240,26 @@ ns.UI.RegisterPage("guild", function(page)
   title("Roles", COL1 + 4, -322)
   local rolesHint = W.Text(page, "GameFontDisableSmall")
   rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324)
-  rolesHint:SetText("desde nivel 10 · pulsa el tuyo")
+  rolesHint:SetText("desde nivel 10 · pulsa los tuyos")
 
-  -- Pulsar tanque, sanador o DPS pone ese rol a este personaje (como en Opciones); pulsar el que
-  -- ya elegiste vuelve a «Auto» (talentos).
+  -- Pulsar tanque, sanador o DPS lo añade a los roles de este personaje (puede tener varios);
+  -- pulsar uno que ya tiene lo quita. Sin ninguno, vuelve a «Auto» (talentos).
   local function setMyRole(role)
     local c = ns.MyChar()
     if not c then return end
-    if c.roleSet == role then
-      c.roleSet = nil
+    local D = ns.Dungeons
+    local mask = D.CleanRole(c.roleSet) or 0
+    if D.HasRole(mask, role) then
+      mask = mask - role
     else
-      local allowed = ns.Dungeons.CLASS_ROLES[c.class or ns.Dungeons.MyClass()] or 7
-      if math.floor(allowed / role) % 2 ~= 1 then
-        ns.Print("tu clase no puede ser %s.", ns.Dungeons.RoleLabel(role):lower())
+      local allowed = D.CLASS_ROLES[c.class or D.MyClass()] or 7
+      if not D.HasRole(allowed, role) then
+        ns.Print("tu clase no puede ser %s.", D.RoleLabel(role):lower())
         return
       end
-      c.roleSet = role
+      mask = mask + role
     end
+    c.roleSet = mask > 0 and mask or nil
     ns.Sync.PublishMine()
     page:Refresh()
   end
@@ -238,14 +319,14 @@ ns.UI.RegisterPage("guild", function(page)
         local c = ns.MyChar()
         if s.key == "unknown" then
           GameTooltip:AddLine(s.text, 1, 1, 1, true)
-        elseif c and c.roleSet == s.key then
-          GameTooltip:AddLine("Es el tuyo: lo has elegido tú. Pulsa otra vez para volver a «Auto» (talentos).",
+        elseif c and ns.Dungeons.HasRole(c.roleSet, s.key) then
+          GameTooltip:AddLine("Es uno de los tuyos: lo has elegido tú. Pulsa otra vez para quitarlo.",
             0.25, 1, 0.25, true)
         elseif c and not c.roleSet and c.roleAuto == s.key then
           GameTooltip:AddLine("Es el tuyo: sale de tus talentos. Pulsa para fijarlo a mano.", 0.25, 1, 0.25, true)
         else
-          GameTooltip:AddLine("Pulsa si este personaje es " .. ns.Dungeons.RoleLabel(s.key):lower()
-            .. " (como el rol de Opciones). Otra vez: vuelve a «Auto».", 1, 1, 1, true)
+          GameTooltip:AddLine("Pulsa si este personaje también hace de " .. ns.Dungeons.RoleLabel(s.key):lower()
+            .. " (puedes marcar varios). Otra vez: lo quita.", 1, 1, 1, true)
         end
         local names = page.roleNames and page.roleNames[s.key] or {}
         if #names > 0 then
@@ -304,6 +385,15 @@ ns.UI.RegisterPage("guild", function(page)
   page.noWho:SetTextColor(0.6, 0.6, 0.6)
 
   -- Columna 3: oficiales.
+  -- Abajo a la derecha: la ventana de hermandad del juego (la J abre esta página).
+  page.gameGuild = W.Button(page, "Ventana del juego", 140, 22, function() ns.UI.OpenGameGuild() end)
+  page.gameGuild:SetPoint("BOTTOMRIGHT", 0, 2)
+  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: lista de miembros, rangos, noticias...")
+  page.guildKey = W.Check(page, "Abrir con la J", function(checked) ns.UI.SetGuildKey(checked) end)
+  page.guildKey:SetPoint("RIGHT", page.gameGuild, "LEFT", -150, 0)
+  ns.UI.Tip(page.guildKey, "Abrir con la J", "Al abrir la ventana de hermandad del juego (la J), se abre "
+    .. "también esta página a su lado, y se cierran juntas. Quítalo para que la J abra solo la del juego.")
+
   page.officerTitle = title("Oficiales", COL3 + 4, -6)
   page.announce = W.Input(page, OFF_W - 66)
   page.announce:SetPoint("TOPLEFT", COL3 + 8, -28)
@@ -336,6 +426,7 @@ ns.UI.RegisterPage("guild", function(page)
   page.inactive:SetSpacing(2)
 
   function page:Refresh()
+    page.guildKey:SetChecked(ns.UI.GuildKeyOn())
     local now = ns.Now()
     local officer = S.AmOfficer()
 
@@ -374,7 +465,7 @@ ns.UI.RegisterPage("guild", function(page)
     for _, b in ipairs(page.roleSlots) do
       b.count:SetText(rc[b.key] or 0)
       if b.ring then
-        local mine = myRole ~= nil and b.key == myRole
+        local mine = myRole ~= nil and type(b.key) == "number" and ns.Dungeons.HasRole(myRole, b.key)
         b.ring:SetShown(mine)
         -- elegido a mano: dorado; sacado de los talentos: más apagado
         if mine and c.roleSet then b.ringBorder:SetColor(1, 0.82, 0, 1) else b.ringBorder:SetColor(0.6, 0.5, 0.25, 1) end
