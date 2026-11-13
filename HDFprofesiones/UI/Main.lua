@@ -689,13 +689,19 @@ function UI.ApplyGuildKey()
     return
   end
   UI.keyPending = nil
-  ClearOverrideBindings(keyButton)
-  if not UI.GuildKeyOn() then return end
-  for _, action in ipairs(GUILD_BINDINGS) do
-    for _, key in ipairs({ GetBindingKey(action) }) do
-      if key then SetOverrideBindingClick(keyButton, false, key, "HDFProfGuildKey") end
+  local keys = {}
+  if UI.GuildKeyOn() then
+    for _, action in ipairs(GUILD_BINDINGS) do
+      for _, key in ipairs({ GetBindingKey(action) }) do
+        if key then keys[#keys + 1] = key end
+      end
     end
   end
+  local sig = table.concat(keys, ",")
+  if sig == UI.keySig then return end -- nada que cambiar (y no se lanza otro aviso de teclas)
+  UI.keySig = sig
+  ClearOverrideBindings(keyButton)
+  for _, key in ipairs(keys) do SetOverrideBindingClick(keyButton, false, key, "HDFProfGuildKey") end
 end
 ns.Listen("LOGIN", function() UI.ApplyGuildKey() end)
 ns.On("UPDATE_BINDINGS", function() ns.Coalesce("guildKey", 1, UI.ApplyGuildKey) end)

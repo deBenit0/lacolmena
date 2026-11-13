@@ -847,12 +847,26 @@ function Dungeons.CheckAutoLeveling()
   local mates = guildmatesInParty()
   local zone = Dungeons.CurrentZone()
   local together = next(mates) ~= nil and zone ~= nil
-  -- El mío (si soy el jefe): publicarlo, cambiarlo de zona o cancelarlo.
+  -- El mío (si soy el jefe): publicarlo, o cancelarlo con margen. No se cancela al momento: al
+  -- entrar (la lista aún no ha cargado), al cruzar a otra zona, al entrar en una ciudad o una
+  -- mazmorra... se espera; así no salen avisos a toda la hermandad cada dos por tres.
   local mine = c.autoRun and list and list[c.autoRun]
   if mine and (mine.x or Dungeons.State(mine, now) ~= "open") then mine, c.autoRun = nil, nil end
-  if mine and (not together or not amLeader() or mine.d ~= zone) then
-    ns.Sync.CancelRun(mine.id)
-    mine, c.autoRun = nil, nil
+  local auto = Dungeons.auto or {}
+  Dungeons.auto = auto
+  if mine then
+    local lost = next(mates) == nil or not amLeader()
+    auto.lostSince = lost and (auto.lostSince or now) or nil
+    -- otra zona de leveo (no una ciudad ni una mazmorra) durante un buen rato
+    local moved = zone ~= nil and zone ~= mine.d
+    auto.movedSince = moved and (auto.movedSince or now) or nil
+    if (auto.lostSince and now - auto.lostSince >= Dungeons.AUTO_LOST)
+      or (auto.movedSince and now - auto.movedSince >= Dungeons.AUTO_MOVED) then
+      ns.Sync.CancelRun(mine.id)
+      mine, c.autoRun, auto.lostSince, auto.movedSince = nil, nil, nil, nil
+    end
+  else
+    auto.lostSince, auto.movedSince = nil, nil
   end
   if together and amLeader() and not mine then
     local allowed = Dungeons.RolesFor(Dungeons.MyClass())
@@ -863,7 +877,9 @@ function Dungeons.CheckAutoLeveling()
   if together and list then
     for id, r in pairs(list) do
       local su = r.s and r.s[me]
-      if mates[r.a] and r.d == zone and not r.x and Dungeons.State(r, now) == "open" and not (su and not su.o) then
+      -- solo si nunca me he apuntado (si me desapunté, no me vuelve a meter) y es para ahora
+      if mates[r.a] and r.d == zone and not r.x and Dungeons.State(r, now) == "open" and not su
+        and Dungeons.IsLeveling(r) and (r.at or 0) <= now + 600 then
         local allowed = Dungeons.RolesFor(Dungeons.MyClass())
         ns.Sync.SignUpRun(id, allowed > 0 and allowed or Dungeons.DPS)
       end
@@ -871,6 +887,8 @@ function Dungeons.CheckAutoLeveling()
   end
 end
 
+Dungeons.AUTO_LOST = 120   -- sin nadie de la hermandad en el grupo (o sin ser jefe): se cancela a los 2 min
+Dungeons.AUTO_MOVED = 600  -- en otra zona de leveo: se cambia a los 10 min
 local function scheduleAuto() ns.Coalesce("autoLeveling", 3, Dungeons.CheckAutoLeveling) end
 ns.On("GROUP_ROSTER_UPDATE", scheduleAuto)
 ns.On("PARTY_MEMBERS_CHANGED", scheduleAuto)

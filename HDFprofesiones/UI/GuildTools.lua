@@ -38,6 +38,23 @@ local function rosterName(name)
   return info and info.raw or ns.ShortName(name)
 end
 
+-- Encender o apagar una casilla de texto (con o sin SetEnabled en este cliente).
+local function setEnabled(box, on)
+  if box.SetEnabled then box:SetEnabled(on and true or false)
+  elseif on then box:Enable() else box:Disable() end
+end
+
+-- El número de fila de alguien en la lista del juego, comprobado justo ahora (la lista se
+-- reordena cuando alguien se conecta: con el número viejo la nota iría a otro).
+local function rosterIndex(name)
+  local info = ns.Guild.Info(name)
+  if not info or not GetGuildRosterInfo then return nil end
+  if info.index and GetGuildRosterInfo(info.index) == info.raw then return info.index end
+  for i = 1, (GetNumGuildMembers and GetNumGuildMembers()) or 0 do
+    if GetGuildRosterInfo(i) == info.raw then return i end
+  end
+end
+
 local function call(fn, ...)
   if type(fn) ~= "function" then
     ns.Print("este cliente del juego no deja hacer eso desde el addon: usa «Ventana del juego».")
@@ -104,7 +121,7 @@ local function openTextWindow(title, text, editable, onSave)
   local f = textWindow
   f.title:SetText(title)
   f.edit:SetText(text or "")
-  f.edit:SetEnabled(editable and true or false)
+  setEnabled(f.edit, editable)
   f.edit:SetCursorPosition(0)
   f.onSave = onSave
   f.save:SetShown(editable and true or false)
@@ -118,6 +135,7 @@ function Tools.ShowInfo()
   openTextWindow("Información de la hermandad", ok and text or "", editable, function(newText)
     call(G("SetGuildInfoText"), newText)
   end)
+  textWindow.mode = "info"
 end
 
 -- Registro de la hermandad: quién entró, salió, fue ascendido...
@@ -131,14 +149,18 @@ local EVENT_TEXT = {
 }
 function Tools.ShowLog()
   local query = G("QueryGuildEventLog")
+  local num, get = G("GetNumGuildEvents"), G("GetGuildEventInfo")
+  if not num or not get then
+    openTextWindow("Registro de la hermandad", "Este cliente del juego no deja leer el registro desde el addon: "
+      .. "míralo en «Ventana del juego».", false)
+    return
+  end
   if query then pcall(query) end
   local function fill()
-    local num = G("GetNumGuildEvents")
-    local get = G("GetGuildEventInfo")
     local lines = {}
-    local n = num and select(2, pcall(num)) or 0
+    local n = select(2, pcall(num))
     if type(n) ~= "number" then n = 0 end
-    for i = n, math.max(1, n - 99), -1 do
+    for i = n, 1, -1 do
       local ok, kind, p1, p2, rank, year, month, day, hour = pcall(get, i)
       if ok and kind then
         local fmt = EVENT_TEXT[kind] or (kind .. ": %s %s")
@@ -153,15 +175,21 @@ function Tools.ShowLog()
     end
     openTextWindow("Registro de la hermandad", #lines > 0 and table.concat(lines, "\n")
       or "Aún no ha llegado el registro: vuelve a pulsar en un momento.", false)
+    textWindow.mode = "log"
   end
   fill()
-  ns.After(1, function() if textWindow and textWindow:IsShown() then fill() end end)
+  -- el juego lo manda un poco después: se repinta si sigue abierta la del registro
+  ns.After(1, function() if textWindow and textWindow:IsShown() and textWindow.mode == "log" then fill() end end)
 end
 
 -- Rangos y permisos: la ventana del juego para eso (solo el líder).
 function Tools.OpenRanks()
-  if LoadAddOn then pcall(LoadAddOn, "Blizzard_GuildControlUI") end
-  local frame = G("GuildControlUI") or G("GuildControlPopupFrame")
+  local load = (C_AddOns and C_AddOns.LoadAddOn) or G("LoadAddOn")
+  if load then pcall(load, "Blizzard_GuildControlUI") end
+  local frame = G("GuildControlUI")
+  local popup = G("GuildControlPopupFrame")
+  local parent = popup and popup.GetParent and popup:GetParent()
+  if not frame and popup and (not parent or parent == UIParent or parent:IsShown()) then frame = popup end
   if frame then
     frame:Show()
   else
@@ -183,7 +211,7 @@ local function createCard()
   local f = W.Panel("HDFProfMemberCard", UIParent, 360, 300)
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)
-  f:SetPoint("CENTER", 0, 40)
+  f:SetPoint("CENTER", 0, -90)
   f:SetMovable(true)
   f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", f.StartMoving)
@@ -195,6 +223,9 @@ local function createCard()
   f.name:SetPoint("TOPLEFT", 20, -18)
   f.sub = W.Text(f, "GameFontHighlightSmall")
   f.sub:SetPoint("TOPLEFT", 20, -42)
+  f.sub:SetWidth(320)
+  f.sub:SetJustifyH("LEFT")
+  f.sub:SetWordWrap(false)
 
   local function noteRow(label, y)
     local t = W.Text(f, "GameFontNormalSmall")
@@ -242,24 +273,26 @@ function Tools.ShowMember(name)
   -- Notas
   f.note:SetText(info.note or "")
   local editPublic = Tools.CanEditPublicNote()
-  f.note:SetEnabled(editPublic)
+  setEnabled(f.note, editPublic)
   f.noteSave:SetShown(editPublic)
   f.noteSave:SetScript("OnClick", function()
     f.note:ClearFocus()
-    local cur = ns.Guild.Info(name)
-    if cur and cur.index then call(G("GuildRosterSetPublicNote"), cur.index, f.note:GetText() or "") end
+    local index = rosterIndex(name)
+    if index then call(G("GuildRosterSetPublicNote"), index, f.note:GetText() or "")
+    else ns.Print("no encuentro a %s en la lista: vuelve a intentarlo en un momento.", display) end
   end)
   local viewOff = Tools.CanViewOfficerNote()
   f.offLabel:SetShown(viewOff)
   f.offNote:SetShown(viewOff)
   f.offNote:SetText(viewOff and (info.officerNote or "") or "")
   local editOff = viewOff and Tools.CanEditOfficerNote()
-  f.offNote:SetEnabled(editOff)
+  setEnabled(f.offNote, editOff)
   f.offSave:SetShown(editOff)
   f.offSave:SetScript("OnClick", function()
     f.offNote:ClearFocus()
-    local cur = ns.Guild.Info(name)
-    if cur and cur.index then call(G("GuildRosterSetOfficerNote"), cur.index, f.offNote:GetText() or "") end
+    local index = rosterIndex(name)
+    if index then call(G("GuildRosterSetOfficerNote"), index, f.offNote:GetText() or "")
+    else ns.Print("no encuentro a %s en la lista: vuelve a intentarlo en un momento.", display) end
   end)
   -- Rango
   local me = name == ns.Me()

@@ -135,19 +135,20 @@ ns.UI.RegisterPage("chat", function(f)
   -- (así no salta al final si estás leyendo más arriba).
   local function rebuild()
     local officer = amOfficer()
+    -- si estás leyendo más arriba, no se te mueve
+    local atBottom = not messages.AtBottom or messages:AtBottom()
+    local offset = messages.GetScrollOffset and messages:GetScrollOffset() or 0
     messages:Clear()
     -- Lo que guarda el juego (también lo de antes de conectarte); si no se puede, lo que
     -- ha apuntado el addon.
     local history = ns.ChatLog and ns.ChatLog.History and ns.ChatLog.History(officer)
     if history and #history > 0 then
-      local l = log()
-      if l then wipe(l) end -- lo del juego ya lo trae todo
-      for _, m in ipairs(history) do
-        messages:AddMessage((lineText(m)), 1, 1, 1)
-        if l then l[#l + 1] = m end
+      for _, m in ipairs(history) do messages:AddMessage((lineText(m)), 1, 1, 1) end
+      if atBottom or not messages.SetScrollOffset then
+        messages:ScrollToBottom()
+      else
+        messages:SetScrollOffset(offset)
       end
-      if l then while #l > KEEP do table.remove(l, 1) end end
-      messages:ScrollToBottom()
       return
     end
     for _, m in ipairs(log() or {}) do
@@ -157,8 +158,11 @@ ns.UI.RegisterPage("chat", function(f)
   end
   f:SetScript("OnShow", function()
     rebuild()
-    -- pedir al juego más mensajes de antes (llegan un poco después y se repinta)
-    if ns.ChatLog and ns.ChatLog.ReadHistory then pcall(ns.ChatLog.ReadHistory) end
+    -- pedir al juego los mensajes de antes, una vez por sesión (llegan un poco después y se repinta)
+    if not f.askedHistory and ns.ChatLog and ns.ChatLog.ReadHistory then
+      f.askedHistory = true
+      pcall(ns.ChatLog.ReadHistory)
+    end
   end)
   ns.Listen("CHAT_HISTORY", function()
     if f:IsVisible() then ns.Coalesce("chatHistory", 0.5, rebuild) end

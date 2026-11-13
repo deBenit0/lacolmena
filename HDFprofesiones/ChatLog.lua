@@ -159,13 +159,13 @@ function ChatLog.History(withOfficer)
             end
             local epoch = m.messageId and m.messageId.epoch
             out[#out + 1] = { a = author, k = class, m = text, c = channel,
-              t = epoch and math.floor(epoch / 1000000) or 0 }
+              t = epoch and math.floor(epoch / 1000000) or 0, e = epoch or 0 }
           end
         end
       end
     end
   end
-  table.sort(out, function(x, y) return x.t < y.t end)
+  table.sort(out, function(x, y) return x.e < y.e end)
   return out
 end
 
