@@ -46,8 +46,8 @@ end
 
 -- El número de fila de alguien en la lista del juego, comprobado justo ahora (la lista se
 -- reordena cuando alguien se conecta: con el número viejo la nota iría a otro).
-local function rosterIndex(name)
-  local info = ns.Guild.Info(name)
+local function rosterIndex(name, info)
+  info = info or ns.Guild.Info(name)
   if not info or not GetGuildRosterInfo then return nil end
   if info.index and GetGuildRosterInfo(info.index) == info.raw then return info.index end
   for i = 1, (GetNumGuildMembers and GetNumGuildMembers()) or 0 do
@@ -234,7 +234,7 @@ local function createCard()
     local input = W.Input(f, 250)
     input:SetPoint("TOPLEFT", 20, y - 14)
     input:SetMaxLetters(31)
-    local save = W.Button(f, "Guardar", 60, 22)
+    local save = W.Button(f, "Guardar", 74, 22)
     save:SetPoint("LEFT", input, "RIGHT", 6, 0)
     return t, input, save
   end
@@ -249,7 +249,7 @@ local function createCard()
   f.remove:SetPoint("LEFT", f.demote, "RIGHT", 6, 0)
   f.tell = W.Button(f, "Susurrar", 100, 22)
   f.tell:SetPoint("TOPLEFT", 20, -200)
-  f.party = W.Button(f, "Invitar al grupo", 120, 22)
+  f.party = W.Button(f, "Invitar al grupo", 140, 22)
   f.party:SetPoint("LEFT", f.tell, "RIGHT", 6, 0)
   f.hint = W.Text(f, "GameFontDisableSmall")
   f.hint:SetPoint("BOTTOMLEFT", 20, 16)
@@ -258,13 +258,17 @@ local function createCard()
   return f
 end
 
-function Tools.ShowMember(name)
-  local info = ns.Guild.Info(name)
+-- info: la fila de la lista (para distinguir a dos que se llaman igual de nombre de pila).
+function Tools.ShowMember(name, info)
+  info = info or ns.Guild.Info(name)
   if not info then return end
   if not card then card = createCard() end
   local f = card
-  local game = rosterName(name)
-  local display = (info.raw and info.raw:match("^([^%-]+)")) or ns.ShortName(name)
+  local game = info.raw or rosterName(name)
+  local display = (info.raw and info.raw:match("^([^%-]+)")) or ns.DisplayName(name)
+  -- a quién susurrar o invitar: el nombre completo de su fila
+  local target = info.raw and (info.raw:match("^([^%-]+)") or info.raw) or name
+  if not target:find(ns.SurnameSeparator(), 1, true) then target = name end
   f.name:SetText(display)
   local r, g, b = ns.ClassColor(info.class)
   f.name:SetTextColor(r, g, b)
@@ -277,7 +281,7 @@ function Tools.ShowMember(name)
   f.noteSave:SetShown(editPublic)
   f.noteSave:SetScript("OnClick", function()
     f.note:ClearFocus()
-    local index = rosterIndex(name)
+    local index = rosterIndex(name, info)
     if index then call(G("GuildRosterSetPublicNote"), index, f.note:GetText() or "")
     else ns.Print("no encuentro a %s en la lista: vuelve a intentarlo en un momento.", display) end
   end)
@@ -290,12 +294,13 @@ function Tools.ShowMember(name)
   f.offSave:SetShown(editOff)
   f.offSave:SetScript("OnClick", function()
     f.offNote:ClearFocus()
-    local index = rosterIndex(name)
+    local index = rosterIndex(name, info)
     if index then call(G("GuildRosterSetOfficerNote"), index, f.offNote:GetText() or "")
     else ns.Print("no encuentro a %s en la lista: vuelve a intentarlo en un momento.", display) end
   end)
   -- Rango
-  local me = name == ns.Me()
+  local myRaw = ns.Guild.Info(ns.Me())
+  local me = name == ns.Me() and (not myRaw or myRaw.raw == info.raw)
   f.promote:SetEnabled(not me and Tools.CanPromote())
   f.promote:SetScript("OnClick", function()
     W.Confirm("¿Ascender a " .. display .. "?", function() call((C_GuildInfo and C_GuildInfo.Promote) or G("GuildPromote"), game) end)
@@ -312,11 +317,11 @@ function Tools.ShowMember(name)
     end)
   end)
   f.tell:SetEnabled(not me)
-  f.tell:SetScript("OnClick", function() ns.SendTell(name) end)
+  f.tell:SetScript("OnClick", function() ns.SendTell(target) end)
   f.party:SetEnabled(not me and info.online)
   f.party:SetScript("OnClick", function()
     local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or G("InviteUnit")
-    if invite then pcall(invite, ns.TellName and ns.TellName(name) or game) end
+    if invite then pcall(invite, ns.TellName and ns.TellName(target) or game) end
   end)
   f.hint:SetText("Los botones apagados son los que tu rango no puede usar.")
   f:Show()

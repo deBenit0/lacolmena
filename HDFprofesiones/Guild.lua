@@ -162,7 +162,7 @@ function Guild.Refresh()
   end
   local total = GetNumGuildMembers() or 0
   local now = ns.Now()
-  local fresh, count, dupes = {}, 0, {}
+  local fresh, count, dupes, list = {}, 0, {}, {}
   for i = 1, total do
     local name, rankName, rankIndex, level, className, zone, note, officerNote, online, _, classFile = GetGuildRosterInfo(i)
     if name then
@@ -186,12 +186,14 @@ function Guild.Refresh()
       end
       fresh[name] = { online = online and true or false, rank = rankIndex, level = level, class = classFile, seen = seen,
         raw = raw, rankName = rankName, className = className, zone = zone, index = i,
-        note = note, officerNote = officerNote }
+        note = note, officerNote = officerNote, name = name }
+      list[#list + 1] = fresh[name]
     end
   end
   wipe(roster)
   for name, r in pairs(fresh) do roster[name] = r end
   Guild.dupes = dupes
+  Guild.list = list
   Guild.full = count > 0 and count == total
   Guild.count = count
   cleanup()

@@ -124,7 +124,7 @@ function Orders.CheckNew(name)
       if ns.Alerts then
         local _, icon = ns.KeyInfo(item.key)
         ns.Alerts.Push({ page = "board", icon = icon,
-          text = string.format("%s pide %s en los pedidos de fabricación (hermandad)", ns.ShortName(name), ns.KeyLabel(item.key)) })
+          text = string.format("%s pide %s en los pedidos de fabricación (hermandad)", ns.DisplayName(name), ns.KeyLabel(item.key)) })
       end
     end
   end

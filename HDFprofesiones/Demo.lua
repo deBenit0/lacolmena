@@ -170,7 +170,7 @@ end
 
 -- Lo que dicen los jugadores de ejemplo (en tu chat; nadie más lo ve).
 local function say(author, text)
-  ns.Print("|cffff8040[ejemplo]|r " .. ns.ShortName(author) .. ": " .. text)
+  ns.Print("|cffff8040[ejemplo]|r " .. ns.DisplayName(author) .. ": " .. text)
 end
 
 -- Hermandad de ejemplo: anuncio y necesidades de Gerda (oficial), donaciones, un alt
@@ -240,7 +240,7 @@ function Demo.SimulateMail(r)
   cm.s = Data.DeliveredOf(cm) + units
   cm.sv = now
   ns.Print(string.format("correo de ejemplo enviado a %s: %dx %s (de verdad no se envía nada).",
-    ns.ShortName(r.a), units, ns.KeyLabel(r.k)))
+    ns.DisplayName(r.a), units, ns.KeyLabel(r.k)))
   ns.Fire("DATA_CHANGED", "request", r.id)
   ns.After(3, function()
     local e = g.entries[r.a]
@@ -394,7 +394,7 @@ function Demo.Set(on)
       ns.After(1.5, function()
         local _, icon = ns.KeyInfo(r.k)
         ns.Alerts.Push({ id = r.id, icon = icon, canCommit = true,
-          text = string.format("%s pide %dx %s (ya)", ns.ShortName(r.a), r.q, ns.KeyLabel(r.k)) })
+          text = string.format("%s pide %dx %s (ya)", ns.DisplayName(r.a), r.q, ns.KeyLabel(r.k)) })
       end)
     end
   else

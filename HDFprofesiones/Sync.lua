@@ -256,7 +256,7 @@ function Sync.NotePeerVersion(sender, av)
   elseif versionNumber(av) < versionNumber(ns.VERSION) and not Sync.oldWarned[sender] then
     Sync.oldWarned[sender] = true
     ns.Print("%s tiene una versión antigua del addon (%s; la tuya es la %s): puede que no vea tus pedidos. Dile que lo actualice.",
-      ns.ShortName(sender), av, ns.VERSION)
+      ns.DisplayName(sender), av, ns.VERSION)
   end
 end
 
@@ -264,7 +264,7 @@ end
 function Sync.OtherVersions()
   local out = {}
   for name, av in pairs(Sync.peers) do
-    if av ~= ns.VERSION then out[#out + 1] = string.format("%s (%s)", ns.ShortName(name), av) end
+    if av ~= ns.VERSION then out[#out + 1] = string.format("%s (%s)", ns.DisplayName(name), av) end
   end
   table.sort(out)
   return out

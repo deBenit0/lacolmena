@@ -148,7 +148,7 @@ ns.UI.RegisterPage("home", function(page)
       local plazo = left and (left > 0 and ("quedan " .. ns.FormatDuration(left)) or "|cffff4040se acaba|r") or ""
       local _, icon = ns.KeyInfo(it.r.k)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999para %s · %s|r", it.n, ns.KeyLabel(it.r.k),
-        ns.ShortName(it.r.a), plazo) }
+        ns.DisplayName(it.r.a), plazo) }
     end
     page.cards.commits:Fill(#items, lines, "Nadie te ha encargado nada.\nMira lo que puedes hacer.",
       #items > 0 and "Mis encargos" or "Lo que puedo hacer",
@@ -164,7 +164,7 @@ ns.UI.RegisterPage("home", function(page)
     table.sort(mine, function(a, b) return (a.r.t or 0) > (b.r.t or 0) end)
     local lines = {}
     for _, it in ipairs(mine) do
-      local who = it.info.owner and ("lo hace " .. ns.ShortName(it.info.owner)) or "nadie lo ha cogido"
+      local who = it.info.owner and ("lo hace " .. ns.DisplayName(it.info.owner)) or "nadie lo ha cogido"
       local _, icon = ns.KeyInfo(it.r.k)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999%s|r", it.r.q, ns.KeyLabel(it.r.k), who) }
     end
@@ -209,7 +209,7 @@ ns.UI.RegisterPage("home", function(page)
     page.status:SetShown(inGuild)
     page.goMarket:SetShown(inGuild)
     local an = inGuild and ns.Social.Announcement()
-    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.ShortName(an.name), an.x) or "")
+    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.DisplayName(an.name), an.x) or "")
     if not inGuild then return end
 
     local g, me, now = ns.G(), ns.Me(), ns.Now()

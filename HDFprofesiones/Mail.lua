@@ -43,18 +43,18 @@ function Mail.RegisterDelivery(to, items, how)
   for _, r in ipairs(changed) do
     local cm = r.c[ns.Me()]
     ns.Print("apuntado en la petición de %s: %d de %d %s entregadas %s.",
-      ns.ShortName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
+      ns.DisplayName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
     ns.Sync.PushRequest(r.id, "high")
   end
   local offered = 0
   local offeredList = ns.Offers.RegisterMail(to, items, now)
   for _, d in ipairs(offeredList) do
     offered = offered + 1
-    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who), how)
+    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.who), how)
   end
   local donated = ns.Social.RegisterMail(to, items, now)
   for _, d in ipairs(donated) do
-    ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
+    ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.owner))
   end
   -- Mis estadísticas.
   ns.Extras.AddStat("delivered", #changed)

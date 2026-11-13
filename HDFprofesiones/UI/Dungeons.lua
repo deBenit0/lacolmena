@@ -17,7 +17,7 @@ local function personText(su, dg)
   local level = su.level and tostring(su.level) or "?"
   if su.level and su.level < dg.min then level = "|cffff4040" .. level .. "|r" end
   local text = name .. " (" .. level .. ")"
-  if not su.online then text = "|cff888888" .. ns.ShortName(su.name) .. " (" .. (su.level or "?") .. ", desc.)|r" end
+  if not su.online then text = "|cff888888" .. ns.DisplayName(su.name) .. " (" .. (su.level or "?") .. ", desc.)|r" end
   return text
 end
 
@@ -63,7 +63,7 @@ local function makeSlot(card, i)
   slot:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     if self.name then
-      GameTooltip:SetText(ns.ShortName(self.name), ns.ClassColor(self.class))
+      GameTooltip:SetText(ns.DisplayName(self.name), ns.ClassColor(self.class))
       local c = self.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.class]
       GameTooltip:AddLine((self.leveling and "En el grupo" or SLOT_ROLES[i]) .. (c and (" · " .. c) or ""), 1, 1, 1)
       if self.inParty then GameTooltip:AddLine("Ya está en tu grupo", 0.25, 1, 0.25) end
@@ -87,9 +87,9 @@ local function groupCard(parent)
   card.crown:SetSize(16, 16)
   card.crown:SetPoint("TOPLEFT", 8, -8)
   card.crown:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-  card.leader = W.Text(card, "GameFontNormalLarge")
+  card.leader = W.Text(card, "GameFontNormal")
   card.leader:SetPoint("LEFT", card.crown, "RIGHT", 4, 0)
-  card.leader:SetWidth(130)
+  card.leader:SetWidth(134)
   card.leader:SetWordWrap(false)
   card.leader:SetTextColor(0.3, 0.75, 1)
   card.dungeon = W.Text(card, "GameFontHighlightSmall")
@@ -107,7 +107,7 @@ local function groupCard(parent)
   function card:Set(r)
     local D = ns.Dungeons
     local gp = r.gp or {}
-    self.leader:SetText(ns.ShortName(r.a))
+    self.leader:SetText(ns.DisplayName(r.a))
     self.dungeon:SetText(D.Dungeon(r.d).name)
     local missing = D.Missing(gp)
     if D.IsLeveling(r) then
@@ -709,13 +709,14 @@ ns.UI.RegisterPage("dungeons", function(page)
   watchChecks(detail.checks, function() if detail.updateJoin then detail.updateJoin() end end)
   detail.join = W.Button(detail, "Apuntarme", 110, 22)
   detail.join:SetPoint("TOPLEFT", 12, -304)
-  detail.leave = W.Button(detail, "Desapuntarme", 110, 22)
+  detail.leave = W.Button(detail, "Desapuntarme", 120, 22)
   detail.leave:SetPoint("LEFT", detail.join, "RIGHT", 4, 0)
 
-  detail.make = W.Button(detail, "Elegir grupo", 104, 22)
+  detail.make = W.Button(detail, "Elegir grupo", 126, 22)
   detail.make:SetPoint("BOTTOMLEFT", 8, 8)
-  detail.invite = W.Button(detail, "Invitar al grupo", 120, 22)
+  detail.invite = W.Button(detail, "Invitar", 96, 22)
   detail.invite:SetPoint("LEFT", detail.make, "RIGHT", 4, 0)
+  ns.UI.Tip(detail.invite, "Invitar al grupo", "Invita a los elegidos al grupo del juego.")
   detail.cancel = W.Button(detail, "Cancelar", 96, 22)
   detail.cancel:SetPoint("LEFT", detail.invite, "RIGHT", 4, 0)
 
@@ -783,7 +784,7 @@ ns.UI.RegisterPage("dungeons", function(page)
       detail.group:SetPoint("TOPLEFT", 12, -230)
       local g = {}
       local bench = {}
-      for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.ShortName(name) end
+      for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.DisplayName(name) end
       -- En una sola línea: con muchos suplentes se pisaría con «Me apunto de».
       local more = #bench > 4 and (" y " .. (#bench - 4) .. " más") or ""
       for i = #bench, 5, -1 do bench[i] = nil end

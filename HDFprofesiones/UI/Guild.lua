@@ -13,7 +13,7 @@ function ns.UI.ContributeNeed(item)
         ns.Mail.PrepareNeed(item.owner, item.id, n)
       else
         ns.Print("mándale %dx %s por correo a %s: la aportación se apunta sola al enviarlo.",
-          n, ns.KeyLabel("i" .. item.id), ns.ShortName(item.owner))
+          n, ns.KeyLabel("i" .. item.id), ns.DisplayName(item.owner))
       end
     end)
 end
@@ -386,7 +386,7 @@ ns.UI.RegisterPage("guild", function(page)
 
   -- Columna 3: oficiales.
   -- Abajo a la derecha: la ventana de hermandad del juego (la J abre esta página).
-  page.gameGuild = W.Button(page, "Ventana del juego", 140, 22, function() ns.UI.OpenGameGuild() end)
+  page.gameGuild = W.Button(page, "Ventana del juego", 146, 22, function() ns.UI.OpenGameGuild() end)
   page.gameGuild:SetPoint("BOTTOMRIGHT", 0, 2)
   ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: lista de miembros, rangos, noticias...")
   page.guildKey = W.Check(page, "La J abre el addon", function(checked) ns.UI.SetGuildKey(checked) end)
@@ -395,11 +395,11 @@ ns.UI.RegisterPage("guild", function(page)
     .. "del juego. Quítalo para que la J abra la del juego, como siempre.")
 
   page.officerTitle = title("Oficiales", COL3 + 4, -6)
-  page.announce = W.Input(page, OFF_W - 66)
+  page.announce = W.Input(page, OFF_W - 86)
   page.announce:SetPoint("TOPLEFT", COL3 + 8, -28)
   page.announce:SetMaxLetters(S.ANNOUNCE_MAX)
   W.Placeholder(page.announce, "Anuncio para el Inicio…")
-  page.publish = W.Button(page, "Publicar", 60, 20, function()
+  page.publish = W.Button(page, "Publicar", 80, 20, function()
     local ok, err = S.SetAnnouncement(page.announce:GetText(), ns.Now())
     if not ok then ns.Print(err) else ns.Print("anuncio publicado en el Inicio de todos.") end
   end)
@@ -509,11 +509,11 @@ ns.UI.RegisterPage("guild", function(page)
       local inactive, noAddon = S.Inactive(now)
       local out = { string.format("|cffffd100Inactivos (más de %d días): %d|r", S.INACTIVE_DAYS, #inactive) }
       for i = 1, math.min(6, #inactive) do
-        out[#out + 1] = string.format("  %s  |cff999999%d días|r", ns.ShortName(inactive[i].name), inactive[i].days)
+        out[#out + 1] = string.format("  %s  |cff999999%d días|r", ns.DisplayName(inactive[i].name), inactive[i].days)
       end
       out[#out + 1] = string.format("|cffffd100Sin el addon: %d|r", #noAddon)
       local names = {}
-      for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.ShortName(noAddon[i]) end
+      for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.DisplayName(noAddon[i]) end
       if #names > 0 then out[#out + 1] = "  " .. table.concat(names, ", ") .. (#noAddon > 8 and "…" or "") end
       page.inactive:SetText(table.concat(out, "\n"))
     end
@@ -527,7 +527,7 @@ local HISTORY_LINES = 60
 local KIND_TEXT = { p = "pedido", o = "oferta", a = "aportación" }
 
 local function historyLine(h, now, gave)
-  local other = ns.ShortName(h.who)
+  local other = ns.DisplayName(h.who)
   local text
   if h.kind == "a" then
     text = string.format("aportado a %s", other)
@@ -627,7 +627,7 @@ function ns.UI.ShowMissingRecipes()
   local lines = {}
   for i = 1, math.min(15, #list) do
     local e = list[i]
-    local who = ns.ShortName(e.askers[1]) .. (#e.askers > 1 and (" y " .. (#e.askers - 1) .. " más") or "")
+    local who = ns.DisplayName(e.askers[1]) .. (#e.askers > 1 and (" y " .. (#e.askers - 1) .. " más") or "")
     lines[#lines + 1] = string.format("%s  |cff999999(lo pide %s)|r", ns.KeyLabel(e.key), who)
   end
   if #list > 15 then lines[#lines + 1] = string.format("|cff999999y %d más...|r", #list - 15) end

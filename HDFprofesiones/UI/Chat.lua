@@ -32,11 +32,8 @@ end
 local function displayName(author)
   if type(author) ~= "string" then return "" end
   local name = author:gsub("%-[^%s]*$", "")
-  if not name:find(" ", 1, true) and ns.TellName then
-    local full = ns.TellName(ns.FullName and ns.FullName(author) or author)
-    if full and full:find(" ", 1, true) then name = full end
-  end
-  return name
+  if name:find(ns.SurnameSeparator(), 1, true) then return name end
+  return ns.DisplayName(author)
 end
 
 local function lineText(m)

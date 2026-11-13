@@ -299,7 +299,7 @@ ns.UI.RegisterPage("market", function(page)
         parts[#parts + 1] = by and ("|cff66ccfftu plazo: " .. ns.FormatDuration(math.max(0, by - now)) .. "|r")
           or "|cff66ccffpor enviar|r"
       elseif info.owner then
-        parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
+        parts[#parts + 1] = "lo hace " .. ns.DisplayName(info.owner)
       end
       if info.delivered > 0 and info.delivered < r.q then
         parts[#parts + 1] = string.format("|cff40ff40%d/%d entregadas|r", info.delivered, r.q)
@@ -599,7 +599,7 @@ ns.UI.RegisterPage("market", function(page)
   fbox.rush:SetPoint("LEFT", fbox.tip, "RIGHT", 90, 0)
   fbox.ended = W.Check(fbox, "Terminados", function(on) state.ended = on or nil page:Refresh() end)
   fbox.ended:SetPoint("LEFT", fbox.rush, "RIGHT", 90, 0)
-  fbox.clear = W.Button(fbox, "Quitar filtros", 100, 20, function()
+  fbox.clear = W.Button(fbox, "Quitar filtros", 120, 20, function()
     local m = settings()
     m.type, m.armor, m.slot, m.prof, m.myLevel, m.tip, m.rush = 1, 1, 1, nil, nil, nil, nil
     m.slots = nil
@@ -775,7 +775,7 @@ ns.UI.RegisterPage("market", function(page)
     local mineCommit = r.c and r.c[me]
     if mineCommit and Data.CommitActive(mineCommit, now, r) then
       lines[#lines + 1] = string.format("|cff40ff40Envíale %d por correo a %s: se completa solo.|r",
-        mineCommit.n - Data.DeliveredOf(mineCommit), ns.ShortName(r.a))
+        mineCommit.n - Data.DeliveredOf(mineCommit), ns.DisplayName(r.a))
     end
     if r.demo then lines[#lines + 1] = "|cffff8040Pedido de ejemplo: acéptalo y pulsa «Enviar (ejemplo)».|r" end
     detail.info:SetText(table.concat(lines, "\n"))
@@ -799,8 +799,8 @@ ns.UI.RegisterPage("market", function(page)
         local byMail = target.mailed or 0
         local text = byMail > 0
           and string.format("%s ya te ha enviado %d por correo (contado). ¿Cuántos MÁS te ha dado en mano?",
-            ns.ShortName(target.name), byMail)
-          or string.format("¿Cuántos te ha dado %s en mano? (lo del correo se cuenta solo)", ns.ShortName(target.name))
+            ns.DisplayName(target.name), byMail)
+          or string.format("¿Cuántos te ha dado %s en mano? (lo del correo se cuenta solo)", ns.DisplayName(target.name))
         W.AskAmount(text, left, function(n) ns.Sync.ConfirmDelivery(r.id, target.name, n) end)
       end, "Apunta lo que te han dado en mano. Lo del correo se cuenta solo.")
       setButton(detail.b2, "Renovar", active or info.state == "expired", function() ns.Sync.Renew(r.id) end,
@@ -839,7 +839,7 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.x2, isPri and "Quitar prioridad" or "Prioridad", true,
         function() ns.Social.SetPriority(r.id, not isPri, ns.Now()) end, "Solo oficiales: lo pone arriba del todo.")
       setButton(detail.x3, r.a ~= me and "Cerrar (oficial)" or nil, true, function()
-        W.Confirm("¿Cerrar este pedido de " .. ns.ShortName(r.a) .. " como oficial?", function()
+        W.Confirm("¿Cerrar este pedido de " .. ns.DisplayName(r.a) .. " como oficial?", function()
           ns.Social.ModClose(r.id, ns.Now())
         end)
       end)
@@ -852,7 +852,7 @@ ns.UI.RegisterPage("market", function(page)
       local who = info.owner
       setButton(detail.x3, "Quitar encargado", true, function()
         W.Confirm(string.format("¿Quitarle el encargo a %s? Volverá al Mercado para que lo coja otro "
-          .. "(lo que ya te haya enviado se queda contado).", ns.ShortName(who)), function()
+          .. "(lo que ya te haya enviado se queda contado).", ns.DisplayName(who)), function()
           ns.Sync.Reject(r.id, who)
         end)
       end, "Si no te lo envía, para que lo pueda aceptar otro.")
@@ -883,7 +883,7 @@ ns.UI.RegisterPage("market", function(page)
         lines[#lines + 1] = "|cff999999Nadie lo ha pedido todavía.|r"
       end
     elseif item.claimed then
-      lines[#lines + 1] = string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.ShortName(o.owner))
+      lines[#lines + 1] = string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.DisplayName(o.owner))
     else
       local have = ns.Scan.Have(o.id)
       if have > 0 then lines[#lines + 1] = string.format("|cffbbbbbbTienes %d.|r", have) end
@@ -912,20 +912,20 @@ ns.UI.RegisterPage("market", function(page)
         setButton(detail.b3, "Ya lo he enviado", true, function()
           local function mark(cl)
             local n = ns.Offers.MarkSent(cl.name, o.id, ns.Now())
-            if n > 0 then ns.Print("apuntado: %dx %s entregadas a %s.", n, ns.KeyLabel("i" .. o.id), ns.ShortName(cl.name)) end
+            if n > 0 then ns.Print("apuntado: %dx %s entregadas a %s.", n, ns.KeyLabel("i" .. o.id), ns.DisplayName(cl.name)) end
           end
           -- lo que se apunta: lo que le falta, sin pasar de lo que queda en la oferta
           local function amount(cl) return math.min(cl.left or 0, o.q or 0) end
           if #o.claims == 1 then
             W.Confirm(string.format("¿Ya le has dado %dx %s a %s? Se apuntará como entregado.", amount(first),
-              ns.KeyName("i" .. o.id), ns.ShortName(first.name)), function() mark(first) end)
+              ns.KeyName("i" .. o.id), ns.DisplayName(first.name)), function() mark(first) end)
           else
             -- La quieren varios: se elige a quién se le ha dado (hasta 4).
             local labels, shown = {}, {}
             for i = 1, math.min(4, #o.claims) do
               local cl = o.claims[i]
               shown[i] = cl
-              labels[i] = string.format("%s (%d)", ns.ShortName(cl.name), amount(cl))
+              labels[i] = string.format("%s (%d)", ns.DisplayName(cl.name), amount(cl))
             end
             W.Choose("¿A quién se lo has dado?", string.format("%s · se apuntará como entregado",
               ns.KeyName("i" .. o.id)), labels, function(i) if shown[i] then mark(shown[i]) end end)
@@ -959,7 +959,7 @@ ns.UI.RegisterPage("market", function(page)
     setButton(detail.x2, nil)
     if not item.mine and ns.Social.AmOfficer() then
       setButton(detail.x3, "Quitar (oficial)", true, function()
-        W.Confirm("¿Quitar esta oferta de " .. ns.ShortName(o.owner) .. " como oficial? Desaparecerá del Mercado de todos.",
+        W.Confirm("¿Quitar esta oferta de " .. ns.DisplayName(o.owner) .. " como oficial? Desaparecerá del Mercado de todos.",
           function() ns.Social.ModRemoveOffer(o.key, ns.Now()) end)
       end, "Solo oficiales.")
     else
@@ -1027,7 +1027,7 @@ ns.UI.RegisterPage("market", function(page)
       end)
       local first = grp.crafters[1]
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(first.name) end,
-        "Susurrar a " .. ns.ShortName(first.name) .. ".")
+        "Susurrar a " .. ns.DisplayName(first.name) .. ".")
       setButton(detail.b3, nil)
     end
     setButton(detail.x1, nil)
@@ -1039,11 +1039,11 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.x3, "Quitar (oficial)", true, function()
         local function remove(c) ns.Social.ModRemoveOffer(c.name .. ":" .. item.k, ns.Now()) end
         if #others == 1 then
-          W.Confirm("¿Quitar la oferta de " .. ns.ShortName(others[1].name) .. " como oficial? Desaparecerá del Mercado de todos.",
+          W.Confirm("¿Quitar la oferta de " .. ns.DisplayName(others[1].name) .. " como oficial? Desaparecerá del Mercado de todos.",
             function() remove(others[1]) end)
         else
           local labels = {}
-          for i = 1, math.min(4, #others) do labels[i] = ns.ShortName(others[i].name) end
+          for i = 1, math.min(4, #others) do labels[i] = ns.DisplayName(others[i].name) end
           W.Choose("¿De quién quitas la oferta?", "Como oficial: desaparecerá del Mercado de todos.", labels,
             function(i) if others[i] then remove(others[i]) end end)
         end
@@ -1184,7 +1184,7 @@ ns.UI.RegisterPage("market", function(page)
     if m.tip and not (item.r and (item.r.g or item.r.pi)) then return false end
     if m.rush and not (item.r and item.r.pr) then return false end
     if state.search ~= "" then
-      local text = (ns.KeyName(item.k) .. " " .. ns.ShortName(item.author)):lower()
+      local text = (ns.KeyName(item.k) .. " " .. ns.DisplayName(item.author)):lower()
       if not text:find(state.search, 1, true) then return false end
     end
     return true

@@ -986,13 +986,13 @@ local function buildCatalog(page, mode)
       if count == 0 then
         parts[#parts + 1] = "nadie lo tiene publicado"
       elseif count == 1 then
-        parts[#parts + 1] = (gather == 1 and "solo lo recolecta " or "solo lo hace ") .. ns.ShortName(firstMaker)
+        parts[#parts + 1] = (gather == 1 and "solo lo recolecta " or "solo lo hace ") .. ns.DisplayName(firstMaker)
       else
         if makers > 0 then parts[#parts + 1] = (makers == 1 and "lo hace 1" or ("lo hacen " .. makers)) end
         if gather > 0 then parts[#parts + 1] = (gather == 1 and "lo recolecta 1" or ("lo recolectan " .. gather)) end
       end
       if online == 1 then
-        parts[#parts + 1] = "|cff40ff40" .. ns.ShortName(firstOnline) .. " en línea|r"
+        parts[#parts + 1] = "|cff40ff40" .. ns.DisplayName(firstOnline) .. " en línea|r"
       elseif online > 1 then
         parts[#parts + 1] = "|cff40ff40" .. online .. " en línea|r"
       end
@@ -1426,7 +1426,7 @@ local function buildCraftOffer(page)
     page:Refresh()
   end
   side.note:SetScript("OnEnterPressed", saveNote)
-  side.saveNote = W.Button(side, "Guardar", 64, 22, saveNote)
+  side.saveNote = W.Button(side, "Guardar", 76, 22, saveNote)
   side.saveNote:SetPoint("LEFT", side.note, "RIGHT", 6, 0)
   side.summary = W.Text(side, "GameFontHighlightSmall")
   side.summary:SetPoint("TOPLEFT", 14, -238)

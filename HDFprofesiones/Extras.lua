@@ -68,7 +68,7 @@ function Extras.CheckLearned()
         for _, who in ipairs(e.askers) do if who == me then mine = true end end
         if mine and ns.Alerts then
           local rec = Data.GetIndex()[key]
-          local who = rec and rec.crafters[1] and ns.ShortName(rec.crafters[1].n) or "Alguien"
+          local who = rec and rec.crafters[1] and ns.DisplayName(rec.crafters[1].n) or "Alguien"
           local _, icon = ns.KeyInfo(key)
           ns.Alerts.Push({ page = "board", icon = icon,
             text = string.format("%s ya sabe hacer %s (lo pediste)", who, ns.KeyLabel(key)) })
@@ -120,7 +120,7 @@ function Extras.AnnounceText(kind, obj)
     return text .. ". Susurradme si lo queréis."
   elseif kind == "need" then
     return tag .. "La hermandad necesita " .. itemText("i" .. obj.id, obj.left or obj.q)
-      .. ". Si podéis aportar, mandádselo a " .. ns.ShortName(obj.owner) .. "."
+      .. ". Si podéis aportar, mandádselo a " .. ns.DisplayName(obj.owner) .. "."
   elseif kind == "run" then
     local D, now = ns.Dungeons, ns.Now()
     local when = obj.at <= now + 120 and "ahora" or (D.DayText(obj.at, now) .. " a las " .. D.Clock(obj.at))

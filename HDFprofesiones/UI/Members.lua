@@ -72,7 +72,7 @@ end
 -- Nombre para enseñar: con apellido si lo tiene (sin el reino).
 local function displayName(name, info)
   local raw = info and info.raw
-  local full = (type(raw) == "string" and raw:match("^([^%-]+)")) or (ns.TellName and ns.TellName(name)) or name
+  local full = (type(raw) == "string" and raw:match("^([^%-]+)")) or ns.DisplayName(name)
   return (full:gsub("%-.*$", ""))
 end
 
@@ -200,14 +200,14 @@ ns.UI.RegisterPage("members", function(page)
 
   page.list = W.List(page, W_LIST, 342, {
     rows = 16, rowHeight = 20, bare = true,
-    keyOf = function(item) return item.header and "#inactivos" or item.name end,
+    keyOf = function(item) return item.header and "#inactivos" or (item.raw or item.name) end,
     isHeader = function(item) return item.header end,
     onSelect = function(item)
       if item.header then
         showInactive = not showInactive
         page:Refresh()
       elseif ns.GuildTools then
-        ns.GuildTools.ShowMember(item.name) -- su ficha: notas, ascender, degradar...
+        ns.GuildTools.ShowMember(item.name, item.info) -- su ficha: notas, ascender, degradar...
       end
     end,
     buildRow = function(row)
@@ -232,7 +232,7 @@ ns.UI.RegisterPage("members", function(page)
       row.tell:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
       row.tell:SetScript("OnClick", function(self)
         local item = self:GetParent().item
-        if item and item.name then ns.SendTell(item.name) end
+        if item and item.name then ns.SendTell(item.tell or item.name) end
       end)
       row.tell:SetScript("OnEnter", function(self)
         local item = self:GetParent().item
@@ -285,21 +285,21 @@ ns.UI.RegisterPage("members", function(page)
   -- Mensaje del día (encima de los botones), con «Cambiar» si tu rango puede.
   page.motd = W.Text(page, "GameFontHighlightSmall")
   page.motd:SetPoint("BOTTOMLEFT", 2, 34)
-  page.motd:SetWidth(690)
+  page.motd:SetWidth(684)
   page.motd:SetJustifyH("LEFT")
   page.motd:SetWordWrap(false)
-  page.motdEdit = W.Button(page, "Cambiar", 76, 20, function()
+  page.motdEdit = W.Button(page, "Cambiar", 82, 20, function()
     StaticPopup_Show("HDFPROF_MOTD")
   end)
   page.motdEdit:SetPoint("BOTTOMRIGHT", -4, 30)
 
   -- Abajo: invitar, información, registro, rangos, salir y la ventana del juego.
   local T = function() return ns.GuildTools end
-  page.invite = W.Button(page, "Invitar a miembro", 132, 22, function()
+  page.invite = W.Button(page, "Invitar a miembro", 146, 22, function()
     StaticPopup_Show("HDFPROF_INVITE")
   end)
   page.invite:SetPoint("BOTTOMLEFT", 0, 2)
-  page.info = W.Button(page, "Información", 100, 22, function() T().ShowInfo() end)
+  page.info = W.Button(page, "Información", 106, 22, function() T().ShowInfo() end)
   page.info:SetPoint("LEFT", page.invite, "RIGHT", 6, 0)
   ns.UI.Tip(page.info, "Información de la hermandad", "El texto largo de la hermandad (lo puede cambiar quien tenga permiso).")
   page.log = W.Button(page, "Registro", 90, 22, function() T().ShowLog() end)
@@ -308,9 +308,9 @@ ns.UI.RegisterPage("members", function(page)
   page.ranks = W.Button(page, "Rangos", 80, 22, function() T().OpenRanks() end)
   page.ranks:SetPoint("LEFT", page.log, "RIGHT", 6, 0)
   ns.UI.Tip(page.ranks, "Rangos y permisos", "Solo el líder: nombres de los rangos y qué puede hacer cada uno.")
-  page.leave = W.Button(page, "Salir de la hermandad", 150, 22, function() T().Leave() end)
+  page.leave = W.Button(page, "Salir de la hermandad", 172, 22, function() T().Leave() end)
   page.leave:SetPoint("LEFT", page.ranks, "RIGHT", 6, 0)
-  page.gameGuild = W.Button(page, "Ventana del juego", 140, 22, function() ns.UI.OpenGameGuild() end)
+  page.gameGuild = W.Button(page, "Ventana del juego", 146, 22, function() ns.UI.OpenGameGuild() end)
   page.gameGuild:SetPoint("BOTTOMRIGHT", -4, 2)
   ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre, por si necesitas algo de allí.")
 
@@ -331,12 +331,23 @@ ns.UI.RegisterPage("members", function(page)
     local g = ns.G()
     local now = ns.Now()
     local active, inactive = {}, {}
-    for name, info in pairs(ns.Guild.roster) do
-      local e = g and g.entries[name]
+    local all = ns.Guild.list
+    if not all then
+      all = {}
+      for name, info in pairs(ns.Guild.roster) do info.name = info.name or name; all[#all + 1] = info end
+    end
+    for _, info in ipairs(all) do
+      local name = info.name
+      -- Dos con el mismo nombre de pila: el addon aún guarda sus datos juntos, así que no se
+      -- enseñan (serían de uno de los dos, sin saber de cuál).
+      local twin = ns.Guild.dupes and ns.Guild.dupes[name]
+      local e = not twin and g and g.entries[name] or nil
       local addon, addonState = addonText(e)
+      if twin then addon, addonState = "|cffff9933\194\183 Nombre repetido|r", 0 end
+      local display = displayName(name, info)
       local since = not info.online and info.seen and (now - info.seen) or nil
       local item = {
-        name = name, display = displayName(name, info), online = info.online, class = info.class,
+        name = name, raw = info.raw, info = info, tell = display:find(ns.SurnameSeparator(), 1, true) and display or name, display = display, online = info.online, class = info.class,
         className = info.className, level = info.level, rankName = info.rankName, rank = info.rank,
         zone = info.zone, since = since, role = roleText(e and e.ro), profs = profsText(e),
         addon = addon, hasAddon = addonState > 0, addonState = addonState, crafter = e and type(e.p) == "table" and next(e.p) ~= nil,

@@ -253,6 +253,23 @@ function ns.ShortName(full)
   return full:match("^([^%-]+)") or full
 end
 
+-- Nombre para ENSEÑAR: siempre con apellido si se sabe («Exagono Exagonal»), sin el reino.
+-- (ShortName sigue siendo el nombre de pila, para comparar y buscar.)
+function ns.DisplayName(full)
+  if type(full) ~= "string" or full == "" then return "?" end
+  local base = full:match("^([^%-]+)") or full
+  local sep = ns.SurnameSeparator()
+  if base:find(sep, 1, true) then return base end
+  -- dos en la hermandad con este nombre de pila: no se sabe de cuál es, mejor no adivinar el apellido
+  if ns.Guild and ns.Guild.dupes and ns.Guild.dupes[full] then return base end
+  local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(full)
+  local raw = info and type(info.raw) == "string" and (info.raw:match("^([^%-]+)") or info.raw)
+  if raw and raw:find(sep, 1, true) then return raw end
+  local known = ns.fullNames[full]
+  if type(known) == "string" and known ~= "" then return known end
+  return base
+end
+
 function ns.Me()
   if not ns.me then
     local name, surname = UnitName("player")
@@ -279,7 +296,7 @@ end
 
 function ns.ColoredName(full, classFile)
   local r, g, b = ns.ClassColor(classFile)
-  return format("|cff%02x%02x%02x%s|r", floor(r * 255), floor(g * 255), floor(b * 255), ns.ShortName(full))
+  return format("|cff%02x%02x%02x%s|r", floor(r * 255), floor(g * 255), floor(b * 255), ns.DisplayName(full))
 end
 
 ---------------------------------------------------------------------------

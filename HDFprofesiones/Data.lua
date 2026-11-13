@@ -950,10 +950,10 @@ function Data.Commit(id, when, now)
   if r.a == me then return nil, "No puedes aceptar tu propia petición." end
   local info = Data.RequestInfo(r, now)
   if info.owner and info.owner ~= me then
-    return nil, "Ya lo ha aceptado " .. ns.ShortName(info.owner) .. "."
+    return nil, "Ya lo ha aceptado " .. ns.DisplayName(info.owner) .. "."
   end
   if info.state ~= "open" then return nil, "La petición ya no está abierta." end
-  if r.rj and r.rj[me] then return nil, ns.ShortName(r.a) .. " te quitó este encargo: no puedes volver a cogerlo." end
+  if r.rj and r.rj[me] then return nil, ns.DisplayName(r.a) .. " te quitó este encargo: no puedes volver a cogerlo." end
   when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}

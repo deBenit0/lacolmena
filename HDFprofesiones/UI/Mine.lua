@@ -282,7 +282,7 @@ ns.UI.RegisterPage("mine", function(page)
       page.quiet:SetText("No molestar: no")
     end
     local main = ns.Social.MyMain()
-    page.mainButton:SetText(ns.ShortName(main))
+    page.mainButton:SetText(ns.DisplayName(main))
     local nChars = #ns.Social.MyChars()
     local D = ns.Dungeons
     if c.roleSet then
@@ -295,7 +295,7 @@ ns.UI.RegisterPage("mine", function(page)
     end
     page.hint:SetText(main == myName and (nChars > 1 and "Tus alts suman karma y ayudas contigo (pulsa para cambiar)."
       or "Tus alts suman karma y ayudas con tu principal.")
-      or ("Este es un alt de " .. ns.ShortName(main) .. "."))
+      or ("Este es un alt de " .. ns.DisplayName(main) .. "."))
 
     -- Avisos: un tipo apagado deja sus otras casillas en gris.
     for id, row in pairs(page.alertRows) do

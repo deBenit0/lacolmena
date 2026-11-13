@@ -137,7 +137,17 @@ end
 -- ¿Sigue pendiente un "lo quiero"? Devuelve lo que falta por enviar.
 function Offers.ClaimLeft(owner, who, id, claim, now)
   if not claim or now > (claim.t or 0) + Offers.CLAIM_TTL then return 0 end
-  return max(0, claim.q - (Offers.SentTo(owner, who, id) - (claim.b or 0)))
+  return max(0, claim.q - Offers.ClaimGot(owner, who, id, claim))
+end
+
+-- Lo que ya me ha llegado de un "lo quiero": lo enviado menos lo que ya había antes de pedirlo
+-- (b). Si el registro de envíos se borró (caduca a los días) y queda por debajo de b, se cuenta
+-- desde cero: antes salía negativo y el "lo quiero" se quedaba colgado pidiendo de más.
+function Offers.ClaimGot(owner, who, id, claim)
+  local sent = Offers.SentTo(owner, who, id)
+  local base = claim and claim.b or 0
+  if sent < base then base = 0 end
+  return sent - base
 end
 
 -- Lo que entra en mi ficha: ofertas vivas, "lo quiero" pendientes y envíos recientes.
@@ -324,7 +334,15 @@ end
 function Offers.RenewCrafts(now)
   local c = mine()
   if not c then return nil end
-  for _, o in pairs(c.crafts) do o.t = now end
+  local me = ns.Me()
+  for k, o in pairs(c.crafts) do
+    -- la que quitó un oficial no vuelve al renovar (sí si la ofreces otra vez a mano)
+    if ns.Social and ns.Social.IsOfferRemoved(me .. ":" .. k, o.t) then
+      c.crafts[k] = nil
+    else
+      o.t = now
+    end
+  end
   publish()
   return true
 end
@@ -456,7 +474,7 @@ function Offers.CheckReceived(now)
   local changed = false
   for k, claim in pairs(c.claims) do
     local owner, id = Offers.ParseKey(k)
-    local got = owner and (Offers.SentTo(owner, me, id) - (claim.b or 0)) or 0
+    local got = owner and Offers.ClaimGot(owner, me, id, claim) or 0
     if owner and got >= claim.q then
       c.claims[k] = nil
       ns.Extras.AddStat("received", 1)
@@ -471,7 +489,7 @@ function Offers.CheckReceived(now)
       if ns.Alerts then
         local _, icon = ns.KeyInfo("i" .. id)
         ns.Alerts.Push({ page = "board", icon = icon,
-          text = string.format("%s te ha enviado %dx %s por correo", ns.ShortName(owner), claim.q, ns.KeyLabel("i" .. id)) })
+          text = string.format("%s te ha enviado %dx %s por correo", ns.DisplayName(owner), claim.q, ns.KeyLabel("i" .. id)) })
       end
     end
   end
@@ -492,7 +510,7 @@ function Offers.CheckClaims(name)
       if ns.Alerts then
         local _, icon = ns.KeyInfo("i" .. id)
         ns.Alerts.Push({ page = "board", icon = icon,
-          text = string.format("%s quiere %dx %s de tu oferta", ns.ShortName(name), claim.q, ns.KeyLabel("i" .. id)) })
+          text = string.format("%s quiere %dx %s de tu oferta", ns.DisplayName(name), claim.q, ns.KeyLabel("i" .. id)) })
       end
     end
   end

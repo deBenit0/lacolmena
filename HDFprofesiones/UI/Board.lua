@@ -192,7 +192,7 @@ local function markSelected(buttons, selected)
 end
 
 local function createOfferDialog()
-  local d = W.Panel("HDFProfOfferDialog", UIParent, 380, 196)
+  local d = W.Panel("HDFProfOfferDialog", UIParent, 404, 196)
   offerDialog = d
   d:SetFrameStrata("DIALOG")
   d:SetToplevel(true)
@@ -243,7 +243,7 @@ local function createOfferDialog()
   d.kindLabel:SetText("Ofrecer:")
   d.kindHave = W.Chip(d, "Lo que tengo", 110, function() d:SetKind("have") end)
   d.kindHave:SetPoint("LEFT", d.kindLabel, "RIGHT", 10, 0)
-  d.kindCraft = W.Chip(d, "Fabricarlo por encargo", 170, function() d:SetKind("craft") end)
+  d.kindCraft = W.Chip(d, "Fabricarlo por encargo", 186, function() d:SetKind("craft") end)
   d.kindCraft:SetPoint("LEFT", d.kindHave, "RIGHT", 4, 0)
   -- Materiales (solo al ofrecer fabricar).
   d.mats = W.Button(d, "", 250, 22, function()

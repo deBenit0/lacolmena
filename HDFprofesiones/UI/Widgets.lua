@@ -213,8 +213,30 @@ function W.Button(parent, text, width, height, onClick)
   if onClick then b:SetScript("OnClick", onClick) end
   -- Botón principal (PEDIR, APORTAR...): con la plantilla del juego basta la letra grande.
   function b:SetPrimary(v) end
+  local rawSetText = b.SetText
+  function b:SetText(t)
+    rawSetText(self, t)
+    if self.fixedFont or not self.SetNormalFontObject then return end
+    local fs = self.GetFontString and self:GetFontString()
+    if type(fs) ~= "table" or not fs.GetStringWidth then return end
+    if self.autoSmall then
+      self.autoSmall = nil
+      self:SetNormalFontObject("GameFontNormal")
+      self:SetHighlightFontObject("GameFontHighlight")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisable") end
+    end
+    local room = (self:GetWidth() or 0) - 14
+    if room > 0 and (fs:GetStringWidth() or 0) > room then
+      self.autoSmall = true
+      self:SetNormalFontObject("GameFontNormalSmall")
+      self:SetHighlightFontObject("GameFontHighlightSmall")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisableSmall") end
+    end
+  end
+  b:SetText(text)
   -- Letra: "small", "normal" o "large".
   function b:SetFontSize(size)
+    self.fixedFont = true
     if not self.SetNormalFontObject then return end
     if size == "small" then
       self:SetNormalFontObject("GameFontNormalSmall")
@@ -573,7 +595,7 @@ function W.AcceptRequest(r)
   for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
   local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
   sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al Mercado.", info.remaining)
-  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.ShortName(r.a)),
+  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.DisplayName(r.a)),
     sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
 end
 
@@ -588,7 +610,7 @@ function W.ExtendRequest(r)
   local labels = {}
   for i, w in ipairs(options) do labels[i] = w.label end
   W.Choose(string.format("¿Para cuándo tendrás %s?", ns.KeyLabel(r.k)),
-    "Solo puedes pedir más tiempo una vez. A " .. ns.ShortName(r.a) .. " le llegará un aviso.",
+    "Solo puedes pedir más tiempo una vez. A " .. ns.DisplayName(r.a) .. " le llegará un aviso.",
     labels, function(i) ns.Sync.Extend(r.id, options[i].id) end)
 end
 
@@ -624,6 +646,8 @@ W.LinkHooked = hookedInsert
 -- «Exagono» o a nadie.
 function ns.TellName(name)
   if type(name) ~= "string" or name == "" then return nil end
+  local base = name:match("^([^%-]+)") or name
+  if base:find(ns.SurnameSeparator(), 1, true) then return base end
   local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(name)
   local raw = info and type(info.raw) == "string" and info.raw ~= "" and info.raw or nil
   local key = ns.FullName(name)
@@ -720,7 +744,7 @@ end
 function ns.WhoColored(name)
   local text = ns.ColoredName(name, ns.ClassOf(name))
   local main = ns.Social and ns.Social.MainOf(name)
-  if main and main ~= name then text = text .. " |cff999999(" .. ns.ShortName(main) .. ")|r" end
+  if main and main ~= name then text = text .. " |cff999999(" .. ns.DisplayName(main) .. ")|r" end
   return text
 end
 
@@ -728,7 +752,7 @@ end
 function ns.AuthorText(name)
   local text = ns.ColoredName(name, ns.ClassOf(name))
   local main = ns.Social and ns.Social.MainOf(name)
-  if main and main ~= name then text = text .. " |cff999999(alt de " .. ns.ShortName(main) .. ")|r" end
+  if main and main ~= name then text = text .. " |cff999999(alt de " .. ns.DisplayName(main) .. ")|r" end
   return text
 end
 
@@ -775,12 +799,12 @@ function W.Crafters(parent, width, nrows, rowHeight, bare, onSelect)
         row.level:SetWidth(math.floor(width * 0.24))
         row.state = W.ListText(row, "GameFontHighlightSmall")
         row.state:SetPoint("LEFT", row.level, "RIGHT", 4, 0)
-        row.state:SetPoint("RIGHT", row, "RIGHT", -64, 0)
+        row.state:SetPoint("RIGHT", row, "RIGHT", -74, 0)
         row.state:SetWordWrap(false)
       else
-        row.level:SetPoint("RIGHT", row, "RIGHT", -62, 0)
+        row.level:SetPoint("RIGHT", row, "RIGHT", -72, 0)
       end
-      row.tell = W.Button(row, "Susurrar", 56, math.min(20, rowHeight - 6))
+      row.tell = W.Button(row, "Susurrar", 66, math.min(20, rowHeight - 6))
       row.tell:SetFontSize("small")
       row.tell:SetPoint("RIGHT", -4, 0)
       row.tell:SetScript("OnClick", function(self) ns.SendTell(self:GetParent().item.name) end)

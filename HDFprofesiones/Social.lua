@@ -222,8 +222,8 @@ end
 -- "Bea (Ana)" si Bea es un alt de Ana; si no, "Bea".
 function Social.Who(name)
   local main = Social.MainOf(name)
-  if main and main ~= name then return ns.ShortName(name) .. " (" .. ns.ShortName(main) .. ")" end
-  return ns.ShortName(name)
+  if main and main ~= name then return ns.DisplayName(name) .. " (" .. ns.DisplayName(main) .. ")" end
+  return ns.DisplayName(name)
 end
 
 ---------------------------------------------------------------------------
