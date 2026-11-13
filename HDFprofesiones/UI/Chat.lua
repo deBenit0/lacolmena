@@ -18,6 +18,12 @@ local function log()
 end
 
 local function amOfficer()
+  -- El permiso del juego para ver el chat de oficiales; si no se puede saber, los rangos 0 y 1.
+  local can = (C_GuildInfo and C_GuildInfo.CanViewOfficerNote) or CanViewOfficerNote
+  if can then
+    local ok, yes = pcall(can)
+    if ok and yes ~= nil then return yes and true or false end
+  end
   local info = ns.Guild and ns.Guild.Info(ns.Me())
   return info and (info.rank or 9) <= 1
 end
@@ -67,7 +73,7 @@ ns.UI.RegisterPage("chat", function(f)
   messages:SetJustifyH("LEFT")
   messages:SetFading(false)
   messages:SetMaxLines(KEEP + 20)
-  messages:SetIndentedWordWrap(true)
+  if messages.SetIndentedWordWrap then messages:SetIndentedWordWrap(true) end
   messages:EnableMouseWheel(true)
   messages:SetScript("OnMouseWheel", function(self, delta)
     if delta > 0 then self:ScrollUp() else self:ScrollDown() end

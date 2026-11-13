@@ -65,11 +65,11 @@ local function makeSlot(card, i)
     if self.name then
       GameTooltip:SetText(ns.ShortName(self.name), ns.ClassColor(self.class))
       local c = self.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.class]
-      GameTooltip:AddLine(SLOT_ROLES[i] .. (c and (" · " .. c) or ""), 1, 1, 1)
+      GameTooltip:AddLine((self.leveling and "En el grupo" or SLOT_ROLES[i]) .. (c and (" · " .. c) or ""), 1, 1, 1)
       if self.inParty then GameTooltip:AddLine("Ya está en tu grupo", 0.25, 1, 0.25) end
     else
-      GameTooltip:SetText(SLOT_ROLES[i])
-      GameTooltip:AddLine("Hueco libre", 0.7, 0.7, 0.7)
+      GameTooltip:SetText(self.leveling and "Plaza libre" or SLOT_ROLES[i])
+      GameTooltip:AddLine(self.leveling and "Entran los 5 primeros en apuntarse" or "Hueco libre", 0.7, 0.7, 0.7)
     end
     GameTooltip:Show()
   end)
@@ -110,7 +110,11 @@ local function groupCard(parent)
     self.leader:SetText(ns.ShortName(r.a))
     self.dungeon:SetText(D.Dungeon(r.d).name)
     local missing = D.Missing(gp)
-    if #missing == 0 then
+    if D.IsLeveling(r) then
+      local n = #D.Members(gp)
+      self.status:SetText(n >= D.LEVELING_SIZE and "|cff40ff40Grupo completo|r"
+        or string.format("|cffffd100%d de %d|r", n, D.LEVELING_SIZE))
+    elseif #missing == 0 then
       self.status:SetText("|cff40ff40Grupo completo|r")
     else
       self.status:SetText("|cffffd100Falta: " .. table.concat(missing, ", ") .. "|r")
@@ -123,6 +127,7 @@ local function groupCard(parent)
     local names = { gp.t or false, gp.h or false }
     for k = 1, D.GROUP_SIZE.dps do names[#names + 1] = gp.d and gp.d[k] or false end
     for i, slot in ipairs(self.slots) do
+      slot.leveling = D.IsLeveling(r) or nil
       local name = names[i] or nil
       local su = name and r.s and r.s[name]
       slot.name = name
@@ -232,6 +237,7 @@ local function createDialog()
   local dLabel = W.Text(dialog, "GameFontNormalSmall")
   dLabel:SetPoint("TOPLEFT", 24, -66)
   dLabel:SetText("Mazmorra")
+  dLabel:SetWidth(60)
   dialog.dLabel = dLabel
   dialog.dungeonButton = W.Button(dialog, "", 260, 22)
   dialog.dungeonButton:SetPoint("LEFT", dLabel, "RIGHT", 12, 0)
@@ -281,7 +287,7 @@ local function createDialog()
     self.levelNote:SetText(level < dg.min and string.format("|cffff4040Tu nivel (%d) no llega al recomendado.|r", level) or "")
   end
   dialog.levelNote = W.Text(dialog, "GameFontHighlightSmall")
-  dialog.levelNote:SetPoint("TOPLEFT", 90, -88)
+  dialog.levelNote:SetPoint("TOPLEFT", 98, -82)
 
   -- Día (hoy y hasta 2 semanas) y hora: botones de horas fijas y -/+ de 15 en 15 minutos.
   local dayLabel = W.Text(dialog, "GameFontNormalSmall")
@@ -474,9 +480,36 @@ end
 
 -- Los 5 huecos de una tarjeta: icono del papel; con el grupo hecho, la clase de quien va.
 -- Antes de hacerlo se encienden los papeles que alguien de los apuntados puede cubrir.
+local LEVELING_ICON = "Interface\\Icons\\INV_Misc_GroupLooking"
 local function fillSlots(slots, r)
   local gp = r.gp
   local t, h, dps = roleCounts(r)
+  if D.IsLeveling(r) then
+    -- Grupo de leveo: plazas, sin papeles. Antes de hacerlo, una encendida por apuntado.
+    local count = #D.SignUps(r)
+    local names = gp and { gp.t or false, gp.h or false, gp.d and gp.d[1] or false, gp.d and gp.d[2] or false,
+      gp.d and gp.d[3] or false } or {}
+    for i, slot in ipairs(slots) do
+      slot.leveling = true
+      local name = names[i]
+      local su = name and r.s and r.s[name]
+      local coords = su and su.c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[su.c]
+      if coords then
+        slot.icon:SetTexture(CLASS_ICONS)
+        slot.icon:SetTexCoord(unpack(coords))
+        slot.icon:SetDesaturated(false)
+        slot.icon:SetAlpha(1)
+      else
+        slot.icon:SetTexture(LEVELING_ICON)
+        slot.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local covered = gp and (name and true or false) or i <= count
+        slot.icon:SetDesaturated(not covered)
+        slot.icon:SetAlpha(covered and 1 or 0.35)
+      end
+    end
+    return
+  end
+  for _, slot in ipairs(slots) do slot.leveling = nil end
   local names = gp and { gp.t or false, gp.h or false, gp.d and gp.d[1] or false, gp.d and gp.d[2] or false,
     gp.d and gp.d[3] or false } or {}
   for i, slot in ipairs(slots) do
@@ -722,7 +755,13 @@ ns.UI.RegisterPage("dungeons", function(page)
     -- Apuntados por rol (alguien puede salir en varios).
     local signups = D.SignUps(r)
     local lines = {}
-    for _, role in ipairs(D.ROLES) do
+    if D.IsLeveling(r) then
+      local names = {}
+      for _, su in ipairs(signups) do names[#names + 1] = personText(su, dg) end
+      lines[#lines + 1] = string.format("|cffffd100Apuntados (%d de %d):|r %s", #signups, D.LEVELING_SIZE,
+        #names > 0 and table.concat(names, ", ") or "|cff888888nadie|r")
+    end
+    for _, role in ipairs(D.IsLeveling(r) and {} or D.ROLES) do
       local names = {}
       for _, su in ipairs(signups) do
         if D.HasRole(su.roles, role.bit) then names[#names + 1] = personText(su, dg) end

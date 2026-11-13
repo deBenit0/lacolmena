@@ -340,8 +340,10 @@ Comm.Register("H", function(sender, payload)
       if type(k) == "string" and type(v) == "string" then theirM[expand(k, realm)] = v end
     end
   end
+  local knowsLeveling = versionNumber(d.av) >= versionNumber("0.34.0")
   for id, run in pairs(ns.Dungeons.Runs() or {}) do
-    if not run.demo and theirM[id] ~= ns.Dungeons.Hash(run) then
+    if not run.demo and theirM[id] ~= ns.Dungeons.Hash(run)
+      and (knowsLeveling or not ns.Dungeons.IsLeveling(run)) then
       schedule("M", id, run.a == me and rand(0.2, 1) or rand(2, 8))
     end
   end
@@ -672,7 +674,7 @@ function Sync.Start()
   ns.After(45, function()
     local list = Data.ServableRequests(ns.Now())
     if #list > 0 then
-      ns.Print("hay %d %s que puedes hacer. Míralas en la ventana de hermandad (J), pestaña del addon.",
+      ns.Print("hay %d %s que puedes hacer. Míralas en el addon (pulsa la J).",
         #list, #list == 1 and "petición" or "peticiones")
       ns.Fire("DATA_CHANGED", "summary")
     end

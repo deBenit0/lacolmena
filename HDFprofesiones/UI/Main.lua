@@ -646,6 +646,7 @@ end
 ---------------------------------------------------------------------------
 -- La ventana de hermandad del juego, la de siempre (el botón «Ventana del juego»).
 function UI.OpenGameGuild()
+  if panel and panel:IsShown() then panel:Hide() end
   UI.wantGame = true
   ns.After(1, function() UI.wantGame = nil end)
   if ToggleGuildFrame and pcall(ToggleGuildFrame) then return true end
@@ -662,21 +663,32 @@ function UI.SetGuildKey(on)
   if ns.db then ns.db.settings.guildKey = on and true or false end
 end
 
--- Al abrirse la ventana del juego: el addon a su lado (si no estaba ya abierto por su cuenta).
+-- ¿Esta ventana del juego es la de hermandad sola (la podemos cambiar por la nuestra)?
+local function replaceable(host)
+  if FriendsFrame and host == FriendsFrame then return false end
+  local parent = host.GetParent and host:GetParent()
+  if FriendsFrame and parent == FriendsFrame then return false end -- pestaña de la ventana Social
+  return true
+end
+
+-- Al abrirse la ventana del juego (la J).
 function UI.OpenWithHost(host)
   if UI.wantGame then return end -- la ha pedido con «Ventana del juego»
   if not UI.GuildKeyOn() or not (IsInGuild and IsInGuild()) then return end
-  if InCombatLockdown and InCombatLockdown() then
+  -- La ventana Social (amigos, /who...) no abre el addon sola.
+  if FriendsFrame and host == FriendsFrame then return end
+  if not replaceable(host) or (InCombatLockdown and InCombatLockdown()) then
     -- en combate no se tocan las ventanas del juego: las dos juntas, como antes
     if panel and panel:IsShown() and not panel.withHost then return end
     UI.Open("members", nil, host, true)
     if panel then panel.withHost = host end
     return
   end
-  -- Se cierra la del juego y se abre la nuestra en Miembros (donde estaba la tuya, o en el centro).
+  -- Se cierra la del juego; si la nuestra ya estaba abierta, la J la cierra; si no, se abre en
+  -- Miembros (donde la dejaste, o en el centro).
   if HideUIPanel then pcall(HideUIPanel, host) else host:Hide() end
   if panel and panel:IsShown() then
-    UI.ShowPage("members")
+    panel:Hide()
   else
     UI.Open("members")
   end

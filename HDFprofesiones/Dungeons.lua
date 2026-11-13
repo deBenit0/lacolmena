@@ -146,18 +146,18 @@ Dungeons.LIST = {
 -- Grupos de leveo: hacer misiones juntos en una zona. Mismo sistema que las mazmorras, pero sin
 -- reparto de roles: el grupo son los 5 primeros en apuntarse. Números desde 1001 (fijos).
 Dungeons.ZONES = {
-  { id = 1001, name = "Bosque de Elwynn", min = 1, max = 10 },
-  { id = 1002, name = "Dun Morogh", min = 1, max = 10 },
-  { id = 1003, name = "Teldrassil", min = 1, max = 10 },
-  { id = 1004, name = "Durotar", min = 1, max = 10 },
-  { id = 1005, name = "Mulgore", min = 1, max = 10 },
-  { id = 1006, name = "Claros de Tirisfal", min = 1, max = 10 },
-  { id = 1007, name = "Páramos de Poniente", min = 10, max = 20 },
-  { id = 1008, name = "Loch Modan", min = 10, max = 20 },
-  { id = 1009, name = "Costa Oscura", min = 10, max = 20 },
-  { id = 1010, name = "Los Baldíos", min = 10, max = 25 },
-  { id = 1011, name = "Bosque de Argénteos", min = 10, max = 20 },
-  { id = 1012, name = "Montañas Crestagrana", min = 15, max = 25 },
+  { id = 1001, name = "Bosque de Elwynn", min = 1, max = 10, side = "Alliance" },
+  { id = 1002, name = "Dun Morogh", min = 1, max = 10, side = "Alliance" },
+  { id = 1003, name = "Teldrassil", min = 1, max = 10, side = "Alliance" },
+  { id = 1004, name = "Durotar", min = 1, max = 10, side = "Horde" },
+  { id = 1005, name = "Mulgore", min = 1, max = 10, side = "Horde" },
+  { id = 1006, name = "Claros de Tirisfal", min = 1, max = 10, side = "Horde" },
+  { id = 1007, name = "Páramos de Poniente", min = 10, max = 20, side = "Alliance" },
+  { id = 1008, name = "Loch Modan", min = 10, max = 20, side = "Alliance" },
+  { id = 1009, name = "Costa Oscura", min = 10, max = 20, side = "Alliance" },
+  { id = 1010, name = "Los Baldíos", min = 10, max = 25, side = "Horde" },
+  { id = 1011, name = "Bosque de Argénteos", min = 10, max = 20, side = "Horde" },
+  { id = 1012, name = "Montañas Crestagrana", min = 15, max = 25, side = "Alliance" },
   { id = 1013, name = "Sierra Espolón", min = 15, max = 27 },
   { id = 1014, name = "Vallefresno", min = 18, max = 30 },
   { id = 1015, name = "Bosque del Ocaso", min = 18, max = 30 },
@@ -201,10 +201,14 @@ end
 -- La zona que va mejor con mi nivel.
 function Dungeons.RecommendedZone(level)
   level = level or 1
+  local side = UnitFactionGroup and UnitFactionGroup("player")
   local best, bestScore
   for _, z in ipairs(Dungeons.ZONES) do
-    local score = (level < z.min and (z.min - level) * 2) or (level > z.max and (level - z.max)) or 0
-    if not best or score < bestScore then best, bestScore = z, score end
+    -- las de inicio del otro bando, no
+    if not (z.side and side and z.side ~= side) then
+      local score = (level < z.min and (z.min - level) * 2) or (level > z.max and (level - z.max)) or 0
+      if not best or score < bestScore then best, bestScore = z, score end
+    end
   end
   return best.id
 end
@@ -461,6 +465,8 @@ function Dungeons.Pick(r, prefer)
   if Dungeons.IsLeveling(r) then
     -- Grupo de leveo: sin roles, los primeros en apuntarse (quien lo propone delante).
     table.sort(list, function(a, b)
+      local pa, pb = prefer and prefer[a.name] or 2, prefer and prefer[b.name] or 2
+      if pa ~= pb then return pa < pb end
       if (a.name == r.a) ~= (b.name == r.a) then return a.name == r.a end
       return (a.st or 0) < (b.st or 0)
     end)
