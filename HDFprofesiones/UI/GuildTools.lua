@@ -182,19 +182,35 @@ function Tools.ShowLog()
   ns.After(1, function() if textWindow and textWindow:IsShown() and textWindow.mode == "log" then fill() end end)
 end
 
--- Rangos y permisos: la ventana del juego para eso (solo el líder).
+-- Rangos y permisos: la ventana del juego para eso (solo el líder). Nuestra ventana va en una
+-- capa más alta que las del juego: la de rangos se abría DETRÁS y no se veía. Ahora se pone
+-- delante, en el centro si no tiene sitio, y si aun así no sale, se dice.
 function Tools.OpenRanks()
+  if not Tools.IsLeader() then
+    ns.Print("solo el líder de la hermandad puede cambiar los rangos y permisos.")
+    return
+  end
   local load = (C_AddOns and C_AddOns.LoadAddOn) or G("LoadAddOn")
+  if G("GuildControlUI_LoadUI") then pcall(G("GuildControlUI_LoadUI")) end
   if load then pcall(load, "Blizzard_GuildControlUI") end
   local frame = G("GuildControlUI")
   local popup = G("GuildControlPopupFrame")
   local parent = popup and popup.GetParent and popup:GetParent()
   if not frame and popup and (not parent or parent == UIParent or parent:IsShown()) then frame = popup end
-  if frame then
-    frame:Show()
-  else
-    ns.Print("abre «Ventana del juego» y allí, Ajustes de la hermandad: este cliente no deja abrirlo desde el addon.")
+  if not frame then
+    ns.Print("este cliente no deja abrir los rangos desde el addon: pulsa «Ventana del juego» y allí, Ajustes de la hermandad.")
+    return
   end
+  if frame.GetNumPoints and frame:GetNumPoints() == 0 then frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0) end
+  if frame.SetFrameStrata then frame:SetFrameStrata("DIALOG") end
+  if frame.SetToplevel then frame:SetToplevel(true) end
+  frame:Show()
+  if frame.Raise then frame:Raise() end
+  ns.After(0.3, function()
+    if not (frame.IsVisible and frame:IsVisible()) then
+      ns.Print("no se ha podido enseñar la ventana de rangos: pulsa «Ventana del juego» y allí, Ajustes de la hermandad.")
+    end
+  end)
 end
 
 function Tools.Leave()

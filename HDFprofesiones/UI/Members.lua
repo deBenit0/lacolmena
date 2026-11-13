@@ -321,7 +321,6 @@ ns.UI.RegisterPage("members", function(page)
       local motd = tools.MOTD()
       self.motd:SetText("|cffffd100Mensaje del día:|r " .. (motd ~= "" and motd or "|cff888888(ninguno)|r"))
       self.motdEdit:SetShown(tools.CanEditMOTD())
-      self.ranks:SetEnabled(tools.IsLeader())
     end
     for _, h in ipairs(self.heads) do
       local on = h.col.id == sortCol
