@@ -11,7 +11,7 @@ local HELP = {
   { "Mercado", "Lo que se busca y lo que se ofrece. Pulsa una fila para ver el detalle: quién lo fabrica, "
     .. "aceptar el encargo, susurrar o preparar el correo. Al enviarlo por correo se completa solo." },
   { "+ Pedir y + Ofrecer", "Elige un objeto del catálogo o arrástralo desde tus bolsas al botón." },
-  { "Agenda", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
+  { "Grupos", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
     .. "y «Hacer grupo» elige 1 tanque, 1 sanador y 3 de daño." },
   { "Hermandad", "Miembro de la semana, karma, quién fabrica qué y, para oficiales, anuncios y pedidos de la hermandad." },
   { "Karma", "+1 por cada pedido u oferta que das y -1 por cada uno que recibes (tus alts suman contigo)." },
@@ -186,7 +186,7 @@ ns.UI.RegisterPage("home", function(page)
     for _, r in ipairs(runs) do
       local when = r.at <= now + 120 and "ahora" or (D.DayText(r.at, now) .. " " .. D.Clock(r.at))
       local place = D.MyPlace(r)
-      local extra = place and ("vas de " .. place) or (r.gp and "grupo hecho" or (#D.SignUps(r) .. " apuntados"))
+      local extra = place and ("vas " .. (place == "en el grupo" and "" or "de ") .. place) or (r.gp and "grupo hecho" or (#D.SignUps(r) .. " apuntados"))
       lines[#lines + 1] = { D.Icon(r.d),
         string.format("%s\n|cff999999%s · %s|r", D.Dungeon(r.d).name, when, extra) }
     end

@@ -1585,7 +1585,7 @@ ns.UI.RegisterPage("ask", function(page)
     local f = CreateFrame("Frame", nil, page)
     f:SetPoint("TOPLEFT", 0, -28)
     f:SetPoint("BOTTOMRIGHT")
-    f:SetSize(ns.UI.WIDTH - 32, ns.UI.HEIGHT - 120)
+    f:SetSize(ns.UI.CONTENT_W, ns.UI.CONTENT_H - 28)
     f:Hide()
     page.frames[id] = f
     return f

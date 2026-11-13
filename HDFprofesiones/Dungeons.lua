@@ -143,8 +143,71 @@ Dungeons.LIST = {
   { id = 19, name = "Scholomance", min = 58, max = 60 },
   { id = 109, name = "Terraza del Modelador", min = 58, max = 60, new = true },
 }
+-- Grupos de leveo: hacer misiones juntos en una zona. Mismo sistema que las mazmorras, pero sin
+-- reparto de roles: el grupo son los 5 primeros en apuntarse. Números desde 1001 (fijos).
+Dungeons.ZONES = {
+  { id = 1001, name = "Bosque de Elwynn", min = 1, max = 10 },
+  { id = 1002, name = "Dun Morogh", min = 1, max = 10 },
+  { id = 1003, name = "Teldrassil", min = 1, max = 10 },
+  { id = 1004, name = "Durotar", min = 1, max = 10 },
+  { id = 1005, name = "Mulgore", min = 1, max = 10 },
+  { id = 1006, name = "Claros de Tirisfal", min = 1, max = 10 },
+  { id = 1007, name = "Páramos de Poniente", min = 10, max = 20 },
+  { id = 1008, name = "Loch Modan", min = 10, max = 20 },
+  { id = 1009, name = "Costa Oscura", min = 10, max = 20 },
+  { id = 1010, name = "Los Baldíos", min = 10, max = 25 },
+  { id = 1011, name = "Bosque de Argénteos", min = 10, max = 20 },
+  { id = 1012, name = "Montañas Crestagrana", min = 15, max = 25 },
+  { id = 1013, name = "Sierra Espolón", min = 15, max = 27 },
+  { id = 1014, name = "Vallefresno", min = 18, max = 30 },
+  { id = 1015, name = "Bosque del Ocaso", min = 18, max = 30 },
+  { id = 1016, name = "Los Humedales", min = 20, max = 30 },
+  { id = 1017, name = "Laderas de Trabalomas", min = 20, max = 30 },
+  { id = 1018, name = "Las Mil Agujas", min = 25, max = 35 },
+  { id = 1019, name = "Montañas de Alterac", min = 30, max = 40 },
+  { id = 1020, name = "Tierras Altas de Arathi", min = 30, max = 40 },
+  { id = 1021, name = "Desolace", min = 30, max = 40 },
+  { id = 1022, name = "Vega de Tuercespina", min = 30, max = 45 },
+  { id = 1023, name = "Marjal Revolcafango", min = 35, max = 45 },
+  { id = 1024, name = "Tierras Inhóspitas", min = 35, max = 45 },
+  { id = 1025, name = "Pantano de las Penas", min = 35, max = 45 },
+  { id = 1026, name = "Feralas", min = 40, max = 50 },
+  { id = 1027, name = "Tierras del Interior", min = 40, max = 50 },
+  { id = 1028, name = "Tanaris", min = 40, max = 50 },
+  { id = 1029, name = "La Garganta de Fuego", min = 43, max = 50 },
+  { id = 1030, name = "Azshara", min = 45, max = 55 },
+  { id = 1031, name = "Las Tierras Devastadas", min = 45, max = 55 },
+  { id = 1032, name = "Cráter de Un'Goro", min = 48, max = 55 },
+  { id = 1033, name = "Frondavil", min = 48, max = 55 },
+  { id = 1034, name = "Las Estepas Ardientes", min = 50, max = 58 },
+  { id = 1035, name = "Tierras de la Peste del Oeste", min = 51, max = 58 },
+  { id = 1036, name = "Tierras de la Peste del Este", min = 53, max = 60 },
+  { id = 1037, name = "Cuna del Invierno", min = 55, max = 60 },
+  { id = 1038, name = "Silithus", min = 55, max = 60 },
+}
+for _, z in ipairs(Dungeons.ZONES) do z.zone = true end
+Dungeons.LEVELING_SIZE = 5
+
 Dungeons.BY_ID = {}
 for _, dg in ipairs(Dungeons.LIST) do Dungeons.BY_ID[dg.id] = dg end
+for _, z in ipairs(Dungeons.ZONES) do Dungeons.BY_ID[z.id] = z end
+
+-- ¿Es un grupo de leveo (zona) y no una mazmorra?
+function Dungeons.IsLeveling(r)
+  local dg = r and Dungeons.BY_ID[r.d]
+  return dg ~= nil and dg.zone == true
+end
+
+-- La zona que va mejor con mi nivel.
+function Dungeons.RecommendedZone(level)
+  level = level or 1
+  local best, bestScore
+  for _, z in ipairs(Dungeons.ZONES) do
+    local score = (level < z.min and (z.min - level) * 2) or (level > z.max and (level - z.max)) or 0
+    if not best or score < bestScore then best, bestScore = z, score end
+  end
+  return best.id
+end
 
 -- Un icono del juego distinto para cada mazmorra (la llave si no tiene).
 Dungeons.KEY_ICON = "Interface\\Icons\\INV_Misc_Key_03"
@@ -161,6 +224,7 @@ local ICONS = {
   [109] = "Spell_Arcane_StarFire",
 }
 function Dungeons.Icon(d)
+  if d and d >= 1001 then return "Interface\\Icons\\INV_Misc_Map_01" end
   local name = ICONS[d]
   return name and ("Interface\\Icons\\" .. name) or Dungeons.KEY_ICON
 end
@@ -394,6 +458,23 @@ end
 -- prefer = { [nombre] = 1 (delante de todos) o 3 (detrás de todos) } (para "Rehacer grupo").
 function Dungeons.Pick(r, prefer)
   local list = Dungeons.SignUps(r)
+  if Dungeons.IsLeveling(r) then
+    -- Grupo de leveo: sin roles, los primeros en apuntarse (quien lo propone delante).
+    table.sort(list, function(a, b)
+      if (a.name == r.a) ~= (b.name == r.a) then return a.name == r.a end
+      return (a.st or 0) < (b.st or 0)
+    end)
+    local gp = { d = {}, b = {} }
+    for i, su in ipairs(list) do
+      if i == 1 then gp.t = su.name
+      elseif i == 2 then gp.h = su.name
+      elseif i <= Dungeons.LEVELING_SIZE then gp.d[#gp.d + 1] = su.name
+      else gp.b[#gp.b + 1] = su.name end
+    end
+    if #gp.d == 0 then gp.d = nil end
+    if #gp.b == 0 then gp.b = nil end
+    return gp
+  end
   if prefer and next(prefer) then
     local groups = { {}, {}, {} }
     for _, su in ipairs(list) do
@@ -462,6 +543,13 @@ function Dungeons.MyPlace(r, name)
   local gp = r and r.gp
   if not gp then return nil end
   name = name or ns.Me()
+  if Dungeons.IsLeveling(r) then
+    -- en los de leveo no hay papeles: o vas en el grupo o de suplente
+    if gp.t == name or gp.h == name then return "en el grupo" end
+    for _, n in ipairs(gp.d or {}) do if n == name then return "en el grupo" end end
+    for _, n in ipairs(gp.b or {}) do if n == name then return "suplente" end end
+    return nil
+  end
   if gp.t == name then return "tanque" end
   if gp.h == name then return "sanador" end
   for _, n in ipairs(gp.d or {}) do if n == name then return "DPS" end end

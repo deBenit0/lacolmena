@@ -418,7 +418,8 @@ function Alerts.OnRunUpdated(old, new)
   local place = D.MyPlace(new)
   if place and place ~= "suplente" and new.a ~= me and D.MyPlace(old) ~= place then
     Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "group",
-      text = string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.ShortName(new.a)) })
+      text = place == "en el grupo" and string.format("¡Vas al grupo de %s! Te invitará %s", dg.name, ns.ShortName(new.a))
+        or string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.ShortName(new.a)) })
   end
 end
 ns.Listen("RUN_UPDATED", function(old, new) ns.SafeCall(Alerts.OnRunUpdated, old, new) end)

@@ -389,10 +389,10 @@ ns.UI.RegisterPage("guild", function(page)
   page.gameGuild = W.Button(page, "Ventana del juego", 140, 22, function() ns.UI.OpenGameGuild() end)
   page.gameGuild:SetPoint("BOTTOMRIGHT", 0, 2)
   ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: lista de miembros, rangos, noticias...")
-  page.guildKey = W.Check(page, "Abrir con la J", function(checked) ns.UI.SetGuildKey(checked) end)
+  page.guildKey = W.Check(page, "La J abre el addon", function(checked) ns.UI.SetGuildKey(checked) end)
   page.guildKey:SetPoint("RIGHT", page.gameGuild, "LEFT", -150, 0)
-  ns.UI.Tip(page.guildKey, "Abrir con la J", "Al abrir la ventana de hermandad del juego (la J), se abre "
-    .. "también esta página a su lado, y se cierran juntas. Quítalo para que la J abra solo la del juego.")
+  ns.UI.Tip(page.guildKey, "La J abre el addon", "La J abre esta ventana (en Miembros) en lugar de la de hermandad "
+    .. "del juego. Quítalo para que la J abra la del juego, como siempre.")
 
   page.officerTitle = title("Oficiales", COL3 + 4, -6)
   page.announce = W.Input(page, OFF_W - 66)

@@ -1,32 +1,39 @@
--- Ventana principal: se abre desde una pestaña lateral pegada a la ventana de hermandad o desde
--- el minimapa. Pestañas arriba (Inicio · Mercado · Agenda · Hermandad) y la rueda de Opciones.
--- Se puede encoger a una tira pequeña con el número de avisos.
+-- Ventana principal, la única del addon: la abre la J (en lugar de la de hermandad del juego), la
+-- pestaña lateral o el minimapa. Arriba el escudo, el nombre y el lema; abajo las pestañas
+-- (Inicio, Miembros, Chat, Mercado, Agenda, Hermandad y Opciones). Se puede encoger a una tira
+-- pequeña con el número de avisos.
 local _, ns = ...
 local W = ns.W
 local UI = { pages = {} }
 ns.UI = UI
 
-UI.WIDTH, UI.HEIGHT = 820, 540
+UI.WIDTH, UI.HEIGHT = 820, 604
+UI.CONTENT_W, UI.CONTENT_H = 788, 448 -- lo de dentro de cada página (igual que antes)
 
 local panel, mini
 local hosts = {}
--- Pestañas de arriba. Eventos y raids van dentro de la Agenda.
+-- Pestañas de abajo. Eventos y raids van dentro de la Agenda.
 local SECTIONS = {
   { id = "home", label = "Inicio", page = "home" },
+  { id = "members", label = "Miembros", page = "members" },
+  { id = "chat", label = "Chat", page = "chat" },
   { id = "market", label = "Mercado", page = "market" },
-  { id = "agenda", label = "Agenda", page = "dungeons" },
+  { id = "agenda", label = "Grupos", page = "dungeons" },
   { id = "guild", label = "Hermandad", page = "guild" },
+  { id = "options", label = "Opciones", page = "mine" },
 }
 ns.MOTTO = "Mi vida por el fundillo"
 
 -- Todas las páginas y la pestaña que se enciende con cada una.
 local PAGES = {
   { id = "home", section = "home" },
+  { id = "members", section = "members" },
+  { id = "chat", section = "chat" },
   { id = "market", section = "market" },
   { id = "ask", section = "market" },      -- «+ Pedir» y «+ Ofrecer»: el catálogo
   { id = "dungeons", section = "agenda" },
   { id = "guild", section = "guild" },
-  { id = "mine", section = "options" },    -- Opciones (rueda dentada)
+  { id = "mine", section = "options" },    -- Opciones
 }
 local PAGE_BY_ID = {}
 for _, p in ipairs(PAGES) do PAGE_BY_ID[p.id] = p end
@@ -144,56 +151,80 @@ local function createPanel()
   tip(grip, "Tamaño de la ventana", "Arrastra para hacerla más grande o más pequeña.\nClic derecho: tamaño y posición por defecto.")
   panel.grip = grip
 
-  -- Barra de arriba: título, lema, encoger y cerrar.
-  -- El escudo de NorrisPlay, pequeño, junto al título (en todas las pestañas).
-  panel.logo = panel:CreateTexture(nil, "ARTWORK")
-  panel.logo:SetSize(14, 28)
-  panel.logo:SetPoint("TOPLEFT", 20, -9)
+  -- Marca de agua: el escudo grande y casi transparente detrás de todo.
+  local mark = panel:CreateTexture(nil, "BACKGROUND", nil, 2)
+  mark:SetSize(180, 360)
+  mark:SetPoint("CENTER", 0, -10)
+  mark:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
+  mark:SetAlpha(0.05)
+  panel.watermark = mark
+
+  -- Arriba: el escudo redondo, el nombre de la hermandad y el lema.
+  local shield = CreateFrame("Frame", nil, panel)
+  shield:SetSize(68, 68)
+  shield:SetPoint("TOPLEFT", 14, -10)
+  local disc = shield:CreateTexture(nil, "BACKGROUND")
+  disc:SetAllPoints()
+  disc:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  disc:SetVertexColor(0.09, 0.07, 0.03, 1)
+  local ring = shield:CreateTexture(nil, "BORDER")
+  ring:SetSize(116, 116)
+  ring:SetPoint("TOPLEFT", -3, 3)
+  ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  ring:SetVertexColor(1, 0.82, 0.1)
+  panel.logo = shield:CreateTexture(nil, "ARTWORK")
+  panel.logo:SetSize(24, 48)
+  panel.logo:SetPoint("CENTER", 0, 0)
   panel.logo:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
-  panel.title = W.Text(panel, "GameFontNormalLarge")
-  panel.title:SetPoint("TOPLEFT", 40, -16)
-  panel.motto = W.Text(panel, "GameFontNormal", "RIGHT")
-  panel.motto:SetPoint("TOPRIGHT", -66, -18) -- se recoloca junto a «_» más abajo
+  panel.shield = shield
+  panel.title = W.Text(panel, "GameFontNormalHuge")
+  panel.title:SetPoint("TOPLEFT", 94, -22)
+  panel.title:SetTextColor(1, 0.82, 0)
+  panel.motto = W.Text(panel, "GameFontNormal")
+  panel.motto:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -6)
   panel.motto:SetTextColor(1, 0.45, 0.1)
-  panel.motto:SetText("\194\171" .. ns.MOTTO .. "\194\187")
+  panel.motto:SetText(ns.MOTTO)
+  panel.version = W.Text(panel, "GameFontHighlightSmall")
+  panel.version:SetPoint("LEFT", panel.motto, "RIGHT", 10, 0)
+  panel.version:SetTextColor(0.5, 0.5, 0.5)
   local close = W.CloseButton(panel)
   close:SetPoint("TOPRIGHT", -6, -6)
   panel.close = close
   local shrink = W.Button(panel, "_", 22, 20, function() UI.SetMini(true) end)
   shrink:SetPoint("RIGHT", close, "LEFT", 2, 0)
-  panel.motto:ClearAllPoints()
-  panel.motto:SetPoint("RIGHT", shrink, "LEFT", -8, 0)
   tip(shrink, "Encoger", "Deja solo una tira pequeña con tus avisos. Púlsala para volver.")
   panel.shrink = shrink
+  -- Cuántos hay conectados.
+  panel.online = W.Text(panel, "GameFontNormal", "RIGHT")
+  panel.online:SetPoint("RIGHT", shrink, "LEFT", -12, 0)
+  panel.online:SetTextColor(0.25, 0.8, 0.25)
+  local line = panel:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 1)
+  line:SetHeight(1)
+  line:SetPoint("TOPLEFT", 16, -86)
+  line:SetPoint("TOPRIGHT", -16, -86)
 
-  -- Pestañas (Inicio, Mercado, Agenda, Hermandad) y la rueda de Opciones.
+  -- Abajo: las pestañas, todas iguales, de lado a lado.
   panel.sections = {}
+  local n = #SECTIONS
+  local gap = 6
+  local tabW = math.floor((UI.CONTENT_W - (n - 1) * gap) / n)
   for i, s in ipairs(SECTIONS) do
-    local b = W.Tab(panel, s.label, 124, 26, function() UI.ShowPage(s.page) end)
-    b:SetPoint("TOPLEFT", 16 + (i - 1) * 128, -40)
+    local b = W.Tab(panel, s.label, tabW, 30, function() UI.ShowPage(s.page) end)
+    b:SetPoint("BOTTOMLEFT", 16 + (i - 1) * (tabW + gap), 14)
     b.badge = UI.Badge(b)
     b.badge:SetPoint("TOPRIGHT", 4, 6)
     panel.sections[s.id] = b
   end
-  local gear = CreateFrame("Button", nil, panel)
-  gear:SetSize(26, 26)
-  gear:SetPoint("TOPRIGHT", -18, -41)
-  local gearIcon = gear:CreateTexture(nil, "ARTWORK")
-  gearIcon:SetAllPoints()
-  gearIcon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
-  gear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-  gear:SetScript("OnClick", function() UI.ShowPage("mine") end)
-  tip(gear, "Opciones", "Tu personaje, los avisos y lo demás.")
-  panel.gear = gear
-  local line = panel:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 1)
-  line:SetHeight(1)
-  line:SetPoint("TOPLEFT", 16, -70)
-  line:SetPoint("TOPRIGHT", -16, -70)
+  local bottomLine = panel:CreateTexture(nil, "ARTWORK")
+  bottomLine:SetColorTexture(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 1)
+  bottomLine:SetHeight(1)
+  bottomLine:SetPoint("BOTTOMLEFT", 16, 52)
+  bottomLine:SetPoint("BOTTOMRIGHT", -16, 52)
 
   panel.content = CreateFrame("Frame", nil, panel)
-  panel.content:SetPoint("TOPLEFT", 16, -76)
-  panel.content:SetPoint("BOTTOMRIGHT", -16, 16)
+  panel.content:SetPoint("TOPLEFT", 16, -94)
+  panel.content:SetSize(UI.CONTENT_W, UI.CONTENT_H)
 
   panel.noGuild = W.Text(panel, "GameFontNormalLarge", "CENTER")
   panel.noGuild:SetTextColor(0.6, 0.6, 0.6)
@@ -207,7 +238,7 @@ local function createPanel()
     if create then
       local f = CreateFrame("Frame", nil, panel.content)
       f:SetAllPoints()
-      f:SetSize(UI.WIDTH - 32, UI.HEIGHT - 92)
+      f:SetSize(UI.CONTENT_W, UI.CONTENT_H)
       f:Hide()
       -- Cada página por separado: si una falla al montarse, las demás siguen funcionando y el
       -- error queda en el informe (Opciones → Copiar informe).
@@ -225,8 +256,14 @@ end
 function UI.Refresh()
   if not panel or not panel:IsShown() then return end
   UI.UpdateBadges()
-  panel.title:SetText(W.Upper(ns.TITLE) .. "  |cff999999v" .. ns.VERSION .. "|r"
-    .. (ns.db and ns.db.settings.demo and "  |cffff8040(DEMOSTRACIÓN)|r" or ""))
+  panel.title:SetText(ns.TITLE)
+  panel.version:SetText("v" .. ns.VERSION .. (ns.db and ns.db.settings.demo and "  |cffff8040(DEMOSTRACIÓN)|r" or ""))
+  local online, total = 0, 0
+  for _, r in pairs(ns.Guild.roster) do
+    total = total + 1
+    if r.online then online = online + 1 end
+  end
+  panel.online:SetText(total > 0 and string.format("%d/%d en línea", online, total) or "")
   local inGuild = ns.G() ~= nil
   local free = UI.current == "home" or UI.current == "mine"
   panel.noGuild:SetShown(not inGuild and not free)
@@ -337,7 +374,7 @@ local MINI_ITEMS = {
     text = "Lo que tienes que enviar.", open = function() UI.OpenMarket("involved") end },
   { id = "market", icon = "Interface\\Icons\\INV_Misc_Bag_10", title = "Mercado",
     text = "Lo que piden y puedes fabricar.", open = function() UI.OpenMarket("craft") end },
-  { id = "agenda", icon = "Interface\\Icons\\INV_Misc_Key_03", title = "Agenda",
+  { id = "agenda", icon = "Interface\\Icons\\INV_Misc_Key_03", title = "Grupos",
     text = "Quedadas a las que no te has apuntado.", open = function() UI.Open("dungeons") end },
 }
 
@@ -554,7 +591,7 @@ function UI.AttachHost(host)
     place()
     ns.After(0.1, place)
     ns.After(0.5, place)
-    -- la J: las dos ventanas a la vez (cuando ya está dibujada, para pegarse bien)
+    -- la J: se abre esta ventana en lugar de la del juego
     ns.After(0, function() if host:IsVisible() then UI.OpenWithHost(host) end end)
   end)
   -- Número de peticiones que puedo atender, en la esquina de la pestaña.
@@ -607,8 +644,10 @@ end
 -- La ventana de hermandad del juego (la J) abre también el addon, pegado a su lado en la
 -- página Hermandad; al cerrarla se cierran las dos. Se puede apagar en la página Hermandad.
 ---------------------------------------------------------------------------
--- La ventana de hermandad del juego, la de siempre.
+-- La ventana de hermandad del juego, la de siempre (el botón «Ventana del juego»).
 function UI.OpenGameGuild()
+  UI.wantGame = true
+  ns.After(1, function() UI.wantGame = nil end)
   if ToggleGuildFrame and pcall(ToggleGuildFrame) then return true end
   if ToggleCommunitiesFrame and pcall(ToggleCommunitiesFrame) then return true end
   if ToggleFriendsFrame and pcall(ToggleFriendsFrame, 3) then return true end
@@ -625,10 +664,22 @@ end
 
 -- Al abrirse la ventana del juego: el addon a su lado (si no estaba ya abierto por su cuenta).
 function UI.OpenWithHost(host)
+  if UI.wantGame then return end -- la ha pedido con «Ventana del juego»
   if not UI.GuildKeyOn() or not (IsInGuild and IsInGuild()) then return end
-  if panel and panel:IsShown() and not panel.withHost then return end
-  UI.Open("guild", nil, host, true)
-  if panel then panel.withHost = host end
+  if InCombatLockdown and InCombatLockdown() then
+    -- en combate no se tocan las ventanas del juego: las dos juntas, como antes
+    if panel and panel:IsShown() and not panel.withHost then return end
+    UI.Open("members", nil, host, true)
+    if panel then panel.withHost = host end
+    return
+  end
+  -- Se cierra la del juego y se abre la nuestra en Miembros (donde estaba la tuya, o en el centro).
+  if HideUIPanel then pcall(HideUIPanel, host) else host:Hide() end
+  if panel and panel:IsShown() then
+    UI.ShowPage("members")
+  else
+    UI.Open("members")
+  end
 end
 
 local function attachHosts()
