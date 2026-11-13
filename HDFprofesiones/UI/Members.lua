@@ -111,6 +111,34 @@ StaticPopupDialogs["HDFPROF_INVITE"] = {
   EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
 }
 
+-- Cambiar el mensaje del día.
+StaticPopupDialogs["HDFPROF_MOTD"] = {
+  text = "Mensaje del día de la hermandad:",
+  button1 = ACCEPT or "Aceptar",
+  button2 = CANCEL or "Cancelar",
+  hasEditBox = true,
+  maxLetters = 128,
+  editBoxWidth = 350,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+  preferredIndex = 3,
+  OnShow = function(self)
+    local edit = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
+    if edit and ns.GuildTools then edit:SetText(ns.GuildTools.MOTD()) end
+  end,
+  OnAccept = function(self)
+    local edit = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
+    if edit and ns.GuildTools then ns.GuildTools.SetMOTD(edit:GetText() or "") end
+  end,
+  EditBoxOnEnterPressed = function(self)
+    local popup = self:GetParent()
+    StaticPopupDialogs["HDFPROF_MOTD"].OnAccept(popup)
+    popup:Hide()
+  end,
+  EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+}
+
 ns.UI.RegisterPage("members", function(page)
   local filter, query, showInactive = "all", "", false
   -- Orden: pulsar el título de una columna ordena por ella; otra vez, al revés.
@@ -178,6 +206,8 @@ ns.UI.RegisterPage("members", function(page)
       if item.header then
         showInactive = not showInactive
         page:Refresh()
+      elseif ns.GuildTools then
+        ns.GuildTools.ShowMember(item.name) -- su ficha: notas, ascender, degradar...
       end
     end,
     buildRow = function(row)
@@ -252,20 +282,47 @@ ns.UI.RegisterPage("members", function(page)
   page.list:SetPoint("TOPLEFT", 0, -50)
 
   -- Abajo: invitar, la ventana del juego y la ayuda.
-  page.invite = W.Button(page, "Invitar a miembro", 140, 22, function()
+  -- Mensaje del día (encima de los botones), con «Cambiar» si tu rango puede.
+  page.motd = W.Text(page, "GameFontHighlightSmall")
+  page.motd:SetPoint("BOTTOMLEFT", 2, 34)
+  page.motd:SetWidth(690)
+  page.motd:SetJustifyH("LEFT")
+  page.motd:SetWordWrap(false)
+  page.motdEdit = W.Button(page, "Cambiar", 76, 20, function()
+    StaticPopup_Show("HDFPROF_MOTD")
+  end)
+  page.motdEdit:SetPoint("BOTTOMRIGHT", -4, 30)
+
+  -- Abajo: invitar, información, registro, rangos, salir y la ventana del juego.
+  local T = function() return ns.GuildTools end
+  page.invite = W.Button(page, "Invitar a miembro", 132, 22, function()
     StaticPopup_Show("HDFPROF_INVITE")
   end)
   page.invite:SetPoint("BOTTOMLEFT", 0, 2)
+  page.info = W.Button(page, "Información", 100, 22, function() T().ShowInfo() end)
+  page.info:SetPoint("LEFT", page.invite, "RIGHT", 6, 0)
+  ns.UI.Tip(page.info, "Información de la hermandad", "El texto largo de la hermandad (lo puede cambiar quien tenga permiso).")
+  page.log = W.Button(page, "Registro", 90, 22, function() T().ShowLog() end)
+  page.log:SetPoint("LEFT", page.info, "RIGHT", 6, 0)
+  ns.UI.Tip(page.log, "Registro de la hermandad", "Quién ha entrado, salido, ascendido o sido expulsado.")
+  page.ranks = W.Button(page, "Rangos", 80, 22, function() T().OpenRanks() end)
+  page.ranks:SetPoint("LEFT", page.log, "RIGHT", 6, 0)
+  ns.UI.Tip(page.ranks, "Rangos y permisos", "Solo el líder: nombres de los rangos y qué puede hacer cada uno.")
+  page.leave = W.Button(page, "Salir de la hermandad", 150, 22, function() T().Leave() end)
+  page.leave:SetPoint("LEFT", page.ranks, "RIGHT", 6, 0)
   page.gameGuild = W.Button(page, "Ventana del juego", 140, 22, function() ns.UI.OpenGameGuild() end)
-  page.gameGuild:SetPoint("LEFT", page.invite, "RIGHT", 8, 0)
-  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: rangos, noticias, notas...")
-  local hint = W.Text(page, "GameFontHighlightSmall", "RIGHT")
-  hint:SetPoint("BOTTOMRIGHT", -4, 8)
-  hint:SetTextColor(0.6, 0.6, 0.6)
-  hint:SetText("Bocadillo: susurrarle")
+  page.gameGuild:SetPoint("BOTTOMRIGHT", -4, 2)
+  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre, por si necesitas algo de allí.")
 
   function page:Refresh()
     for _, chip in ipairs(self.chips) do chip:SetOn(chip.id == filter) end
+    local tools = ns.GuildTools
+    if tools then
+      local motd = tools.MOTD()
+      self.motd:SetText("|cffffd100Mensaje del día:|r " .. (motd ~= "" and motd or "|cff888888(ninguno)|r"))
+      self.motdEdit:SetShown(tools.CanEditMOTD())
+      self.ranks:SetEnabled(tools.IsLeader())
+    end
     for _, h in ipairs(self.heads) do
       local on = h.col.id == sortCol
       h.text:SetText(h.col.label .. (on and (sortDesc and " v" or " ^") or ""))

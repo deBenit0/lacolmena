@@ -164,7 +164,7 @@ function Guild.Refresh()
   local now = ns.Now()
   local fresh, count, dupes = {}, 0, {}
   for i = 1, total do
-    local name, rankName, rankIndex, level, className, zone, _, _, online, _, classFile = GetGuildRosterInfo(i)
+    local name, rankName, rankIndex, level, className, zone, note, officerNote, online, _, classFile = GetGuildRosterInfo(i)
     if name then
       local raw = name -- tal como lo da el juego (para invitar)
       name = ns.FullName(name)
@@ -185,7 +185,8 @@ function Guild.Refresh()
         table.insert(dupes[name], raw)
       end
       fresh[name] = { online = online and true or false, rank = rankIndex, level = level, class = classFile, seen = seen,
-        raw = raw, rankName = rankName, className = className, zone = zone }
+        raw = raw, rankName = rankName, className = className, zone = zone, index = i,
+        note = note, officerNote = officerNote }
     end
   end
   wipe(roster)

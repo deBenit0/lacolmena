@@ -37,6 +37,7 @@ UI\Dialog.lua
 UI\Dungeons.lua
 UI\Guild.lua
 UI\Members.lua
+UI\GuildTools.lua
 UI\Chat.lua
 UI\Diag.lua
 UI\Minimap.lua
