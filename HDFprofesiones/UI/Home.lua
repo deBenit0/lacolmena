@@ -191,7 +191,7 @@ ns.UI.RegisterPage("home", function(page)
         string.format("%s\n|cff999999%s · %s|r", D.Dungeon(r.d).name, when, extra) }
     end
     page.cards.runs:Fill(#runs, lines, "No hay quedadas.\nPropón una.",
-      #runs > 0 and "Ver quedadas" or "+ Proponer quedada",
+      #runs > 0 and "Ver grupos" or "+ Hacer grupo",
       function()
         local f = ns.UI.Open("dungeons")
         if #runs > 0 then

@@ -134,6 +134,41 @@ local function guildStream()
   end
 end
 
+-- Los mensajes que el juego guarda del chat de hermandad (y del de oficiales), también los de
+-- antes de conectarte, del más viejo al más nuevo: { a = nombre, k = clase, m = texto, t = hora, c = canal }.
+function ChatLog.History(withOfficer)
+  if not (C_Club and C_Club.GetGuildClubId and C_Club.GetStreams and C_Club.GetMessageRanges) then return nil end
+  local clubId = C_Club.GetGuildClubId()
+  if not clubId then return nil end
+  local guildType = Enum and Enum.ClubStreamType and Enum.ClubStreamType.Guild or 1
+  local officerType = Enum and Enum.ClubStreamType and Enum.ClubStreamType.Officer or 2
+  local out = {}
+  for _, s in ipairs(C_Club.GetStreams(clubId) or {}) do
+    local channel = (s.streamType == guildType and "GUILD") or (withOfficer and s.streamType == officerType and "OFFICER")
+    if channel then
+      for _, range in ipairs(C_Club.GetMessageRanges(clubId, s.streamId) or {}) do
+        local msgs = C_Club.GetMessagesInRange(clubId, s.streamId, range.oldestMessageId, range.newestMessageId) or {}
+        for _, m in ipairs(msgs) do
+          local text, author = m.content, m.author and m.author.name
+          if not m.destroyed and type(text) == "string" and type(author) == "string"
+            and not secret(text) and not secret(author) then
+            local class
+            if m.author.classID and C_CreatureInfo and C_CreatureInfo.GetClassInfo then
+              local info = C_CreatureInfo.GetClassInfo(m.author.classID)
+              class = info and info.classFile
+            end
+            local epoch = m.messageId and m.messageId.epoch
+            out[#out + 1] = { a = author, k = class, m = text, c = channel,
+              t = epoch and math.floor(epoch / 1000000) or 0 }
+          end
+        end
+      end
+    end
+  end
+  table.sort(out, function(x, y) return x.t < y.t end)
+  return out
+end
+
 ChatLog.found = 0  -- pedidos recuperados del historial en esta sesión (para la comprobación)
 ChatLog.read = nil -- cuántas líneas se han leído, o nil si aún no se ha podido
 
@@ -176,6 +211,7 @@ end
 ns.On("CLUB_MESSAGE_HISTORY_RECEIVED", function(clubId, streamId)
   ns.SafeCall(function()
     local gc, gs = guildStream()
+    if gc and clubId == gc then ns.Fire("CHAT_HISTORY") end -- la página Chat se vuelve a pintar
     if not gc or clubId ~= gc or streamId ~= gs then return end
     ChatLog.ReadDownloaded()
     if pagesAsked > 0 and pagesAsked < ChatLog.PAGES then

@@ -221,7 +221,7 @@ local function createDialog()
   tinsert(UISpecialFrames, "HDFProfDungeonDialog")
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
-  title:SetText("Proponer quedada")
+  title:SetText("Hacer grupo")
   local close = W.CloseButton(dialog)
   close:SetPoint("TOPRIGHT", -10, -10)
 
@@ -399,7 +399,7 @@ local function createDialog()
 
   dialog.chat = W.Check(dialog, "Avisar en el chat de hermandad")
   dialog.chat:SetPoint("BOTTOMLEFT", 20, 16)
-  local publish = W.Button(dialog, "Proponer", 96, 22, function() dialog:Publish() end)
+  local publish = W.Button(dialog, "Crear", 96, 22, function() dialog:Publish() end)
   dialog.publish = publish
   function dialog:UpdatePublish() end -- se puede proponer sin ir (se pregunta)
   watchChecks(dialog.checks, function() dialog:UpdatePublish() end)
@@ -559,7 +559,7 @@ ns.UI.RegisterPage("dungeons", function(page)
     end
     page.kinds[i] = b
   end
-  page.propose = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.propose = W.Button(page, "+ Hacer grupo", 160, 24, function() ns.UI.OpenDungeonDialog() end)
   page.propose:SetPoint("TOPRIGHT", 0, 0)
 
   -- Fila 2: la semana. Cada día con sus quedadas (puntos); al pulsarlo se ven solo las suyas.
@@ -666,7 +666,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   page.empty:SetPoint("CENTER", list, "CENTER", 0, 20)
   page.empty:SetWidth(380)
   page.empty:SetTextColor(0.7, 0.7, 0.7)
-  page.emptyButton = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.emptyButton = W.Button(page, "+ Hacer grupo", 160, 24, function() ns.UI.OpenDungeonDialog() end)
   page.emptyButton:SetPoint("TOP", page.empty, "BOTTOM", 0, -12)
 
   local detail = W.Box(page, 350, 414)
@@ -712,7 +712,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   detail.leave = W.Button(detail, "Desapuntarme", 110, 22)
   detail.leave:SetPoint("LEFT", detail.join, "RIGHT", 4, 0)
 
-  detail.make = W.Button(detail, "Hacer grupo", 104, 22)
+  detail.make = W.Button(detail, "Elegir grupo", 104, 22)
   detail.make:SetPoint("BOTTOMLEFT", 8, 8)
   detail.invite = W.Button(detail, "Invitar al grupo", 120, 22)
   detail.invite:SetPoint("LEFT", detail.make, "RIGHT", 4, 0)
@@ -835,7 +835,7 @@ ns.UI.RegisterPage("dungeons", function(page)
       end)
     end)
     detail.make:SetEnabled(open and #signups > 0)
-    detail.make:SetText(r.gp and "Rehacer grupo" or "Hacer grupo")
+    detail.make:SetText(r.gp and "Volver a elegir" or "Elegir grupo")
     if D.IsLeveling(r) then
       ns.UI.Tip(detail.make, "Grupo de leveo", "Sin roles: entran los 5 primeros en apuntarse (tú delante).")
     end

@@ -113,6 +113,8 @@ StaticPopupDialogs["HDFPROF_INVITE"] = {
 
 ns.UI.RegisterPage("members", function(page)
   local filter, query, showInactive = "all", "", false
+  -- Orden: pulsar el título de una columna ordena por ella; otra vez, al revés.
+  local sortCol, sortDesc = nil, false
   local W_LIST = 788
 
   -- Filtros y buscador.
@@ -141,12 +143,26 @@ ns.UI.RegisterPage("members", function(page)
   searchLabel:SetTextColor(0.6, 0.6, 0.6)
   searchLabel:SetText("Buscar")
 
-  -- Títulos de las columnas.
+  -- Títulos de las columnas: se pueden pulsar para ordenar.
+  page.heads = {}
   for _, c in ipairs(COLS) do
-    local t = W.Text(page, "GameFontNormalSmall")
-    t:SetPoint("TOPLEFT", c.x + 6, -32)
-    t:SetText(c.label)
-    t:SetTextColor(0.75, 0.7, 0.6)
+    local b = CreateFrame("Button", nil, page)
+    b:SetSize(c.w, 16)
+    b:SetPoint("TOPLEFT", c.x + 4, -30)
+    b.text = W.Text(b, "GameFontNormalSmall")
+    b.text:SetPoint("LEFT", 2, 0)
+    b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    b:SetScript("OnClick", function()
+      if sortCol == c.id then
+        sortDesc = not sortDesc
+      else
+        sortCol, sortDesc = c.id, (c.id == "level")
+      end
+      page:Refresh()
+    end)
+    ns.UI.Tip(b, c.label, "Pulsa para ordenar por esta columna; otra vez, al revés.")
+    b.col = c
+    page.heads[#page.heads + 1] = b
   end
   local line = page:CreateTexture(nil, "ARTWORK")
   line:SetColorTexture(W.COLORS.LINE[1], W.COLORS.LINE[2], W.COLORS.LINE[3], 0.6)
@@ -250,6 +266,11 @@ ns.UI.RegisterPage("members", function(page)
 
   function page:Refresh()
     for _, chip in ipairs(self.chips) do chip:SetOn(chip.id == filter) end
+    for _, h in ipairs(self.heads) do
+      local on = h.col.id == sortCol
+      h.text:SetText(h.col.label .. (on and (sortDesc and " v" or " ^") or ""))
+      if on then h.text:SetTextColor(1, 0.82, 0) else h.text:SetTextColor(0.75, 0.7, 0.6) end
+    end
     local g = ns.G()
     local now = ns.Now()
     local active, inactive = {}, {}
@@ -261,7 +282,7 @@ ns.UI.RegisterPage("members", function(page)
         name = name, display = displayName(name, info), online = info.online, class = info.class,
         className = info.className, level = info.level, rankName = info.rankName, rank = info.rank,
         zone = info.zone, since = since, role = roleText(e and e.ro), profs = profsText(e),
-        addon = addon, hasAddon = addonState > 0, crafter = e and type(e.p) == "table" and next(e.p) ~= nil,
+        addon = addon, hasAddon = addonState > 0, addonState = addonState, crafter = e and type(e.p) == "table" and next(e.p) ~= nil,
       }
       local ok = true
       if filter == "online" then ok = item.online
@@ -279,7 +300,27 @@ ns.UI.RegisterPage("members", function(page)
         end
       end
     end
+    local KEY = {
+      name = function(x) return x.display:lower() end,
+      class = function(x) return (x.className or ""):lower() end,
+      level = function(x) return x.level or 0 end,
+      role = function(x) return x.role end,
+      profs = function(x) return x.profs end,
+      addon = function(x) return x.addonState end,
+      rank = function(x) return x.rank or 99 end,
+      zone = function(x) return (x.zone or ""):lower() end,
+      seen = function(x) return x.online and -1 or (x.since or 1e12) end,
+    }
     local function order(a, b)
+      local key = sortCol and KEY[sortCol]
+      if key then
+        local ka, kb = key(a), key(b)
+        if ka ~= kb then
+          if sortDesc then return ka > kb end
+          return ka < kb
+        end
+        return a.display < b.display
+      end
       if a.online ~= b.online then return a.online end
       if not a.online and (a.since or 0) ~= (b.since or 0) then return (a.since or 0) < (b.since or 0) end
       if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) > (b.level or 0) end

@@ -591,8 +591,7 @@ function UI.AttachHost(host)
     place()
     ns.After(0.1, place)
     ns.After(0.5, place)
-    -- la J: se abre esta ventana en lugar de la del juego
-    ns.After(0, function() if host:IsVisible() then UI.OpenWithHost(host) end end)
+    -- (la J ya no pasa por aquí: tiene su propio atajo, más abajo)
   end)
   -- Número de peticiones que puedo atender, en la esquina de la pestaña.
   tab.badge = CreateFrame("Frame", nil, tab)
@@ -661,7 +660,46 @@ end
 
 function UI.SetGuildKey(on)
   if ns.db then ns.db.settings.guildKey = on and true or false end
+  UI.ApplyGuildKey()
 end
+
+---------------------------------------------------------------------------
+-- La J (y el atajo de «Hermandad y comunidades»): un atajo propio que abre o cierra esta
+-- ventana. Antes se dejaba abrir la del juego y se cerraba al momento: se veía un parpadeo y
+-- cerrar ventanas del juego desde un addon puede bloquear acciones («No se ha podido realizar
+-- la acción de interfaz debido a un addon»). Los atajos no se pueden cambiar en combate: se
+-- ponen al entrar y cuando cambias tus teclas.
+---------------------------------------------------------------------------
+local GUILD_BINDINGS = { "TOGGLEGUILDTAB", "TOGGLECOMMUNITIESFRAME", "TOGGLEGUILDFRAME" }
+local keyButton = CreateFrame("Button", "HDFProfGuildKey", UIParent)
+keyButton:SetScript("OnClick", function()
+  if not (IsInGuild and IsInGuild()) then
+    UI.OpenGameGuild()
+  elseif panel and panel:IsShown() then
+    panel:Hide()
+  else
+    UI.Open("members")
+  end
+end)
+
+function UI.ApplyGuildKey()
+  if not (ClearOverrideBindings and SetOverrideBindingClick and GetBindingKey) then return end
+  if InCombatLockdown and InCombatLockdown() then
+    UI.keyPending = true
+    return
+  end
+  UI.keyPending = nil
+  ClearOverrideBindings(keyButton)
+  if not UI.GuildKeyOn() then return end
+  for _, action in ipairs(GUILD_BINDINGS) do
+    for _, key in ipairs({ GetBindingKey(action) }) do
+      if key then SetOverrideBindingClick(keyButton, false, key, "HDFProfGuildKey") end
+    end
+  end
+end
+ns.Listen("LOGIN", function() UI.ApplyGuildKey() end)
+ns.On("UPDATE_BINDINGS", function() ns.Coalesce("guildKey", 1, UI.ApplyGuildKey) end)
+ns.On("PLAYER_REGEN_ENABLED", function() if UI.keyPending then UI.ApplyGuildKey() end end)
 
 -- ¿Esta ventana del juego es la de hermandad sola (la podemos cambiar por la nuestra)?
 local function replaceable(host)

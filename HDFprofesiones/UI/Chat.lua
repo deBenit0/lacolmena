@@ -28,10 +28,23 @@ local function amOfficer()
   return info and (info.rank or 9) <= 1
 end
 
+-- Nombre con su apellido (WoW Forever) y sin el reino.
+local function displayName(author)
+  if type(author) ~= "string" then return "" end
+  local name = author:gsub("%-[^%s]*$", "")
+  if not name:find(" ", 1, true) and ns.TellName then
+    local full = ns.TellName(ns.FullName and ns.FullName(author) or author)
+    if full and full:find(" ", 1, true) then name = full end
+  end
+  return name
+end
+
 local function lineText(m)
   local c = CHANNELS[m.c] or CHANNELS.GUILD
   local time = date and date("%H:%M", m.t) or ""
-  local who = m.a and ns.ColoredName and ns.ColoredName(m.a, m.k) or (m.a or "")
+  local r, g, b = ns.ClassColor(m.k)
+  local who = string.format("|cff%02x%02x%02x%s|r", math.floor(r * 255), math.floor(g * 255), math.floor(b * 255),
+    displayName(m.a))
   local tag = m.c == "OFFICER" and "[Of.] " or ""
   return string.format("|cff888888%s|r |cff%02x%02x%02x%s|r%s: %s", time,
     math.floor(c.color[1] * 255), math.floor(c.color[2] * 255), math.floor(c.color[3] * 255), tag, who, m.m), c.color
@@ -49,7 +62,7 @@ local function onMessage(channel)
       local ok, _, classFile = pcall(GetPlayerInfoByGUID, guid)
       if ok then class = classFile end
     end
-    local m = { c = channel, a = ns.FullName and ns.FullName(author) or author, k = class, m = text, t = time() }
+    local m = { c = channel, a = author, k = class, m = text, t = time() }
     l[#l + 1] = m
     while #l > KEEP do table.remove(l, 1) end
     if page and page:IsVisible() and (channel ~= "OFFICER" or amOfficer()) then
@@ -123,12 +136,33 @@ ns.UI.RegisterPage("chat", function(f)
   local function rebuild()
     local officer = amOfficer()
     messages:Clear()
+    -- Lo que guarda el juego (también lo de antes de conectarte); si no se puede, lo que
+    -- ha apuntado el addon.
+    local history = ns.ChatLog and ns.ChatLog.History and ns.ChatLog.History(officer)
+    if history and #history > 0 then
+      local l = log()
+      if l then wipe(l) end -- lo del juego ya lo trae todo
+      for _, m in ipairs(history) do
+        messages:AddMessage((lineText(m)), 1, 1, 1)
+        if l then l[#l + 1] = m end
+      end
+      if l then while #l > KEEP do table.remove(l, 1) end end
+      messages:ScrollToBottom()
+      return
+    end
     for _, m in ipairs(log() or {}) do
       if m.c ~= "OFFICER" or officer then messages:AddMessage((lineText(m)), 1, 1, 1) end
     end
     messages:ScrollToBottom()
   end
-  f:SetScript("OnShow", rebuild)
+  f:SetScript("OnShow", function()
+    rebuild()
+    -- pedir al juego más mensajes de antes (llegan un poco después y se repinta)
+    if ns.ChatLog and ns.ChatLog.ReadHistory then pcall(ns.ChatLog.ReadHistory) end
+  end)
+  ns.Listen("CHAT_HISTORY", function()
+    if f:IsVisible() then ns.Coalesce("chatHistory", 0.5, rebuild) end
+  end)
   f.showOfficer = amOfficer
 
   function f:Refresh()

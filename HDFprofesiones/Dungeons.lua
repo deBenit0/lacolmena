@@ -146,44 +146,44 @@ Dungeons.LIST = {
 -- Grupos de leveo: hacer misiones juntos en una zona. Mismo sistema que las mazmorras, pero sin
 -- reparto de roles: el grupo son los 5 primeros en apuntarse. Números desde 1001 (fijos).
 Dungeons.ZONES = {
-  { id = 1001, name = "Bosque de Elwynn", min = 1, max = 10, side = "Alliance" },
-  { id = 1002, name = "Dun Morogh", min = 1, max = 10, side = "Alliance" },
-  { id = 1003, name = "Teldrassil", min = 1, max = 10, side = "Alliance" },
-  { id = 1004, name = "Durotar", min = 1, max = 10, side = "Horde" },
-  { id = 1005, name = "Mulgore", min = 1, max = 10, side = "Horde" },
-  { id = 1006, name = "Claros de Tirisfal", min = 1, max = 10, side = "Horde" },
-  { id = 1007, name = "Páramos de Poniente", min = 10, max = 20, side = "Alliance" },
-  { id = 1008, name = "Loch Modan", min = 10, max = 20, side = "Alliance" },
-  { id = 1009, name = "Costa Oscura", min = 10, max = 20, side = "Alliance" },
-  { id = 1010, name = "Los Baldíos", min = 10, max = 25, side = "Horde" },
-  { id = 1011, name = "Bosque de Argénteos", min = 10, max = 20, side = "Horde" },
-  { id = 1012, name = "Montañas Crestagrana", min = 15, max = 25, side = "Alliance" },
-  { id = 1013, name = "Sierra Espolón", min = 15, max = 27 },
-  { id = 1014, name = "Vallefresno", min = 18, max = 30 },
-  { id = 1015, name = "Bosque del Ocaso", min = 18, max = 30 },
-  { id = 1016, name = "Los Humedales", min = 20, max = 30 },
-  { id = 1017, name = "Laderas de Trabalomas", min = 20, max = 30 },
-  { id = 1018, name = "Las Mil Agujas", min = 25, max = 35 },
-  { id = 1019, name = "Montañas de Alterac", min = 30, max = 40 },
-  { id = 1020, name = "Tierras Altas de Arathi", min = 30, max = 40 },
-  { id = 1021, name = "Desolace", min = 30, max = 40 },
-  { id = 1022, name = "Vega de Tuercespina", min = 30, max = 45 },
-  { id = 1023, name = "Marjal Revolcafango", min = 35, max = 45 },
-  { id = 1024, name = "Tierras Inhóspitas", min = 35, max = 45 },
-  { id = 1025, name = "Pantano de las Penas", min = 35, max = 45 },
-  { id = 1026, name = "Feralas", min = 40, max = 50 },
-  { id = 1027, name = "Tierras del Interior", min = 40, max = 50 },
-  { id = 1028, name = "Tanaris", min = 40, max = 50 },
-  { id = 1029, name = "La Garganta de Fuego", min = 43, max = 50 },
-  { id = 1030, name = "Azshara", min = 45, max = 55 },
-  { id = 1031, name = "Las Tierras Devastadas", min = 45, max = 55 },
-  { id = 1032, name = "Cráter de Un'Goro", min = 48, max = 55 },
-  { id = 1033, name = "Frondavil", min = 48, max = 55 },
-  { id = 1034, name = "Las Estepas Ardientes", min = 50, max = 58 },
-  { id = 1035, name = "Tierras de la Peste del Oeste", min = 51, max = 58 },
-  { id = 1036, name = "Tierras de la Peste del Este", min = 53, max = 60 },
-  { id = 1037, name = "Cuna del Invierno", min = 55, max = 60 },
-  { id = 1038, name = "Silithus", min = 55, max = 60 },
+  { id = 1001, map = 1429, name = "Bosque de Elwynn", min = 1, max = 10, side = "Alliance" },
+  { id = 1002, map = 1426, name = "Dun Morogh", min = 1, max = 10, side = "Alliance" },
+  { id = 1003, map = 1438, name = "Teldrassil", min = 1, max = 10, side = "Alliance" },
+  { id = 1004, map = 1411, name = "Durotar", min = 1, max = 10, side = "Horde" },
+  { id = 1005, map = 1412, name = "Mulgore", min = 1, max = 10, side = "Horde" },
+  { id = 1006, map = 1420, name = "Claros de Tirisfal", min = 1, max = 10, side = "Horde" },
+  { id = 1007, map = 1436, name = "Páramos de Poniente", min = 10, max = 20, side = "Alliance" },
+  { id = 1008, map = 1432, name = "Loch Modan", min = 10, max = 20, side = "Alliance" },
+  { id = 1009, map = 1439, name = "Costa Oscura", min = 10, max = 20, side = "Alliance" },
+  { id = 1010, map = 1413, name = "Los Baldíos", min = 10, max = 25, side = "Horde" },
+  { id = 1011, map = 1421, name = "Bosque de Argénteos", min = 10, max = 20, side = "Horde" },
+  { id = 1012, map = 1433, name = "Montañas Crestagrana", min = 15, max = 25, side = "Alliance" },
+  { id = 1013, map = 1442, name = "Sierra Espolón", min = 15, max = 27 },
+  { id = 1014, map = 1440, name = "Vallefresno", min = 18, max = 30 },
+  { id = 1015, map = 1431, name = "Bosque del Ocaso", min = 18, max = 30 },
+  { id = 1016, map = 1437, name = "Los Humedales", min = 20, max = 30 },
+  { id = 1017, map = 1424, name = "Laderas de Trabalomas", min = 20, max = 30 },
+  { id = 1018, map = 1441, name = "Las Mil Agujas", min = 25, max = 35 },
+  { id = 1019, map = 1416, name = "Montañas de Alterac", min = 30, max = 40 },
+  { id = 1020, map = 1417, name = "Tierras Altas de Arathi", min = 30, max = 40 },
+  { id = 1021, map = 1443, name = "Desolace", min = 30, max = 40 },
+  { id = 1022, map = 1434, name = "Vega de Tuercespina", min = 30, max = 45 },
+  { id = 1023, map = 1445, name = "Marjal Revolcafango", min = 35, max = 45 },
+  { id = 1024, map = 1418, name = "Tierras Inhóspitas", min = 35, max = 45 },
+  { id = 1025, map = 1435, name = "Pantano de las Penas", min = 35, max = 45 },
+  { id = 1026, map = 1444, name = "Feralas", min = 40, max = 50 },
+  { id = 1027, map = 1425, name = "Tierras del Interior", min = 40, max = 50 },
+  { id = 1028, map = 1446, name = "Tanaris", min = 40, max = 50 },
+  { id = 1029, map = 1427, name = "La Garganta de Fuego", min = 43, max = 50 },
+  { id = 1030, map = 1447, name = "Azshara", min = 45, max = 55 },
+  { id = 1031, map = 1419, name = "Las Tierras Devastadas", min = 45, max = 55 },
+  { id = 1032, map = 1449, name = "Cráter de Un'Goro", min = 48, max = 55 },
+  { id = 1033, map = 1448, name = "Frondavil", min = 48, max = 55 },
+  { id = 1034, map = 1428, name = "Las Estepas Ardientes", min = 50, max = 58 },
+  { id = 1035, map = 1422, name = "Tierras de la Peste del Oeste", min = 51, max = 58 },
+  { id = 1036, map = 1423, name = "Tierras de la Peste del Este", min = 53, max = 60 },
+  { id = 1037, map = 1452, name = "Cuna del Invierno", min = 55, max = 60 },
+  { id = 1038, map = 1451, name = "Silithus", min = 55, max = 60 },
 }
 for _, z in ipairs(Dungeons.ZONES) do z.zone = true end
 Dungeons.LEVELING_SIZE = 5
@@ -800,3 +800,81 @@ function Dungeons.Purge(now)
     end
   end
 end
+
+---------------------------------------------------------------------------
+-- Grupos de leveo automáticos: si vas en grupo con alguien más de la hermandad por una zona de
+-- leveo, el jefe del grupo lo publica solo en Grupos (para que se pueda unir quien ande cerca) y
+-- los demás de la hermandad que van en ese grupo se apuntan solos. Si el grupo se deshace o
+-- cambiáis de zona, se cancela (o se cambia de zona).
+---------------------------------------------------------------------------
+-- La zona de leveo en la que estoy (o nil).
+function Dungeons.CurrentZone()
+  if IsInInstance then
+    local inside = IsInInstance()
+    if inside then return nil end
+  end
+  local mapId = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local name = GetRealZoneText and GetRealZoneText()
+  for _, z in ipairs(Dungeons.ZONES) do
+    if (mapId and z.map == mapId) or (name and name == z.name) then return z.id end
+  end
+end
+
+-- Los de la hermandad que van en mi grupo (sin contarme).
+local function guildmatesInParty()
+  local out = {}
+  if not UnitName then return out end
+  for i = 1, 4 do
+    local name = UnitName("party" .. i)
+    if name and name ~= UNKNOWNOBJECT then
+      local _, full = ns.Guild.Find(ns.FullName(name))
+      if full then out[full] = true end
+    end
+  end
+  return out
+end
+
+local function amLeader()
+  if UnitIsGroupLeader then return UnitIsGroupLeader("player") end
+  return IsPartyLeader and IsPartyLeader() or false
+end
+
+function Dungeons.CheckAutoLeveling()
+  local c, g = ns.MyChar(), ns.G()
+  if not c or not g or not ns.Sync then return end
+  local now, me = ns.Now(), ns.Me()
+  local list = runs()
+  local mates = guildmatesInParty()
+  local zone = Dungeons.CurrentZone()
+  local together = next(mates) ~= nil and zone ~= nil
+  -- El mío (si soy el jefe): publicarlo, cambiarlo de zona o cancelarlo.
+  local mine = c.autoRun and list and list[c.autoRun]
+  if mine and (mine.x or Dungeons.State(mine, now) ~= "open") then mine, c.autoRun = nil, nil end
+  if mine and (not together or not amLeader() or mine.d ~= zone) then
+    ns.Sync.CancelRun(mine.id)
+    mine, c.autoRun = nil, nil
+  end
+  if together and amLeader() and not mine then
+    local allowed = Dungeons.RolesFor(Dungeons.MyClass())
+    local r = ns.Sync.CreateRun({ d = zone, roles = allowed > 0 and allowed or Dungeons.DPS })
+    if r then c.autoRun = r.id end
+  end
+  -- Los de los demás: si el jefe de mi grupo ha publicado uno en esta zona, me apunto.
+  if together and list then
+    for id, r in pairs(list) do
+      local su = r.s and r.s[me]
+      if mates[r.a] and r.d == zone and not r.x and Dungeons.State(r, now) == "open" and not (su and not su.o) then
+        local allowed = Dungeons.RolesFor(Dungeons.MyClass())
+        ns.Sync.SignUpRun(id, allowed > 0 and allowed or Dungeons.DPS)
+      end
+    end
+  end
+end
+
+local function scheduleAuto() ns.Coalesce("autoLeveling", 3, Dungeons.CheckAutoLeveling) end
+ns.On("GROUP_ROSTER_UPDATE", scheduleAuto)
+ns.On("PARTY_MEMBERS_CHANGED", scheduleAuto)
+ns.On("ZONE_CHANGED_NEW_AREA", scheduleAuto)
+ns.Listen("LOGIN", function()
+  if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(60, function() ns.SafeCall(Dungeons.CheckAutoLeveling) end) end
+end)

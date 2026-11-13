@@ -191,7 +191,6 @@ function Guild.Refresh()
   wipe(roster)
   for name, r in pairs(fresh) do roster[name] = r end
   Guild.dupes = dupes
-  Guild.WarnDupes()
   Guild.full = count > 0 and count == total
   Guild.count = count
   cleanup()
