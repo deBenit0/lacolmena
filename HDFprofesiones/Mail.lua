@@ -100,8 +100,11 @@ end
 local function applyCOD()
   if not cod or not SendMailCODButton or not SendMailMoney or not MoneyInputFrame_SetCopper then return end
   -- Si ha cambiado el destinatario, ya no es nuestro correo.
-  local to = SendMailNameEditBox and SendMailNameEditBox:GetText() or ""
-  if to:lower() ~= ns.ShortName(cod.to):lower() and to:lower() ~= cod.to:lower()
+  local to = (SendMailNameEditBox and SendMailNameEditBox:GetText() or ""):lower()
+  local first = to:match("^([^%s%-]+)") or to -- nombre de pila (sin apellido ni reino)
+  local tell = ns.TellName and ns.TellName(cod.to) or cod.to
+  if to ~= ns.ShortName(cod.to):lower() and to ~= cod.to:lower() and to ~= tell:lower()
+    and first ~= ns.ShortName(cod.to):lower()
     and (ns.FullName(to) or ""):lower() ~= (ns.FullName(cod.to) or ""):lower() then
     cod = nil
     return

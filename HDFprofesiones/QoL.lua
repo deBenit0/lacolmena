@@ -177,7 +177,7 @@ function QoL.OnJoin(name)
   if settings.on and QoL.IAmWelcomer() and send then
     local text = settings.text and settings.text ~= "" and settings.text or QoL.DEFAULT_WELCOME
     text = text:format(ns.guildName or ns.TITLE, ns.ShortName(name), ns.TITLE)
-    ns.After(5, function() pcall(send, text:sub(1, 255), "WHISPER", nil, ns.ShortName(name)) end)
+    ns.After(5, function() pcall(send, text:sub(1, 255), "WHISPER", nil, ns.TellName and ns.TellName(name) or ns.ShortName(name)) end)
   end
 end
 

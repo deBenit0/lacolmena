@@ -299,8 +299,11 @@ Comm.Register("H", function(sender, payload)
     if theirE[me] then
       Sync.ownSeen = true
     elseif not Sync.ownSeen then
-      Sync.waitingOwn = nil
-      ns.After(0.5, Sync.PublishMine)
+      Sync.ownMissing = (Sync.ownMissing or 0) + 1
+      if Sync.ownMissing >= 3 then
+        Sync.waitingOwn = nil
+        ns.After(0.5, Sync.PublishMine)
+      end
     end
   end
   -- Lo que tengo y le falta (o tiene más antiguo): se lo envío.
@@ -326,7 +329,7 @@ Comm.Register("H", function(sender, payload)
   for id in pairs(theirR) do
     -- las copias con el nombre mal escrito no se piden si ya tengo el pedido de verdad
     local cid = Data.CanonicalRequestId(id)
-    if not g.requests[id] and not g.requests[cid] and not (cid ~= id and g.gone and g.gone[cid]) then
+    if not g.requests[id] and not g.requests[cid] and not (g.gone and (g.gone[id] or g.gone[cid])) then
       want.r[id] = true
     end
   end
@@ -648,7 +651,7 @@ function Sync.Start()
   -- hermandad: si publicase ya una nueva y vacía, pisaría la buena (karma, ofertas...).
   local g = ns.G()
   if g and not g.entries[ns.Me()] then
-    Sync.waitingOwn, Sync.ownSeen = true, nil
+    Sync.waitingOwn, Sync.ownSeen, Sync.ownMissing = true, nil, 0
     local tries = 0
     local function giveUp()
       if not Sync.waitingOwn then return end

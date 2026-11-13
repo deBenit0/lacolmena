@@ -160,17 +160,33 @@ local function restoreRest(e, c)
   local g, me = ns.G(), ns.Me()
   if not g or not me then return end
   g.karma = g.karma or {}
-  local karma = g.karma[me]
-  if (not karma or (not next(karma.kc or {}) and (karma.kd or 0) == 0)) and (e.kc or e.kd) then
-    g.karma[me] = { kc = deepCopy(e.kc or {}), kd = e.kd or 0 }
+  g.thanks = g.thanks or {}
+  -- Karma dado y encargos confirmados: el mayor de cada uno. Si al entrar llegó antes un pedido
+  -- entregado que mi ficha, aquí ya se había contado otra vez: así no se duplica ni se pierde.
+  if e.kc or e.kd then
+    local karma = g.karma[me] or { kc = {}, kd = 0 }
+    karma.kc = karma.kc or {}
+    for who, v in pairs(e.kc or {}) do
+      if v > (karma.kc[who] or 0) then karma.kc[who] = v end
+    end
+    if (e.kd or 0) > (karma.kd or 0) then karma.kd = e.kd end
+    g.karma[me] = karma
   end
-  if e.th and not next(g.thanks[me] or {}) then g.thanks[me] = deepCopy(e.th) end
+  if e.th then
+    local th = g.thanks[me] or {}
+    for who, v in pairs(e.th) do
+      if v > (th[who] or 0) then th[who] = v end
+    end
+    g.thanks[me] = th
+  end
   local function fill(field, value)
     if value ~= nil and (c[field] == nil or (type(c[field]) == "table" and next(c[field]) == nil)) then
       c[field] = deepCopy(value)
     end
   end
   fill("offers", e.of)
+  fill("crafts", e.fb)
+  fill("claims", e.cl)
   fill("donated", e.dn)
   fill("needs", e.nd)
   fill("mc", e.mc)
@@ -771,7 +787,7 @@ function Data.RequestInfo(r, now)
     local last = 0
     for _, cm in pairs(r.c or {}) do last = max(last, cm.dv or 0, cm.sv or 0) end
     info.state, info.ended = "done", last
-  elseif now > info.expires then
+  elseif now > info.expires and not info.owner then
     info.state, info.ended = "expired", info.expires
   elseif info.remaining <= 0 or info.owner then
     -- con encargado, aunque se haya ampliado la cantidad: nadie más puede cogerlo hasta que
@@ -802,6 +818,7 @@ function Data.ApplyRequest(incoming, now)
   local behind = mergedText ~= Codec.Serialize(incoming)
   if cur and Codec.Serialize(cur) == mergedText then return false, cur, cur, behind end
   if not cur and isGone(merged, now) then return false, nil, nil, false end -- no resucitar
+  if not cur and g.gone and g.gone[incoming.id] then return false, nil, nil, false end -- ya lo borré
   g.requests[incoming.id] = merged
   return true, cur, merged, behind
 end

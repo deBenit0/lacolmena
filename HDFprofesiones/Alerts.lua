@@ -333,7 +333,11 @@ function Alerts.CheckDeadlines()
       local key = id .. ":" .. name .. ":" .. (cm.by or 0)
       local pendingUnits = cm.n and (cm.n - Data.DeliveredOf(cm)) or 0
       local expired = cm.by and not cm.rl and pendingUnits > 0 and now > cm.by + Data.COMMIT_GRACE
-        and now < cm.by + Data.COMMIT_GRACE + 86400 and Data.IsActiveState(Data.RequestInfo(r, now).state)
+        and now < cm.by + Data.COMMIT_GRACE + 86400 and not Data.Rejected(r, name)
+      if expired then
+        local info = Data.RequestInfo(r, now)
+        expired = Data.IsActiveState(info.state) and info.late ~= nil and info.late.name == name
+      end
       if name == me and r.a ~= me then
         if cm.by and Data.CommitActive(cm, now, r) and cm.by - now <= Alerts.WARN_BEFORE then
           local left = cm.by - now

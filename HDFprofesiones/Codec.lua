@@ -46,6 +46,7 @@ function Codec.DecodeUInt(s, pos)
     if t then return value * 32 + t, pos + 1 end
     local c = contVal[b]
     if not c then return nil end
+    if value >= 2 ^ 43 then return nil end -- nadie manda números así: el mensaje está mal
     value = value * 32 + c
     pos = pos + 1
   end

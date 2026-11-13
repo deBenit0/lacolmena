@@ -395,7 +395,7 @@ local function createOfferDialog()
       ok, err = ns.Social.AddNeed(self.id, tonumber(self.qty:GetText()), ns.Now())
     elseif self.kind == "craft" then
       ok, err = ns.Offers.SetCraft("i" .. tostring(self.id), self:Price(), self.matsOn, ns.Now(), note)
-    elseif self.id and ns.ItemCount(self.id) < 1 then
+    elseif self.id and not self.editing and ns.ItemCount(self.id) < 1 then
       ok, err = nil, "No llevas ninguno: para ofrecer fabricarlo, hazlo desde tu ventana de profesión."
     else
       ok, err = ns.Offers.Create(self.id, tonumber(self.qty:GetText()), self:Price(), ns.Now(), note)
@@ -441,6 +441,7 @@ function ns.UI.OpenOfferDialog(id, qty, mode, opts)
   d.note:SetText(opts.note or "")
   d.noteGiven = opts.note ~= nil
   d.mode = mode
+  d.editing = opts.edit and true or false
   local need = mode == "need"
   -- El precio se ve siempre al ofrecer (antes estaba escondido en «Más opciones»).
   d:SetExpanded(not need)
