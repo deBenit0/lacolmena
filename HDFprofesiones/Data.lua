@@ -1138,3 +1138,20 @@ function Data.RenewRequest(id, now)
   r.av = bump(r.av, now)
   return r
 end
+
+-- Materiales que usan mis recetas: [objeto] = { claves de mis recetas que lo usan }.
+function Data.MyReagents()
+  local c, out = ns.MyChar(), {}
+  for pk, prof in pairs(c and c.profs or {}) do
+    for key in pairs(prof.recipes or {}) do
+      local info = Data.GetInfo(Data.InfoKey(pk, key))
+      for _, var in ipairs(info and info.v or {}) do
+        for id in pairs(var.r) do
+          out[id] = out[id] or {}
+          out[id][key] = true
+        end
+      end
+    end
+  end
+  return out
+end

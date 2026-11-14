@@ -64,9 +64,15 @@ local function create()
   dialog.iconTex:SetAllPoints()
   W.KeyTooltip(dialog.itemButton, function() return dialog.key end)
   dialog.itemName = W.Text(dialog, "GameFontHighlight")
-  dialog.itemName:SetPoint("LEFT", dialog.itemButton, "RIGHT", 10, 0)
+  dialog.itemName:SetPoint("LEFT", dialog.itemButton, "RIGHT", 10, 7)
   dialog.itemName:SetPoint("RIGHT", dialog, "RIGHT", -24, 0)
   dialog.itemName:SetWordWrap(false)
+  -- Aviso si no te sirve (otra clase, más nivel, material que no usan tus profesiones).
+  dialog.useWarn = W.Text(dialog, "GameFontNormalSmall")
+  dialog.useWarn:SetPoint("LEFT", dialog.itemButton, "RIGHT", 10, -9)
+  dialog.useWarn:SetPoint("RIGHT", dialog, "RIGHT", -24, 0)
+  dialog.useWarn:SetJustifyH("LEFT")
+  dialog.useWarn:SetWordWrap(false)
 
   -- Cantidad con - y +.
   local qtyLabel = W.Text(dialog, "GameFontNormalSmall")
@@ -259,12 +265,31 @@ local function create()
   dialog.info:SetPoint("BOTTOMLEFT", 24, 24)
   dialog.info:SetTextColor(0.7, 0.7, 0.7)
   local publish = W.Button(dialog, "Pedir", 96, 22, function() dialog:Publish() end)
+  dialog.publish = publish
+  -- ¿Te sirve? Equipo de otra clase: no se puede pedir (salvo para la hermandad).
+  function dialog:UpdateUse()
+    local blocked, text = ns.UseCheck(self.key)
+    local forGuild = self.guild:IsShown() and self.guild:GetChecked()
+    if forGuild then blocked, text = false, nil end
+    self.blocked = blocked
+    if blocked then
+      self.useWarn:SetText("|cffff5555" .. text .. "|r")
+    elseif text then
+      self.useWarn:SetText("|cffffaa33" .. text .. "|r")
+    else
+      self.useWarn:SetText("")
+    end
+    self.publish:SetEnabled(not blocked)
+  end
+  dialog.guild:HookScript("OnClick", function() dialog:UpdateUse() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(dialog, "Cancelar", 86, 22, function() dialog:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
 
   function dialog:Publish()
     if not self.key then return end
+    self:UpdateUse()
+    if self.blocked then return end
     local q = tonumber(self.qty:GetText()) or 1
     if self.guild:IsShown() and self.guild:GetChecked() then
       local kind, id = ns.ParseKey(self.key)
@@ -293,6 +318,31 @@ local function create()
   end
 end
 
+-- ¿Le sirve a mi personaje lo que voy a pedir? Devuelve (bloqueado, texto).
+-- Equipo que mi clase no puede llevar nunca: bloqueado. Más nivel del mío o un material que no
+-- usa ninguna de mis recetas: solo un aviso (puede ser para más adelante, una misión o un amigo).
+function ns.UseCheck(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return false, nil end
+  local equipLoc, classID = ns.ItemInstant(id)
+  local _, _, _, _, minLevel = ns.KeyInfo(key)
+  if classID == 2 or classID == 4 then
+    if not ns.CanUseItem(key, ns.Dungeons.MyClass(), 60, nil) then
+      return true, "Tu clase no puede llevar esto nunca: no se puede pedir."
+    end
+    local level = UnitLevel and UnitLevel("player") or 60
+    if minLevel and minLevel > level then
+      return false, "Lo podrás llevar a nivel " .. minLevel .. "."
+    end
+  elseif classID == 7 then
+    local c = ns.MyChar()
+    if c and c.profs and next(c.profs) and not Data.MyReagents()[id] then
+      return false, "Ninguna de tus profesiones usa esto (puedes pedirlo igual)."
+    end
+  end
+  return false, nil
+end
+
 -- opts = { k = objeto, pk = profesión, q = cantidad }
 function ns.UI.OpenRequestDialog(opts)
   if not ns.G() then
@@ -311,6 +361,7 @@ function ns.UI.OpenRequestDialog(opts)
   dialog:SetExpanded(false)
   dialog.guild:SetShown(ns.Social.AmOfficer())
   dialog.guild:SetChecked(false)
+  dialog:UpdateUse()
   local open = Data.CountOpenBy(ns.Me(), ns.Now())
   dialog.info:SetText(string.format("Va a toda la hermandad (%d/%d abiertas).", open, Data.MAX_OPEN))
   dialog:Show()

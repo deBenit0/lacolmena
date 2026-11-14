@@ -109,14 +109,20 @@ local function applyCOD()
     cod = nil
     return
   end
-  if hasAttachments() and SendMailCODButton:IsEnabled() then
-    if not SendMailCODButton:GetChecked() and SendMailRadioButton_OnClick then SendMailRadioButton_OnClick(2) end
-    if SendMailCODButton:GetChecked() and currentMoney() ~= cod.amount then
-      MoneyInputFrame_SetCopper(SendMailMoney, cod.amount)
+  -- Se pone UNA sola vez (al meter el primer objeto); después manda quien escribe el correo:
+  -- si cambia la cantidad o quita el reembolso, el addon no lo vuelve a tocar.
+  if not cod.applied then
+    if hasAttachments() and SendMailCODButton:IsEnabled() then
+      if not SendMailCODButton:GetChecked() and SendMailRadioButton_OnClick then SendMailRadioButton_OnClick(2) end
+      if SendMailCODButton:GetChecked() then
+        if currentMoney() ~= cod.amount then MoneyInputFrame_SetCopper(SendMailMoney, cod.amount) end
+        cod.applied = true
+      end
     end
-  elseif currentMoney() == cod.amount then
-    -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad.
-    MoneyInputFrame_SetCopper(SendMailMoney, 0)
+  elseif not hasAttachments() then
+    -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad (se regalaría).
+    if currentMoney() == cod.amount then MoneyInputFrame_SetCopper(SendMailMoney, 0) end
+    cod = nil
   end
 end
 Mail.ApplyCOD = applyCOD
@@ -126,6 +132,8 @@ function Mail.SetPendingCOD(to, amount)
     cod = nil
     return
   end
+  amount = math.floor(amount)
+  if amount > (MAX_COD_AMOUNT or 10000) * 10000 then amount = (MAX_COD_AMOUNT or 10000) * 10000 end
   cod = { to = to, amount = amount }
   ns.Print("pon los objetos en el correo: se marcará \"Contra reembolso\" de %s y se le cobrará al recogerlo.",
     ns.FormatMoney(amount))
@@ -134,10 +142,8 @@ end
 
 function Mail.PendingCOD() return cod end
 
-if SendMailFrame_Update then
-  hooksecurefunc("SendMailFrame_Update", function() ns.SafeCall(applyCOD) end)
-end
--- Al adjuntar o quitar objetos el juego avisa con este evento (y actualiza el buzón).
+-- Al adjuntar o quitar objetos el juego avisa con este evento. El addon NO se mete dentro de las
+-- funciones del buzón del juego (eso estropeaba los envíos contra reembolso): mira un instante después.
 ns.On("MAIL_SEND_INFO_UPDATE", function() ns.After(0, applyCOD) end)
 ns.On("MAIL_SEND_SUCCESS", function() cod = nil end)
 ns.On("MAIL_CLOSED", function() cod = nil end)
@@ -159,7 +165,16 @@ function Mail.Prepare(r, amount)
   return true
 end
 
-if SendMail then hooksecurefunc("SendMail", function(recipient) ns.SafeCall(Mail.OnSendMail, recipient) end) end
+-- Qué se envía: se mira al pulsar «Enviar» del buzón, sin tocar la función de enviar del juego.
+local function hookSendButton()
+  if Mail.hooked or not SendMailMailButton or not SendMailMailButton.HookScript then return end
+  Mail.hooked = true
+  SendMailMailButton:HookScript("OnClick", function()
+    ns.SafeCall(Mail.OnSendMail, SendMailNameEditBox and SendMailNameEditBox:GetText())
+  end)
+end
+hookSendButton()
+ns.On("MAIL_SHOW", hookSendButton)
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
 

@@ -15,50 +15,7 @@ local function isLowGear(minLevel, equipLoc, playerLevel)
   return minLevel and minLevel > 0 and minLevel < playerLevel - 10 or false
 end
 
--- ¿Puede usarlo mi personaje? (clase y nivel, reglas de Classic)
--- Armadura: tela (1), cuero (2), malla (3), placas (4); escudo (6).
-local ARMOR_MAX = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, SHAMAN = 3, ROGUE = 2, DRUID = 2, MAGE = 1, PRIEST = 1, WARLOCK = 1 }
-local SHIELDS = { WARRIOR = true, PALADIN = true, SHAMAN = true }
--- Armas por subclase: 0 hacha 1M, 1 hacha 2M, 2 arco, 3 arma de fuego, 4 maza 1M, 5 maza 2M,
--- 6 arma de asta, 7 espada 1M, 8 espada 2M, 10 bastón, 13 puño, 15 daga, 16 arrojadiza,
--- 18 ballesta, 19 varita.
-local function set(list)
-  local t = {}
-  for _, v in ipairs(list) do t[v] = true end
-  return t
-end
-local WEAPONS = {
-  WARRIOR = set({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 }),
-  PALADIN = set({ 0, 1, 4, 5, 6, 7, 8 }),
-  HUNTER = set({ 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 }),
-  ROGUE = set({ 2, 3, 4, 7, 13, 15, 16, 18 }),
-  PRIEST = set({ 4, 10, 15, 19 }),
-  SHAMAN = set({ 0, 1, 4, 5, 10, 13, 15 }),
-  MAGE = set({ 7, 10, 15, 19 }),
-  WARLOCK = set({ 7, 10, 15, 19 }),
-  DRUID = set({ 4, 5, 10, 13, 15 }),
-}
-
-local function canUse(key, class, level, minLevel)
-  local kind, id = ns.ParseKey(key)
-  if kind ~= "i" then return true end -- encantamientos: para cualquiera
-  if minLevel and minLevel > level then return false end
-  local equipLoc, classID, subclassID = ns.ItemInstant(id)
-  if classID == 4 then -- armadura
-    if equipLoc == "INVTYPE_CLOAK" or subclassID == 0 then return true end -- capas, anillos, abalorios...
-    if subclassID == 6 then return SHIELDS[class] or false end
-    if subclassID and subclassID >= 1 and subclassID <= 4 then
-      local max = ARMOR_MAX[class] or 1
-      if level < 40 and max >= 3 then max = max - 1 end -- malla y placas, a partir del 40
-      return subclassID <= max
-    end
-    return false -- reliquias (libros, ídolos, tótems): casi nunca se fabrican
-  elseif classID == 2 then -- armas
-    local allowed = WEAPONS[class]
-    return allowed == nil or allowed[subclassID] or false
-  end
-  return true -- bolsas y lo demás
-end
+local function canUse(key, class, level, minLevel) return ns.CanUseItem(key, class, level, minLevel) end
 
 local function qualityColor(quality)
   local c = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
@@ -145,22 +102,7 @@ end
 
 local MAX_REAGENTS = 8
 
--- Materiales que usan mis recetas: [objeto] = { claves de mis recetas que lo usan }.
-local function myReagents()
-  local c, out = ns.MyChar(), {}
-  for pk, prof in pairs(c and c.profs or {}) do
-    for key in pairs(prof.recipes or {}) do
-      local info = Data.GetInfo(Data.InfoKey(pk, key))
-      for _, var in ipairs(info and info.v or {}) do
-        for id in pairs(var.r) do
-          out[id] = out[id] or {}
-          out[id][key] = true
-        end
-      end
-    end
-  end
-  return out
-end
+local function myReagents() return Data.MyReagents() end
 
 local NON_EQUIP = { [""] = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true }
 
