@@ -462,6 +462,9 @@ Comm.Register("Q", function(sender, payload)
     if gone and gone[copy.id] then return end -- el de verdad ya terminó: la copia no lo resucita
     r = copy
   end
+  -- Nadie tiene más de 10 pedidos abiertos: si llegan muchos más de alguien, se ignoran (así no
+  -- se puede llenar el archivo de guardado de los demás con pedidos inventados).
+  if not ns.G().requests[r.id] and Data.CountOpenBy(r.a, ns.Now()) >= Data.MAX_OPEN * 2 then return end
   local changed, old, merged, behind = Data.ApplyRequest(r, ns.Now())
   if behind then
     schedule("Q", r.id, rand(1.5, 5)) -- teníamos algo que la recibida no tenía
@@ -486,6 +489,12 @@ Comm.Register("M", function(sender, payload)
   if Data.FromFuture(run, ns.Now()) then return end
   markInflight("M:" .. run.id, nil, ns.Dungeons.Hash(run))
   want.m[run.id] = nil
+  local runsNow = ns.Dungeons.Runs() or {}
+  if not runsNow[run.id] then
+    local n = 0
+    for _, other in pairs(runsNow) do if other.a == run.a then n = n + 1 end end
+    if n >= 10 then return end -- nadie organiza tantos grupos a la vez
+  end
   local changed, old, merged, behind = ns.Dungeons.Apply(run, ns.Now())
   if behind then
     schedule("M", run.id, rand(1.5, 5))
@@ -508,7 +517,7 @@ end
 
 Comm.Register("R", function(sender, payload)
   local ik = Codec.Deserialize(payload)
-  if type(ik) ~= "string" then return end
+  if type(ik) ~= "string" or #ik > 40 then return end
   infoAsked[ik] = GetTime() -- otro ya lo ha pedido: no repetirlo
   local info = Data.GetInfo(ik)
   if info and info.v and #info.v > 0 then schedule("I", ik, rand(0.3, 2.5)) end

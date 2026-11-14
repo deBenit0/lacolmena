@@ -350,21 +350,23 @@ function Dungeons.Sanitize(r)
   if tonumber(r.x) then out.x = tonumber(r.x) end
   if type(r.gp) == "table" then
     local gp = {}
-    if type(r.gp.t) == "string" then gp.t = r.gp.t end
-    if type(r.gp.h) == "string" then gp.h = r.gp.h end
+    gp.t = ns.CleanText(r.gp.t, 80)
+    gp.h = ns.CleanText(r.gp.h, 80)
     gp.d = nameList(r.gp.d, 3)
     gp.b = nameList(r.gp.b, 40)
     out.gp = gp
   end
   if type(r.s) == "table" then
-    local s, any = {}, false
+    local s, any, count = {}, false, 0
     for name, su in pairs(r.s) do
-      if type(name) == "string" and type(su) == "table" then
+      count = count + 1
+      if count > 40 then break end -- nunca hay más de 40 apuntados
+      if type(name) == "string" and #name <= 80 and not name:find("|", 1, true) and type(su) == "table" then
         local o = {}
         local mask = tonumber(su.r)
         if mask and mask >= 0 and mask <= 7 then o.r = floor(mask) end
         if tonumber(su.l) then o.l = floor(tonumber(su.l)) end
-        if type(su.c) == "string" then o.c = su.c end
+        o.c = ns.CleanText(su.c, 20)
         if tonumber(su.st) then o.st = tonumber(su.st) end
         if su.o == true then o.o = true end
         if tonumber(su.sv) then o.sv = tonumber(su.sv) end

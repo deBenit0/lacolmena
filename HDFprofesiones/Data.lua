@@ -51,6 +51,7 @@ end
 Data.MAX_OPEN = 10           -- peticiones abiertas por jugador
 Data.KEEP_AFTER = 2 * 86400  -- las terminadas se siguen viendo 2 días
 Data.MAX_QTY = 1000
+Data.MAX_INFO = 6000          -- recetas con materiales guardadas (en Classic hay unas 2000)
 
 -- Recetas con cooldown conocidas; el resto se aprende al ver cooldowns reales.
 Data.KNOWN_COOLDOWNS = {
@@ -105,10 +106,10 @@ function Data.SanitizeEntry(e)
   local out = {
     n = e.n,
     v = e.v,
-    c = type(e.c) == "string" and e.c or nil,
+    c = ns.CleanText(e.c, 20),
     l = tonumber(e.l),
     u = (e.u == true) or nil,
-    av = type(e.av) == "string" and e.av or nil,
+    av = ns.CleanText(e.av, 20),
     th = cleanNumberMap(e.th, "string"),
     ga = cleanNumberMap(e.ga, "number"),
     kc = cleanNumberMap(e.kc, "string"),
@@ -528,7 +529,14 @@ function Data.IsCooldownRecipe(ik)
 end
 
 function Data.MergeInfo(ik, d)
-  if type(ik) ~= "string" or not ik:match("^[^:]+:[ie]%d+$") or type(d) ~= "table" then return false end
+  if type(ik) ~= "string" or #ik > 40 or not ik:match("^[^:]+:[ie]%d+$") or type(d) ~= "table" then return false end
+  -- Tope de recetas guardadas: nadie puede llenar el archivo de guardado de recetas inventadas.
+  if ns.db and ns.db.info and not ns.db.info[ik] then
+    ns.infoCount = ns.infoCount or 0
+    if ns.infoCount == 0 then for _ in pairs(ns.db.info) do ns.infoCount = ns.infoCount + 1 end end
+    if ns.infoCount >= Data.MAX_INFO then return false end
+    ns.infoCount = ns.infoCount + 1
+  end
   local changed = false
   if type(d.v) == "table" then
     for _, var in ipairs(d.v) do
@@ -575,7 +583,7 @@ function Data.SanitizeRequest(r)
     end
     if any then out.pi = pi end
   end
-  if type(r.to) == "string" and r.to ~= "" then out.to = r.to end
+  if type(r.to) == "string" and r.to ~= "" and not r.to:find("|", 1, true) and #r.to <= 80 then out.to = r.to end
   if tonumber(r.x) then out.x = tonumber(r.x) end
   if tonumber(r.rn) then out.rn = tonumber(r.rn) end
   local vu = tonumber(r.vu)

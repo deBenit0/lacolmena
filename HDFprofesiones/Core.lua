@@ -156,6 +156,15 @@ end
 -- Nota de un pedido u oferta («trueque», «precio a convenir», «escríbeme por Discord»...):
 -- texto corto, sin códigos del juego (la barra | abre colores y enlaces) ni saltos de línea.
 ns.NOTE_MAX = 80
+
+-- Texto que llega de otro jugador (versión, clase, horas...): sin «|» (códigos de color, enlaces,
+-- imágenes), sin saltos de línea y como mucho "max" letras. Si no es texto, nil.
+function ns.CleanText(text, max)
+  if type(text) ~= "string" then return nil end
+  text = text:gsub("|", ""):gsub("[%c]", "")
+  if #text > (max or 40) then text = text:sub(1, max or 40) end
+  return text
+end
 function ns.CleanNote(text)
   if type(text) ~= "string" then return nil end
   text = text:gsub("|", ""):gsub("[%c]", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
