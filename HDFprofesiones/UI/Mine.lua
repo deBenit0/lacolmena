@@ -202,6 +202,10 @@ ns.UI.RegisterPage("mine", function(page)
   page.chatPost = W.Check(ot, "Escribir mis pedidos en el chat", function(checked) ns.db.settings.chatPost = checked end)
   page.chatPost:SetPoint("TOPLEFT", 8, -44)
   page.chatPost.label:SetWidth(150)
+  page.mailHelp = W.Check(ot, "Ayuda con el correo", function(checked) ns.db.settings.mailOff = not checked or nil end)
+  page.mailHelp:SetPoint("TOPLEFT", 300, -44)
+  ns.UI.Tip(page.mailHelp, "Ayuda con el correo", "Pone el reembolso de los pedidos y apunta solo las entregas al "
+    .. "enviar. Apágala si un envío falla, para ver si es cosa del addon (vuelve a abrir el buzón).")
   page.minimap = W.Check(ot, "Icono en el minimapa", function(checked) ns.MinimapButton.SetShown(checked) end)
   page.minimap:SetPoint("TOPLEFT", 8, -80)
   page.demo = W.Check(ot, "Demostración", function(checked) ns.Demo.Set(checked) end)
@@ -309,6 +313,7 @@ ns.UI.RegisterPage("mine", function(page)
     end
 
     page.chatPost:SetChecked(ns.db.settings.chatPost ~= false)
+    page.mailHelp:SetChecked(not ns.db.settings.mailOff)
     page.demo:SetChecked(ns.db.settings.demo and true or false)
     page.minimap:SetChecked(ns.MinimapButton.IsShown())
     page.fontButton:SetText(W.ListFontSize().label)
