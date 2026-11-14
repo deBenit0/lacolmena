@@ -355,8 +355,6 @@ function ns.KeyFromLink(link)
   if id then return "e" .. id end
 end
 
--- Devuelve nombre, icono, enlace, calidad, nivel mínimo y hueco de equipo.
--- El nombre puede ser nil si el juego aún no tiene el objeto en caché (se pide solo).
 -- ¿Puede usarlo mi personaje? (clase y nivel, reglas de Classic)
 -- Armadura: tela (1), cuero (2), malla (3), placas (4); escudo (6).
 local ARMOR_MAX = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, SHAMAN = 3, ROGUE = 2, DRUID = 2, MAGE = 1, PRIEST = 1, WARLOCK = 1 }
@@ -394,14 +392,19 @@ function ns.CanUseItem(key, class, level, minLevel)
       if level < 40 and max >= 3 then max = max - 1 end -- malla y placas, a partir del 40
       return subclassID <= max
     end
-    return false -- reliquias (libros, ídolos, tótems): casi nunca se fabrican
+    -- reliquias: libros (paladín), ídolos (druida) y tótems (chamán)
+    local relic = ({ [7] = "PALADIN", [8] = "DRUID", [9] = "SHAMAN" })[subclassID]
+    return relic == class
   elseif classID == 2 then -- armas
+    if subclassID == 14 or subclassID == 20 then return true end -- armas varias y cañas de pescar
     local allowed = WEAPONS[class]
     return allowed == nil or allowed[subclassID] or false
   end
   return true -- bolsas y lo demás
 end
 
+-- Devuelve nombre, icono, enlace, calidad, nivel mínimo y hueco de equipo.
+-- El nombre puede ser nil si el juego aún no tiene el objeto en caché (se pide solo).
 function ns.KeyInfo(key)
   local kind, id = ns.ParseKey(key)
   if kind == "i" then

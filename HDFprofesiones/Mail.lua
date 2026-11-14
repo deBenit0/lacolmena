@@ -27,7 +27,7 @@ end
 function Mail.OnSendMail(recipient)
   if type(recipient) ~= "string" or recipient == "" then return end
   local items = attachedItems()
-  if next(items) then pending = { to = ns.FullName(recipient), items = items } end
+  pending = next(items) and { to = ns.FullName(recipient), items = items } or nil
 end
 
 -- Apunta una entrega a "to" de los objetos "items" ({ [id] = cantidad }), por correo o en mano:
@@ -122,7 +122,7 @@ local function applyCOD()
   elseif not hasAttachments() then
     -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad (se regalaría).
     if currentMoney() == cod.amount then MoneyInputFrame_SetCopper(SendMailMoney, 0) end
-    cod = nil
+    cod.applied = nil
   end
 end
 Mail.ApplyCOD = applyCOD
