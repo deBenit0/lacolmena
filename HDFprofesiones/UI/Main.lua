@@ -104,6 +104,40 @@ function UI.Badge(parent)
   return f
 end
 
+-- Emblema del tabardo de la hermandad (el mismo dibujo y color que en el juego). Se guarda
+-- para que salga al momento la próxima vez, antes de que el juego cargue los datos de la hermandad.
+local EMBLEMS = "Interface\\GuildFrame\\GuildEmblemsLG_01" -- 16 columnas de 64x64 en 1024x1024
+function UI.ApplyEmblem()
+  local info = C_GuildInfo and C_GuildInfo.GetGuildTabardInfo and C_GuildInfo.GetGuildTabardInfo("player")
+  if info and info.emblemFileID and info.emblemColor then
+    local r, g, b = info.emblemColor:GetRGB()
+    ns.db.settings.emblem = { s = info.emblemStyle, f = info.emblemFileID, r = r, g = g, b = b }
+  end
+  local e = ns.db.settings.emblem
+  for _, tex in ipairs({ panel and panel.logo, panel and panel.watermark }) do
+    if tex then
+      if e then
+        if e.s then
+          local size = 64 / 1024
+          local x, y = (e.s % 16) * size, math.floor(e.s / 16) * size
+          tex:SetTexture(EMBLEMS)
+          tex:SetTexCoord(x, x + size, y, y + size)
+        else
+          tex:SetTexture(e.f)
+          tex:SetTexCoord(0, 1, 0, 1)
+        end
+        tex:SetVertexColor(e.r or 1, e.g or 0.82, e.b or 0)
+        tex:Show()
+      else
+        tex:Hide() -- sin tabardo todavía: solo el aro
+      end
+    end
+  end
+end
+for _, ev in ipairs({ "PLAYER_GUILD_UPDATE", "GUILD_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD" }) do
+  ns.On(ev, function() if panel then ns.Coalesce("emblem", 1, UI.ApplyEmblem) end end)
+end
+
 local function createPanel()
   panel = W.Panel("HDFProfPanel", UIParent, UI.WIDTH, UI.HEIGHT)
   panel:SetFrameStrata("HIGH")
@@ -151,12 +185,11 @@ local function createPanel()
   tip(grip, "Tamaño de la ventana", "Arrastra para hacerla más grande o más pequeña.\nClic derecho: tamaño y posición por defecto.")
   panel.grip = grip
 
-  -- Marca de agua: el escudo grande y casi transparente detrás de todo.
+  -- Marca de agua: el emblema del tabardo, grande y casi transparente detrás de todo.
   local mark = panel:CreateTexture(nil, "BACKGROUND", nil, 2)
-  mark:SetSize(180, 360)
+  mark:SetSize(280, 320)
   mark:SetPoint("CENTER", 0, -10)
-  mark:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
-  mark:SetAlpha(0.05)
+  mark:SetAlpha(0.06)
   panel.watermark = mark
 
   -- Arriba: el escudo redondo, el nombre de la hermandad y el lema.
@@ -173,10 +206,10 @@ local function createPanel()
   ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   ring:SetVertexColor(1, 0.82, 0.1)
   panel.logo = shield:CreateTexture(nil, "ARTWORK")
-  panel.logo:SetSize(24, 48)
+  panel.logo:SetSize(46, 52)
   panel.logo:SetPoint("CENTER", 0, 0)
-  panel.logo:SetTexture("Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay")
   panel.shield = shield
+  UI.ApplyEmblem()
   panel.title = W.Text(panel, "GameFontNormalHuge")
   panel.title:SetPoint("TOPLEFT", 94, -22)
   panel.title:SetTextColor(1, 0.82, 0)

@@ -122,7 +122,7 @@ ns.UI.RegisterPage("home", function(page)
     runs = card(page, 524, "Interface\\Icons\\INV_Misc_Key_03", "Quedadas"),
   }
 
-  -- Abajo: lo nuevo del Mercado. (El escudo de NorrisPlay va en la barra de arriba.)
+  -- Abajo: lo nuevo del Mercado. (El emblema de la hermandad va en la barra de arriba.)
   page.status = W.Text(page, "GameFontNormal")
   page.status:SetPoint("BOTTOMLEFT", 6, 14)
   page.status:SetPoint("RIGHT", page, "RIGHT", -170, 0)
