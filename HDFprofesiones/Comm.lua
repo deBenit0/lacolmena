@@ -10,6 +10,8 @@ local MAX_LEN = 250   -- el juego admite 255 bytes por mensaje
 local BUCKET_CAP = 8  -- ráfaga máxima
 local BUCKET_RATE = 1 -- mensajes por segundo de media
 local INBOX_TTL = 120 -- segundos que esperamos a que llegue un mensaje troceado
+local MAX_PIECES = 400 -- trozos de un mensaje (unos 100 KB): más es que algo va mal
+local MAX_OPEN_BOXES = 30 -- mensajes a medias de una misma persona
 local RELAY_GAP_MIN, RELAY_GAP_MAX = 0.5, 2 -- espera entre reenvíos de datos ajenos
 local nextRelayAt = 0
 
@@ -190,6 +192,11 @@ function Comm.OnAddonMessage(prefix, text, channel, sender)
     inbox[sender] = box
   end
   if head == "F" then
+    if not box[id] then
+      local open = 0
+      for _ in pairs(box) do open = open + 1 end
+      if open >= MAX_OPEN_BOXES then return end
+    end
     box[id] = { part, t = GetTime() }
     -- Aviso temprano: ya se sabe qué está enviando aunque falten trozos.
     local peek = peekers[string.sub(part, 1, 1)]
@@ -197,6 +204,10 @@ function Comm.OnAddonMessage(prefix, text, channel, sender)
   else
     local pieces = box[id]
     if not pieces then return end
+    if #pieces >= MAX_PIECES then
+      box[id] = nil
+      return
+    end
     pieces[#pieces + 1] = part
     pieces.t = GetTime()
     if head == "L" then

@@ -27,7 +27,7 @@ end
 function Mail.OnSendMail(recipient)
   if type(recipient) ~= "string" or recipient == "" then return end
   local items = attachedItems()
-  if next(items) then pending = { to = ns.FullName(recipient), items = items } end
+  pending = next(items) and { to = ns.FullName(recipient), items = items } or nil
 end
 
 -- Apunta una entrega a "to" de los objetos "items" ({ [id] = cantidad }), por correo o en mano:
@@ -35,23 +35,26 @@ end
 -- un pedido de la hermandad. "how" es el texto para el chat ("por correo" o "en mano").
 function Mail.RegisterDelivery(to, items, how)
   if not to or not ns.G() then return 0 end
+  -- El destinatario escrito («Exagono Exagonal», o con otro reino interno) se pasa al nombre
+  -- de su ficha; si no, no coincidía con nada y no se apuntaba la entrega.
+  to = Data.CanonicalName(ns.FullName(to) or to, true)
   local now = ns.Now()
   local changed = Data.RegisterMail(to, items, now)
   for _, r in ipairs(changed) do
     local cm = r.c[ns.Me()]
     ns.Print("apuntado en la petición de %s: %d de %d %s entregadas %s.",
-      ns.ShortName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
+      ns.DisplayName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
     ns.Sync.PushRequest(r.id, "high")
   end
   local offered = 0
   local offeredList = ns.Offers.RegisterMail(to, items, now)
   for _, d in ipairs(offeredList) do
     offered = offered + 1
-    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.who), how)
+    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.who), how)
   end
   local donated = ns.Social.RegisterMail(to, items, now)
   for _, d in ipairs(donated) do
-    ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.ShortName(d.owner))
+    ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.owner))
   end
   -- Mis estadísticas.
   ns.Extras.AddStat("delivered", #changed)
@@ -97,19 +100,29 @@ end
 local function applyCOD()
   if not cod or not SendMailCODButton or not SendMailMoney or not MoneyInputFrame_SetCopper then return end
   -- Si ha cambiado el destinatario, ya no es nuestro correo.
-  local to = SendMailNameEditBox and SendMailNameEditBox:GetText() or ""
-  if to:lower() ~= ns.ShortName(cod.to):lower() and to:lower() ~= cod.to:lower() then
+  local to = (SendMailNameEditBox and SendMailNameEditBox:GetText() or ""):lower()
+  local first = to:match("^([^%s%-]+)") or to -- nombre de pila (sin apellido ni reino)
+  local tell = ns.TellName and ns.TellName(cod.to) or cod.to
+  if to ~= ns.ShortName(cod.to):lower() and to ~= cod.to:lower() and to ~= tell:lower()
+    and first ~= ns.ShortName(cod.to):lower()
+    and (ns.FullName(to) or ""):lower() ~= (ns.FullName(cod.to) or ""):lower() then
     cod = nil
     return
   end
-  if hasAttachments() and SendMailCODButton:IsEnabled() then
-    if not SendMailCODButton:GetChecked() and SendMailRadioButton_OnClick then SendMailRadioButton_OnClick(2) end
-    if SendMailCODButton:GetChecked() and currentMoney() ~= cod.amount then
-      MoneyInputFrame_SetCopper(SendMailMoney, cod.amount)
+  -- Se pone UNA sola vez (al meter el primer objeto); después manda quien escribe el correo:
+  -- si cambia la cantidad o quita el reembolso, el addon no lo vuelve a tocar.
+  if not cod.applied then
+    if hasAttachments() and SendMailCODButton:IsEnabled() then
+      if not SendMailCODButton:GetChecked() and SendMailRadioButton_OnClick then SendMailRadioButton_OnClick(2) end
+      if SendMailCODButton:GetChecked() then
+        if currentMoney() ~= cod.amount then MoneyInputFrame_SetCopper(SendMailMoney, cod.amount) end
+        cod.applied = true
+      end
     end
-  elseif currentMoney() == cod.amount then
-    -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad.
-    MoneyInputFrame_SetCopper(SendMailMoney, 0)
+  elseif not hasAttachments() then
+    -- Sin objetos el juego vuelve a "Enviar dinero": nunca dejar ahí nuestra cantidad (se regalaría).
+    if currentMoney() == cod.amount then MoneyInputFrame_SetCopper(SendMailMoney, 0) end
+    cod.applied = nil
   end
 end
 Mail.ApplyCOD = applyCOD
@@ -119,6 +132,8 @@ function Mail.SetPendingCOD(to, amount)
     cod = nil
     return
   end
+  amount = math.floor(amount)
+  if amount > (MAX_COD_AMOUNT or 10000) * 10000 then amount = (MAX_COD_AMOUNT or 10000) * 10000 end
   cod = { to = to, amount = amount }
   ns.Print("pon los objetos en el correo: se marcará \"Contra reembolso\" de %s y se le cobrará al recogerlo.",
     ns.FormatMoney(amount))
@@ -127,10 +142,8 @@ end
 
 function Mail.PendingCOD() return cod end
 
-if SendMailFrame_Update then
-  hooksecurefunc("SendMailFrame_Update", function() ns.SafeCall(applyCOD) end)
-end
--- Al adjuntar o quitar objetos el juego avisa con este evento (y actualiza el buzón).
+-- Al adjuntar o quitar objetos el juego avisa con este evento. El addon NO se mete dentro de las
+-- funciones del buzón del juego (eso estropeaba los envíos contra reembolso): mira un instante después.
 ns.On("MAIL_SEND_INFO_UPDATE", function() ns.After(0, applyCOD) end)
 ns.On("MAIL_SEND_SUCCESS", function() cod = nil end)
 ns.On("MAIL_CLOSED", function() cod = nil end)
@@ -143,7 +156,7 @@ end
 function Mail.Prepare(r, amount)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(r.a))
+  SendMailNameEditBox:SetText(ns.TellName(r.a) or ns.ShortName(r.a))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName(r.k)))
   end
@@ -152,7 +165,16 @@ function Mail.Prepare(r, amount)
   return true
 end
 
-if SendMail then hooksecurefunc("SendMail", function(recipient) ns.SafeCall(Mail.OnSendMail, recipient) end) end
+-- Qué se envía: se mira al pulsar «Enviar» del buzón, sin tocar la función de enviar del juego.
+local function hookSendButton()
+  if Mail.hooked or not SendMailMailButton or not SendMailMailButton.HookScript then return end
+  Mail.hooked = true
+  SendMailMailButton:HookScript("OnClick", function()
+    ns.SafeCall(Mail.OnSendMail, SendMailNameEditBox and SendMailNameEditBox:GetText())
+  end)
+end
+hookSendButton()
+ns.On("MAIL_SHOW", hookSendButton)
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
 
@@ -160,7 +182,7 @@ ns.On("MAIL_FAILED", function() pending = nil end)
 function Mail.PrepareOffer(who, id, amount, price)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(who))
+  SendMailNameEditBox:SetText(ns.TellName(who) or ns.ShortName(who))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName("i" .. id)))
   end
@@ -173,7 +195,7 @@ end
 function Mail.PrepareNeed(owner, id, amount)
   if not Mail.CanPrepare() then return false end
   if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.ShortName(owner))
+  SendMailNameEditBox:SetText(ns.TellName(owner) or ns.ShortName(owner))
   if SendMailSubjectEditBox then
     SendMailSubjectEditBox:SetText(string.format("Para la hermandad: %dx %s", amount, ns.KeyName("i" .. id)))
   end

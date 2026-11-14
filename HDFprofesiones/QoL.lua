@@ -35,7 +35,7 @@ function QoL.TooltipLines(itemID)
   local shown = {}
   for i = 1, math.min(4, #names) do
     local n = names[i]
-    shown[#shown + 1] = (n.online and "|cff40ff40" or "|cff999999") .. ns.ShortName(n.name) .. "|r"
+    shown[#shown + 1] = (n.online and "|cff40ff40" or "|cff999999") .. ns.DisplayName(n.name) .. "|r"
   end
   local more = #names > 4 and (" y " .. (#names - 4) .. " más") or ""
   return ns.TITLE .. ": lo dan " .. table.concat(shown, ", ") .. more
@@ -100,7 +100,7 @@ QoL.TradeSnapshot = snapshot
 
 local function tradePartner()
   local name = GetUnitName and GetUnitName("NPC", true) or (UnitName and UnitName("NPC"))
-  return name and ns.FullName(name:gsub("%s", "")) or nil
+  return name and ns.FullName(name) or nil
 end
 
 ns.On("TRADE_SHOW", function()
@@ -117,7 +117,7 @@ ns.On("UI_INFO_MESSAGE", function(_, message)
     trade.to, trade.items = nil, nil
     local n = ns.Mail.RegisterDelivery(to, items, "en mano")
     if n == 0 then return end
-    ns.Print("comercio con %s apuntado.", ns.ShortName(to))
+    ns.Print("comercio con %s apuntado.", ns.DisplayName(to))
   end
 end)
 ns.On("TRADE_CLOSED", function()
@@ -169,15 +169,15 @@ function QoL.OnJoin(name)
   name = ns.FullName(name)
   if ns.Social.AmOfficer() and ns.Alerts then
     ns.Alerts.Push({ page = "guild", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
-      text = string.format("%s se ha unido a la hermandad", ns.ShortName(name)) })
+      text = string.format("%s se ha unido a la hermandad", ns.DisplayName(name)) })
   end
   local settings = QoL.WelcomeSettings()
   -- Forever: C_ChatInfo.SendChatMessage (la global SendChatMessage solo queda como obsoleta).
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
   if settings.on and QoL.IAmWelcomer() and send then
     local text = settings.text and settings.text ~= "" and settings.text or QoL.DEFAULT_WELCOME
-    text = text:format(ns.guildName or ns.TITLE, ns.ShortName(name), ns.TITLE)
-    ns.After(5, function() pcall(send, text:sub(1, 255), "WHISPER", nil, ns.ShortName(name)) end)
+    text = text:format(ns.guildName or ns.TITLE, ns.DisplayName(name), ns.TITLE)
+    ns.After(5, function() pcall(send, text:sub(1, 255), "WHISPER", nil, ns.TellName and ns.TellName(name) or ns.ShortName(name)) end)
   end
 end
 
@@ -200,10 +200,10 @@ function QoL.Summary(since, now)
     if r.a == me then
       for name, cm in pairs(r.c or {}) do
         if (cm.at or cm.cv or 0) > since and not cm.rl then
-          lines[#lines + 1] = string.format("%s aceptó tu pedido de %dx %s", ns.ShortName(name), r.q, ns.KeyLabel(r.k))
+          lines[#lines + 1] = string.format("%s aceptó tu pedido de %dx %s", ns.DisplayName(name), r.q, ns.KeyLabel(r.k))
         end
         if math.max(cm.sv or 0, cm.dv or 0) > since and Data.DeliveredOf(cm) > 0 then
-          lines[#lines + 1] = string.format("%s te entregó %dx %s", ns.ShortName(name), Data.DeliveredOf(cm), ns.KeyLabel(r.k))
+          lines[#lines + 1] = string.format("%s te entregó %dx %s", ns.DisplayName(name), Data.DeliveredOf(cm), ns.KeyLabel(r.k))
         end
       end
     end
@@ -217,7 +217,7 @@ function QoL.Summary(since, now)
     if o.owner == me then
       for _, c in ipairs(o.claims) do
         if (c.t or 0) > since then
-          lines[#lines + 1] = string.format("%s quiere %dx %s de tu oferta", ns.ShortName(c.name), c.left, ns.KeyLabel("i" .. o.id))
+          lines[#lines + 1] = string.format("%s quiere %dx %s de tu oferta", ns.DisplayName(c.name), c.left, ns.KeyLabel("i" .. o.id))
         end
       end
     end
@@ -234,7 +234,7 @@ function QoL.Summary(since, now)
   if runs > 0 then lines[#lines + 1] = string.format("%d quedadas de mazmorra nuevas", runs) end
   local an = ns.Social.Announcement()
   if an and (an.t or 0) > since then
-    lines[#lines + 1] = string.format("Anuncio de %s: %s", ns.ShortName(an.name), an.x)
+    lines[#lines + 1] = string.format("Anuncio de %s: %s", ns.DisplayName(an.name), an.x)
   end
   return lines
 end

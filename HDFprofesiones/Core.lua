@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.32.0"
+ns.VERSION = "0.34.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -153,6 +153,45 @@ function ns.FormatDuration(seconds)
   return "menos de 1 min"
 end
 
+-- Nota de un pedido u oferta («trueque», «precio a convenir», «escríbeme por Discord»...):
+-- texto corto, sin códigos del juego (la barra | abre colores y enlaces) ni saltos de línea.
+ns.NOTE_MAX = 80
+
+-- Texto que llega de otro jugador (versión, clase, horas...): sin «|» (códigos de color, enlaces,
+-- imágenes), sin saltos de línea y como mucho "max" letras. Si no es texto, nil.
+function ns.CleanText(text, max)
+  if type(text) ~= "string" then return nil end
+  text = text:gsub("|", ""):gsub("[%c]", "")
+  if #text > (max or 40) then text = text:sub(1, max or 40) end
+  return text
+end
+function ns.CleanNote(text)
+  if type(text) ~= "string" then return nil end
+  text = text:gsub("|", ""):gsub("[%c]", " "):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  if text == "" then return nil end
+  if #text > ns.NOTE_MAX then
+    -- cortar sin partir una letra con tilde
+    local out = ""
+    for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+      if #out + #ch > ns.NOTE_MAX then break end
+      out = out .. ch
+    end
+    text = out
+  end
+  return text
+end
+
+-- Dinero en palabras, para el chat («1 oro 50 plata», «50 plata»): sin iconos.
+function ns.MoneyWords(copper)
+  copper = floor(copper or 0)
+  local gold, silver, cop = floor(copper / 10000), floor(copper / 100) % 100, copper % 100
+  local parts = {}
+  if gold > 0 then parts[#parts + 1] = gold .. " oro" end
+  if silver > 0 then parts[#parts + 1] = silver .. " plata" end
+  if cop > 0 or #parts == 0 then parts[#parts + 1] = cop .. " cobre" end
+  return table.concat(parts, " ")
+end
+
 function ns.FormatMoney(copper)
   copper = floor(copper or 0)
   if GetCoinTextureString then return GetCoinTextureString(copper) end
@@ -185,12 +224,37 @@ function ns.Realm()
   return realm or ""
 end
 
+-- Apellidos de WoW Forever: cada personaje es «Nombre Apellido». El addon guarda a cada uno
+-- como «Nombre-Reino» (como siempre) y se apunta aquí su nombre completo, que es el que hace
+-- falta para el correo, susurrar e invitar.
+--   ns.fullNames["Nombre-Reino"] = "Nombre Apellido"
+ns.fullNames = {}
+
+function ns.SurnameSeparator()
+  local c = Constants and Constants.CharacterNameSeparatorConsts
+  local sep = c and c.CHARACTERNAME_SURNAME_SEPARATOR
+  if type(sep) == "string" and sep ~= "" and sep ~= "-" then return sep end
+  return " "
+end
+
 function ns.FullName(name)
   if type(name) ~= "string" or name == "" then return nil end
-  if name:find("-", 1, true) then return name end
-  local realm = ns.Realm()
-  if realm == "" then return name end
-  return name .. "-" .. realm
+  local who, realm = name:match("^([^%-]+)%-(.+)$")
+  who = who or name
+  who = who:match("^%s*(.-)%s*$")
+  if who == "" then return nil end
+  realm = realm and realm:gsub("%s", "") or ns.Realm()
+  -- Con apellido: se guarda el nombre completo y se usa el nombre de pila.
+  local sep = ns.SurnameSeparator()
+  local cut = who:find(sep, 1, true)
+  local complete
+  if cut and cut > 1 then
+    complete = who
+    who = who:sub(1, cut - 1)
+  end
+  local full = (realm ~= "") and (who .. "-" .. realm) or who
+  if complete then ns.fullNames[full] = complete end
+  return full
 end
 
 function ns.ShortName(full)
@@ -198,11 +262,36 @@ function ns.ShortName(full)
   return full:match("^([^%-]+)") or full
 end
 
+-- Nombre para ENSEÑAR: siempre con apellido si se sabe («Exagono Exagonal»), sin el reino.
+-- (ShortName sigue siendo el nombre de pila, para comparar y buscar.)
+function ns.DisplayName(full)
+  if type(full) ~= "string" or full == "" then return "?" end
+  local base = full:match("^([^%-]+)") or full
+  local sep = ns.SurnameSeparator()
+  if base:find(sep, 1, true) then return base end
+  -- dos en la hermandad con este nombre de pila: no se sabe de cuál es, mejor no adivinar el apellido
+  if ns.Guild and ns.Guild.dupes and ns.Guild.dupes[full] then return base end
+  local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(full)
+  local raw = info and type(info.raw) == "string" and (info.raw:match("^([^%-]+)") or info.raw)
+  if raw and raw:find(sep, 1, true) then return raw end
+  local known = ns.fullNames[full]
+  if type(known) == "string" and known ~= "" then return known end
+  return base
+end
+
 function ns.Me()
   if not ns.me then
-    local name = UnitName("player")
+    local name, surname = UnitName("player")
     local realm = ns.Realm()
-    if name and name ~= "" and realm ~= "" then ns.me = name .. "-" .. realm end
+    if name and name ~= "" and realm ~= "" then
+      -- Si el juego lo da entero («Ana Smith»), antes se guardaba así: se recuerda para pasar sus datos.
+      if name:find(ns.SurnameSeparator(), 1, true) then ns.meOld = name .. "-" .. realm end
+      ns.me = ns.FullName(name .. "-" .. realm)
+      -- Forever da el apellido aparte (otros juegos dan ahí el reino, pero nunca para "player").
+      if type(surname) == "string" and surname ~= "" and not ns.fullNames[ns.me] then
+        ns.fullNames[ns.me] = ns.ShortName(ns.me) .. ns.SurnameSeparator() .. surname
+      end
+    end
   end
   return ns.me
 end
@@ -216,7 +305,7 @@ end
 
 function ns.ColoredName(full, classFile)
   local r, g, b = ns.ClassColor(classFile)
-  return format("|cff%02x%02x%02x%s|r", floor(r * 255), floor(g * 255), floor(b * 255), ns.ShortName(full))
+  return format("|cff%02x%02x%02x%s|r", floor(r * 255), floor(g * 255), floor(b * 255), ns.DisplayName(full))
 end
 
 ---------------------------------------------------------------------------
@@ -275,6 +364,54 @@ function ns.KeyFromLink(link)
   if id then return "e" .. id end
 end
 
+-- ¿Puede usarlo mi personaje? (clase y nivel, reglas de Classic)
+-- Armadura: tela (1), cuero (2), malla (3), placas (4); escudo (6).
+local ARMOR_MAX = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, SHAMAN = 3, ROGUE = 2, DRUID = 2, MAGE = 1, PRIEST = 1, WARLOCK = 1 }
+local SHIELDS = { WARRIOR = true, PALADIN = true, SHAMAN = true }
+-- Armas por subclase: 0 hacha 1M, 1 hacha 2M, 2 arco, 3 arma de fuego, 4 maza 1M, 5 maza 2M,
+-- 6 arma de asta, 7 espada 1M, 8 espada 2M, 10 bastón, 13 puño, 15 daga, 16 arrojadiza,
+-- 18 ballesta, 19 varita.
+local function set(list)
+  local t = {}
+  for _, v in ipairs(list) do t[v] = true end
+  return t
+end
+local WEAPONS = {
+  WARRIOR = set({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 }),
+  PALADIN = set({ 0, 1, 4, 5, 6, 7, 8 }),
+  HUNTER = set({ 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 }),
+  ROGUE = set({ 2, 3, 4, 7, 13, 15, 16, 18 }),
+  PRIEST = set({ 4, 10, 15, 19 }),
+  SHAMAN = set({ 0, 1, 4, 5, 10, 13, 15 }),
+  MAGE = set({ 7, 10, 15, 19 }),
+  WARLOCK = set({ 7, 10, 15, 19 }),
+  DRUID = set({ 4, 5, 10, 13, 15 }),
+}
+
+function ns.CanUseItem(key, class, level, minLevel)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return true end -- encantamientos: para cualquiera
+  if minLevel and minLevel > level then return false end
+  local equipLoc, classID, subclassID = ns.ItemInstant(id)
+  if classID == 4 then -- armadura
+    if equipLoc == "INVTYPE_CLOAK" or subclassID == 0 then return true end -- capas, anillos, abalorios...
+    if subclassID == 6 then return SHIELDS[class] or false end
+    if subclassID and subclassID >= 1 and subclassID <= 4 then
+      local max = ARMOR_MAX[class] or 1
+      if level < 40 and max >= 3 then max = max - 1 end -- malla y placas, a partir del 40
+      return subclassID <= max
+    end
+    -- reliquias: libros (paladín), ídolos (druida) y tótems (chamán)
+    local relic = ({ [7] = "PALADIN", [8] = "DRUID", [9] = "SHAMAN" })[subclassID]
+    return relic == class
+  elseif classID == 2 then -- armas
+    if subclassID == 14 or subclassID == 20 then return true end -- armas varias y cañas de pescar
+    local allowed = WEAPONS[class]
+    return allowed == nil or allowed[subclassID] or false
+  end
+  return true -- bolsas y lo demás
+end
+
 -- Devuelve nombre, icono, enlace, calidad, nivel mínimo y hueco de equipo.
 -- El nombre puede ser nil si el juego aún no tiene el objeto en caché (se pide solo).
 function ns.KeyInfo(key)
@@ -292,6 +429,16 @@ function ns.KeyInfo(key)
     return name, icon or ns.QUESTION_ICON, link
   end
   return nil, ns.QUESTION_ICON
+end
+
+-- ¿Se liga al recogerlo (o es de misión)? Entonces no se puede dar a nadie: quien lo fabrica
+-- se lo queda. true/false; nil si el juego aún no tiene los datos del objeto.
+function ns.IsSoulbound(key)
+  local kind, id = ns.ParseKey(key)
+  if kind ~= "i" then return false end
+  local name, _, _, _, _, _, _, _, _, _, _, _, _, bindType = getItemInfo(id)
+  if not name then return nil end
+  return bindType == 1 or bindType == 4
 end
 
 function ns.KeyName(key)
@@ -416,6 +563,12 @@ function ns.MyChar()
   local me = ns.Me()
   if not me or not ns.db then return nil end
   local c = ns.db.chars[me]
+  if not c and ns.meOld and ns.meOld ~= me and ns.db.chars[ns.meOld] then
+    -- antes se guardaba con el apellido: se pasa al nombre de pila
+    c = ns.db.chars[ns.meOld]
+    ns.db.chars[ns.meOld] = nil
+    ns.db.chars[me] = c
+  end
   if not c then
     c = { profs = {}, bank = {} }
     ns.db.chars[me] = c

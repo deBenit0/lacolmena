@@ -22,7 +22,7 @@ local CHECKS = {
     local panel = HDFProfPanel
     if not panel then return nil, "abre el addon una vez y vuelve a comprobar" end
     local ok = panel.pageFrames and panel.pageFrames.dungeons ~= nil
-    return ok, ok and ("versión " .. ns.VERSION .. ", Agenda incluida") or "falta la Agenda"
+    return ok, ok and ("versión " .. ns.VERSION .. ", Grupos incluido") or "falta Grupos"
   end },
   { "Lista de la hermandad", function()
     if not (GetNumGuildMembers and GetGuildRosterInfo) then return false, "el juego no da la lista de miembros" end
@@ -37,6 +37,12 @@ local CHECKS = {
     local n = 0
     for _ in pairs(c and c.gather or {}) do n = n + 1 end
     return true, (modern and "C_SkillInfo" or "clásico") .. (n > 0 and (", " .. n .. " de recolección") or "")
+  end },
+  { "Nombres de pila repetidos", function()
+    local text = ns.Guild.DupesText()
+    if text then return false, "se pisan en el addon: " .. text end
+    if not ns.Guild.full then return nil, "falta la lista entera de la hermandad" end
+    return true, "ninguno"
   end },
   { "Pestaña en la ventana de hermandad", function()
     local hosts = ns.UI.HostNames()
@@ -231,8 +237,9 @@ function Diag.TellLine()
     or (ChatFrame_SendTell and "ChatFrame_SendTell") or "ninguna"
   local open = (ChatFrameUtil and ChatFrameUtil.OpenChat and "ChatFrameUtil.OpenChat")
     or (ChatFrame_OpenChat and "ChatFrame_OpenChat") or "ninguna"
-  return string.format("Susurrar: %s (si falla, %s); ejemplo: %s -> %s", how, open, tostring(ns.Me()),
-    tostring(ns.TellName and ns.TellName(ns.Me())))
+  local first, second = UnitName("player")
+  return string.format("Susurrar: %s (si falla, %s); el juego te llama \"%s\" + \"%s\"; ejemplo: %s -> %s", how, open,
+    tostring(first), tostring(second), tostring(ns.Me()), tostring(ns.TellName and ns.TellName(ns.Me())))
 end
 
 -- Texto del informe (sin colores, para copiar y pegar).
@@ -325,14 +332,14 @@ local function createWindow()
   window.edit:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
   scroll:SetScrollChild(window.edit)
 
-  window.recheck = W.Button(window, "Comprobar otra vez", 140, 22, function() Diag.Show() end)
+  window.recheck = W.Button(window, "Comprobar otra vez", 156, 22, function() Diag.Show() end)
   window.recheck:SetPoint("BOTTOMLEFT", 20, 14)
-  window.clear = W.Button(window, "Borrar errores", 120, 22, function()
+  window.clear = W.Button(window, "Borrar errores", 126, 22, function()
     if ns.db then wipe(ns.db.errors) end
     Diag.Show()
   end)
   window.clear:SetPoint("LEFT", window.recheck, "RIGHT", 6, 0)
-  window.select = W.Button(window, "Seleccionar informe", 150, 22, function()
+  window.select = W.Button(window, "Seleccionar informe", 166, 22, function()
     window.edit:SetFocus()
     window.edit:HighlightText()
   end)

@@ -34,6 +34,8 @@ Data.WHEN = {
   { id = 1, label = "Lo hago ya", need = "Lo necesita ya", ask = "Ya", secs = 3600 },
   { id = 2, label = "Antes de 2 horas", need = "Lo necesita antes de 2 h", ask = "Antes de 2 horas", secs = 7200 },
   { id = 3, label = "Lo hago hoy", need = "Lo necesita hoy", ask = "Hoy", today = true },
+  -- el correo entre jugadores tarda y a veces no coincides con quien lo pidió
+  { id = 4, label = "Antes de 24 horas", need = "Lo necesita antes de 24 h", ask = "En 24 horas", secs = 24 * 3600 },
 }
 
 -- Plazo (en el reloj del addon) para la opción elegida.
@@ -49,6 +51,7 @@ end
 Data.MAX_OPEN = 10           -- peticiones abiertas por jugador
 Data.KEEP_AFTER = 2 * 86400  -- las terminadas se siguen viendo 2 días
 Data.MAX_QTY = 1000
+Data.MAX_INFO = 6000          -- recetas con materiales guardadas (en Classic hay unas 2000)
 
 -- Recetas con cooldown conocidas; el resto se aprende al ver cooldowns reales.
 Data.KNOWN_COOLDOWNS = {
@@ -103,15 +106,15 @@ function Data.SanitizeEntry(e)
   local out = {
     n = e.n,
     v = e.v,
-    c = type(e.c) == "string" and e.c or nil,
+    c = ns.CleanText(e.c, 20),
     l = tonumber(e.l),
     u = (e.u == true) or nil,
-    av = type(e.av) == "string" and e.av or nil,
+    av = ns.CleanText(e.av, 20),
     th = cleanNumberMap(e.th, "string"),
     ga = cleanNumberMap(e.ga, "number"),
     kc = cleanNumberMap(e.kc, "string"),
     kd = tonumber(e.kd),
-    ro = (e.ro == 1 or e.ro == 2 or e.ro == 4) and e.ro or nil,
+    ro = (type(e.ro) == "number" and e.ro >= 1 and e.ro <= 7 and e.ro % 1 == 0) and e.ro or nil, -- 1+2+4: varios roles
   }
   if type(e.p) == "table" then
     local profs, any = {}, false
@@ -132,6 +135,7 @@ function Data.SanitizeEntry(e)
   if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
   if ns.Social then ns.Social.SanitizeInto(out, e) end -- alts, oficiales, necesidades, ayudas
   if ns.Orders then ns.Orders.SanitizeInto(out, e) end -- pedidos de fabricación de hermandad
+  if ns.History then ns.History.SanitizeInto(out, e) end -- historial público
   return out
 end
 
@@ -157,22 +161,40 @@ local function restoreRest(e, c)
   local g, me = ns.G(), ns.Me()
   if not g or not me then return end
   g.karma = g.karma or {}
-  local karma = g.karma[me]
-  if (not karma or (not next(karma.kc or {}) and (karma.kd or 0) == 0)) and (e.kc or e.kd) then
-    g.karma[me] = { kc = deepCopy(e.kc or {}), kd = e.kd or 0 }
+  g.thanks = g.thanks or {}
+  -- Karma dado y encargos confirmados: el mayor de cada uno. Si al entrar llegó antes un pedido
+  -- entregado que mi ficha, aquí ya se había contado otra vez: así no se duplica ni se pierde.
+  if e.kc or e.kd then
+    local karma = g.karma[me] or { kc = {}, kd = 0 }
+    karma.kc = karma.kc or {}
+    for who, v in pairs(e.kc or {}) do
+      if v > (karma.kc[who] or 0) then karma.kc[who] = v end
+    end
+    if (e.kd or 0) > (karma.kd or 0) then karma.kd = e.kd end
+    g.karma[me] = karma
   end
-  if e.th and not next(g.thanks[me] or {}) then g.thanks[me] = deepCopy(e.th) end
+  if e.th then
+    local th = g.thanks[me] or {}
+    for who, v in pairs(e.th) do
+      if v > (th[who] or 0) then th[who] = v end
+    end
+    g.thanks[me] = th
+  end
   local function fill(field, value)
     if value ~= nil and (c[field] == nil or (type(c[field]) == "table" and next(c[field]) == nil)) then
       c[field] = deepCopy(value)
     end
   end
   fill("offers", e.of)
+  fill("crafts", e.fb)
+  fill("claims", e.cl)
   fill("donated", e.dn)
   fill("needs", e.nd)
   fill("mc", e.mc)
   fill("mp", e.mp)
+  fill("mo", e.mo)
   fill("guildOrders", e.go)
+  fill("hist", e.hi)
   if e.an and not c.announce then c.announce = deepCopy(e.an) end
   if e.wk and not c.week then c.week = deepCopy(e.wk) end
   if e.od and not next(c.sent or {}) then c.sent = deepCopy(e.od) end
@@ -250,6 +272,7 @@ function Data.BuildMyEntry(now)
   if ns.Offers then ns.Offers.BuildInto(e, now) end
   if ns.Social then ns.Social.BuildInto(e, now) end
   if ns.Orders then ns.Orders.BuildInto(e, now) end
+  if ns.History then ns.History.BuildInto(e) end
   return e
 end
 
@@ -506,7 +529,14 @@ function Data.IsCooldownRecipe(ik)
 end
 
 function Data.MergeInfo(ik, d)
-  if type(ik) ~= "string" or not ik:match("^[^:]+:[ie]%d+$") or type(d) ~= "table" then return false end
+  if type(ik) ~= "string" or #ik > 40 or not ik:match("^[^:]+:[ie]%d+$") or type(d) ~= "table" then return false end
+  -- Tope de recetas guardadas: nadie puede llenar el archivo de guardado de recetas inventadas.
+  if ns.db and ns.db.info and not ns.db.info[ik] then
+    ns.infoCount = ns.infoCount or 0
+    if ns.infoCount == 0 then for _ in pairs(ns.db.info) do ns.infoCount = ns.infoCount + 1 end end
+    if ns.infoCount >= Data.MAX_INFO then return false end
+    ns.infoCount = ns.infoCount + 1
+  end
   local changed = false
   if type(d.v) == "table" then
     for _, var in ipairs(d.v) do
@@ -522,7 +552,7 @@ end
 ---------------------------------------------------------------------------
 -- Peticiones
 ---------------------------------------------------------------------------
-local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu", "pr" }
+local AUTHOR_FIELDS = { "q", "m", "g", "pi", "to", "x", "rn", "vu", "pr", "rj", "nt" }
 
 function Data.SanitizeRequest(r)
   if type(r) ~= "table" then return nil end
@@ -553,13 +583,25 @@ function Data.SanitizeRequest(r)
     end
     if any then out.pi = pi end
   end
-  if type(r.to) == "string" and r.to ~= "" then out.to = r.to end
+  if type(r.to) == "string" and r.to ~= "" and not r.to:find("|", 1, true) and #r.to <= 80 then out.to = r.to end
   if tonumber(r.x) then out.x = tonumber(r.x) end
   if tonumber(r.rn) then out.rn = tonumber(r.rn) end
   local vu = tonumber(r.vu)
   if vu and vu >= 1 then out.vu = floor(vu) end
   local pr = tonumber(r.pr)
   if pr and Data.WHEN[pr] then out.pr = pr end
+  out.nt = ns.CleanNote(r.nt) -- nota del que pide
+  -- rj = { [fabricante] = hora }: el autor le quitó el encargo (vuelve al Mercado)
+  if type(r.rj) == "table" then
+    local rj, any = {}, false
+    for name, t in pairs(r.rj) do
+      if type(name) == "string" and tonumber(t) then
+        rj[name] = tonumber(t)
+        any = true
+      end
+    end
+    if any then out.rj = rj end
+  end
   if type(r.c) == "table" then
     local c, any = {}, false
     for name, cm in pairs(r.c) do
@@ -591,10 +633,19 @@ function Data.SanitizeRequest(r)
   return out
 end
 
--- Elige el bloque con mayor versión; si empatan, el mismo para todos (orden del texto).
+-- Elige el bloque con mayor versión. Si empatan: el que trae más datos (una versión vieja del addon
+-- borra los campos que no conoce, como rj o nt, pero deja la misma versión) y, si no, el mismo para
+-- todos (orden del texto).
+local function fieldCount(t)
+  local n = 0
+  for _ in pairs(t) do n = n + 1 end
+  return n
+end
 local function pickBlock(a, b, verField)
   local va, vb = a[verField] or 0, b[verField] or 0
   if va ~= vb then return va > vb and a or b end
+  local na, nb = fieldCount(a), fieldCount(b)
+  if na ~= nb then return na > nb and a or b end
   return Codec.Serialize(a) >= Codec.Serialize(b) and a or b
 end
 
@@ -666,12 +717,19 @@ local function commitAlive(cm, now)
   return now <= commitDeadline(cm)
 end
 
+-- ¿Le quitó el autor el encargo? (solo cuenta si se lo quitó después de aceptarlo)
+local function rejected(r, name, cm)
+  local t = r and r.rj and r.rj[name]
+  return t ~= nil and t >= (cm.at or cm.cv or 0)
+end
+Data.Rejected = function(r, name) return r and r.c and r.c[name] and rejected(r, name, r.c[name]) or false end
+
 -- El pedido es de uno solo: el primero que lo aceptó (si dos lo aceptan a la vez sin verse,
 -- gana el que lo hizo antes; todos llegan a la misma conclusión).
 function Data.OwnerOf(r, now)
   local owner, ocm
   for name, cm in pairs(r and r.c or {}) do
-    if commitAlive(cm, now) then
+    if commitAlive(cm, now) and not rejected(r, name, cm) then
       -- la hora en que lo aceptó (ampliar el plazo no cambia quién lo tiene)
       local cv, ocv = cm.at or cm.cv or 0, ocm and (ocm.at or ocm.cv or 0)
       if not owner or cv < ocv or (cv == ocv and name < owner) then owner, ocm = name, cm end
@@ -714,6 +772,18 @@ function Data.RequestInfo(r, now)
     end
   end
   table.sort(info.commits, function(x, y) return x.name < y.name end)
+  -- Sin encargado, el último que lo aceptó y se le pasó el plazo (sin soltarlo ni que se lo
+  -- quitaran): el autor aún puede darle a «Recibido» (el correo tarda y a veces no coincidís).
+  if not info.owner then
+    local best, bestAt
+    for name, cm in pairs(r.c or {}) do
+      if cm.n and not cm.rl and not rejected(r, name, cm) and deliveredOf(cm) < cm.n then
+        local at = cm.at or cm.cv or 0
+        if not bestAt or at > bestAt then best, bestAt = name, at end
+      end
+    end
+    if best then info.late = { name = best, pending = 0, mailed = r.c[best].s or 0 } end
+  end
   info.expires = max(r.t or 0, r.rn or 0) + Data.REQUEST_TTL
   info.remaining = max(0, r.q - info.delivered - info.pending)
   local modClosed = ns.Social and ns.Social.IsModClosed(r.id)
@@ -725,7 +795,7 @@ function Data.RequestInfo(r, now)
     local last = 0
     for _, cm in pairs(r.c or {}) do last = max(last, cm.dv or 0, cm.sv or 0) end
     info.state, info.ended = "done", last
-  elseif now > info.expires then
+  elseif now > info.expires and not info.owner then
     info.state, info.ended = "expired", info.expires
   elseif info.remaining <= 0 or info.owner then
     -- con encargado, aunque se haya ampliado la cantidad: nadie más puede cogerlo hasta que
@@ -756,6 +826,7 @@ function Data.ApplyRequest(incoming, now)
   local behind = mergedText ~= Codec.Serialize(incoming)
   if cur and Codec.Serialize(cur) == mergedText then return false, cur, cur, behind end
   if not cur and isGone(merged, now) then return false, nil, nil, false end -- no resucitar
+  if not cur and g.gone and g.gone[incoming.id] then return false, nil, nil, false end -- ya lo borré
   g.requests[incoming.id] = merged
   return true, cur, merged, behind
 end
@@ -860,6 +931,7 @@ function Data.CreateRequest(opts, now)
   local g, me = ns.G(), ns.Me()
   if not g or not me then return nil, "No estás en una hermandad." end
   if not ns.ParseKey(opts.k) then return nil, "Elige un objeto o encantamiento." end
+  if ns.IsSoulbound(opts.k) then return nil, "Ese objeto se liga al recogerlo: quien lo fabrique no te lo puede dar." end
   if Data.CountOpenBy(me, now) >= Data.MAX_OPEN then
     return nil, "Ya tienes " .. Data.MAX_OPEN .. " peticiones abiertas."
   end
@@ -867,7 +939,7 @@ function Data.CreateRequest(opts, now)
   local id = me .. ":" .. Codec.EncodeUInt(now) .. Codec.EncodeUInt(g.reqSeq % 1024)
   local r = Data.SanitizeRequest({
     id = id, a = me, t = now, k = opts.k, pk = opts.pk, q = opts.q or 1, av = now,
-    m = opts.m and true or nil, g = opts.g, pr = opts.pr,
+    m = opts.m and true or nil, g = opts.g, pr = opts.pr, nt = opts.nt,
   })
   g.requests[id] = r
   return r
@@ -886,9 +958,10 @@ function Data.Commit(id, when, now)
   if r.a == me then return nil, "No puedes aceptar tu propia petición." end
   local info = Data.RequestInfo(r, now)
   if info.owner and info.owner ~= me then
-    return nil, "Ya lo ha aceptado " .. ns.ShortName(info.owner) .. "."
+    return nil, "Ya lo ha aceptado " .. ns.DisplayName(info.owner) .. "."
   end
   if info.state ~= "open" then return nil, "La petición ya no está abierta." end
+  if r.rj and r.rj[me] then return nil, ns.DisplayName(r.a) .. " te quitó este encargo: no puedes volver a cogerlo." end
   when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}
@@ -989,6 +1062,7 @@ function Data.CheckThanks(r, now)
         g.thanks[me][crafter] = (g.thanks[me][crafter] or 0) + 1
         karma.kc[crafter] = (karma.kc[crafter] or 0) + Data.KARMA_POINT
         karma.kd = (karma.kd or 0) + Data.KARMA_POINT
+        if ns.History then ns.History.Add("p", r.k, d, crafter, now) end
         changed = true
       end
     end
@@ -1038,6 +1112,18 @@ function Data.SetQuantity(id, q, now)
   return r
 end
 
+-- El autor le quita el encargo a quien lo aceptó (no lo envía): vuelve al Mercado para otro.
+function Data.Reject(id, crafter, now)
+  local r, me = getRequest(id), ns.Me()
+  if not r then return nil, "La petición ya no existe." end
+  if r.a ~= me then return nil, "Solo el autor puede quitar el encargo." end
+  if not (r.c and r.c[crafter]) then return nil, "Esa persona no tiene el encargo." end
+  r.rj = r.rj or {}
+  r.rj[crafter] = now
+  r.av = bump(r.av, now)
+  return r
+end
+
 function Data.CloseRequest(id, now)
   local r, me = getRequest(id), ns.Me()
   if not r then return nil, "La petición ya no existe." end
@@ -1059,4 +1145,21 @@ function Data.RenewRequest(id, now)
   r.rn = now
   r.av = bump(r.av, now)
   return r
+end
+
+-- Materiales que usan mis recetas: [objeto] = { claves de mis recetas que lo usan }.
+function Data.MyReagents()
+  local c, out = ns.MyChar(), {}
+  for pk, prof in pairs(c and c.profs or {}) do
+    for key in pairs(prof.recipes or {}) do
+      local info = Data.GetInfo(Data.InfoKey(pk, key))
+      for _, var in ipairs(info and info.v or {}) do
+        for id in pairs(var.r) do
+          out[id] = out[id] or {}
+          out[id][key] = true
+        end
+      end
+    end
+  end
+  return out
 end

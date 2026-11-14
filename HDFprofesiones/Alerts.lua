@@ -14,6 +14,7 @@ Alerts.TYPES = {
   { id = "craft", label = "Pedido que puedes hacer" },
   { id = "accepted", label = "Novedades de tus pedidos" },
   { id = "run", label = "Quedada nueva" },
+  { id = "signup", label = "Se apuntan a tu quedada" },
   { id = "group", label = "Te eligen para el grupo" },
   { id = "remind", label = "Recordatorio de la hora" },
   { id = "expire", label = "Algo tuyo caduca pronto" },
@@ -191,7 +192,7 @@ local function show(alert)
     frame:SetScale(1)
   end
   frame:Show()
-  if ts.sound then PlaySound((SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
+  if ts.sound then PlaySound(alert.sound or (SOUNDKIT and SOUNDKIT.TELL_MESSAGE) or 3081) end
   local token = {}
   hideToken = token
   ns.After(SHOW_SECONDS, function()
@@ -249,7 +250,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
     end
     if Data.ICanCraft(new.k) or canGather then
       g.alerted[new.id] = true
-      local text = string.format("%s pide %dx %s", ns.ShortName(new.a), new.q, ns.KeyLabel(new.k))
+      local text = string.format("%s pide %dx %s", ns.DisplayName(new.a), new.q, ns.KeyLabel(new.k))
       if new.pr then text = text .. " (" .. Data.WHEN[new.pr].ask:lower() .. ")" end
       Alerts.Push({ id = new.id, icon = icon, text = text, canCommit = true, type = "craft" })
     end
@@ -263,7 +264,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
       if (cm.s or 0) > sentBefore then
         Alerts.Push({
           id = new.id, icon = icon, type = "accepted",
-          text = string.format("%s te ha enviado %dx %s por correo", ns.ShortName(name), cm.s - sentBefore, ns.KeyLabel(new.k)),
+          text = string.format("%s te ha enviado %dx %s por correo", ns.DisplayName(name), cm.s - sentBefore, ns.KeyLabel(new.k)),
         })
       end
     end
@@ -277,7 +278,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
       local w = cm.w and Data.WHEN[cm.w]
       Alerts.Push({
         id = new.id, icon = icon, type = "accepted",
-        text = string.format("%s te hace %dx %s%s", ns.ShortName(owner), new.q, ns.KeyLabel(new.k),
+        text = string.format("%s te hace %dx %s%s", ns.DisplayName(owner), new.q, ns.KeyLabel(new.k),
           w and (" (" .. w.label:gsub("^Lo hago ", ""):lower() .. ")") or ""),
       })
     end
@@ -290,9 +291,16 @@ function Alerts.OnRequestUpdated(old, new, retry)
     if owner and cm.ex and before and not before.ex and before.n then
       local w = cm.w and Data.WHEN[cm.w]
       Alerts.Push({ id = new.id, icon = icon, type = "accepted",
-        text = string.format("%s necesita más tiempo para %s%s", ns.ShortName(owner), ns.KeyLabel(new.k),
+        text = string.format("%s necesita más tiempo para %s%s", ns.DisplayName(owner), ns.KeyLabel(new.k),
           w and (": " .. w.label:gsub("^Lo hago ", ""):lower()) or "") })
     end
+  end
+
+  -- El autor me ha quitado el encargo.
+  if new.a ~= me and old and new.c and new.c[me] and Data.Rejected(new, me) and not Data.Rejected(old, me) then
+    Alerts.Push({ id = new.id, icon = icon,
+      text = string.format("%s te ha quitado el encargo: %s", ns.DisplayName(new.a), ns.KeyLabel(new.k)) })
+    return
   end
 
   -- Lo acepté a la vez que otro y él lo hizo antes: me quedo sin él.
@@ -301,7 +309,7 @@ function Alerts.OnRequestUpdated(old, new, retry)
     local owner = Data.OwnerOf(new, now)
     if mineBefore and owner and owner ~= me then
       Alerts.Push({ id = new.id, icon = icon,
-        text = string.format("%s aceptó antes que tú: %s", ns.ShortName(owner), ns.KeyLabel(new.k)) })
+        text = string.format("%s aceptó antes que tú: %s", ns.DisplayName(owner), ns.KeyLabel(new.k)) })
     end
   end
 end
@@ -325,21 +333,25 @@ function Alerts.CheckDeadlines()
       local key = id .. ":" .. name .. ":" .. (cm.by or 0)
       local pendingUnits = cm.n and (cm.n - Data.DeliveredOf(cm)) or 0
       local expired = cm.by and not cm.rl and pendingUnits > 0 and now > cm.by + Data.COMMIT_GRACE
-        and now < cm.by + Data.COMMIT_GRACE + 86400 and Data.IsActiveState(Data.RequestInfo(r, now).state)
+        and now < cm.by + Data.COMMIT_GRACE + 86400 and not Data.Rejected(r, name)
+      if expired then
+        local info = Data.RequestInfo(r, now)
+        expired = Data.IsActiveState(info.state) and info.late ~= nil and info.late.name == name
+      end
       if name == me and r.a ~= me then
         if cm.by and Data.CommitActive(cm, now, r) and cm.by - now <= Alerts.WARN_BEFORE then
           local left = cm.by - now
           once(key .. ":soon", { id = id, icon = icon,
             text = string.format("%s para enviar %dx %s a %s",
               left > 60 and ("Te quedan " .. ns.FormatDuration(left)) or "Se acaba tu plazo", pendingUnits,
-              ns.KeyLabel(r.k), ns.ShortName(r.a)) })
+              ns.KeyLabel(r.k), ns.DisplayName(r.a)) })
         elseif expired then
           once(key .. ":late", { id = id, icon = icon,
             text = string.format("Se pasó tu plazo: %s vuelve al Mercado", ns.KeyLabel(r.k)) })
         end
       elseif r.a == me and expired then
         once(key .. ":back", { id = id, icon = icon,
-          text = string.format("%s no lo entregó a tiempo: %s vuelve al Mercado", ns.ShortName(name), ns.KeyLabel(r.k)) })
+          text = string.format("%s no lo entregó a tiempo: %s vuelve al Mercado", ns.DisplayName(name), ns.KeyLabel(r.k)) })
       end
     end
   end
@@ -383,13 +395,31 @@ function Alerts.OnRunUpdated(old, new)
     if level >= dg.min and level <= dg.max + 3 then
       g.runAlerted[new.id] = true
       Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "run",
-        text = string.format("%s propone %s %s", ns.ShortName(new.a), dg.name, when) })
+        text = string.format("%s propone %s %s", ns.DisplayName(new.a), dg.name, when) })
+    end
+  end
+  -- En mi quedada: aviso con el sonido de invitación a grupo del juego cuando alguien se apunta.
+  if old and new.a == me then
+    for name, su in pairs(new.s or {}) do
+      local before = old.s and old.s[name]
+      local active = not su.o and su.r and su.r > 0
+      local wasActive = before and not before.o and before.r and before.r > 0
+      if name ~= me and active and not wasActive then
+        local roles = {}
+        for _, ro in ipairs(D.ROLES) do
+          if math.floor(su.r / ro.bit) % 2 == 1 then roles[#roles + 1] = ro.label end
+        end
+        Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "signup",
+          sound = (SOUNDKIT and SOUNDKIT.IG_PLAYER_INVITE) or 880,
+          text = string.format("%s se apunta a %s (%s)", ns.DisplayName(name), dg.name, table.concat(roles, "/")) })
+      end
     end
   end
   local place = D.MyPlace(new)
   if place and place ~= "suplente" and new.a ~= me and D.MyPlace(old) ~= place then
     Alerts.Push({ id = new.id, page = "dungeons", icon = DUNGEON_ICON, type = "group",
-      text = string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.ShortName(new.a)) })
+      text = place == "en el grupo" and string.format("¡Vas al grupo de %s! Te invitará %s", dg.name, ns.DisplayName(new.a))
+        or string.format("¡Vas a %s de %s! Te invitará %s", dg.name, place, ns.DisplayName(new.a)) })
   end
 end
 ns.Listen("RUN_UPDATED", function(old, new) ns.SafeCall(Alerts.OnRunUpdated, old, new) end)

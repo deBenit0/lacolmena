@@ -136,25 +136,7 @@ ns.UI.RegisterPage("mine", function(page)
   local roleLabel = W.Text(me, "GameFontNormalSmall")
   roleLabel:SetPoint("TOPLEFT", 12, -334)
   roleLabel:SetText("Rol de este personaje:")
-  page.roleButton = W.Button(me, "", 100, 22, function()
-    local c = ns.MyChar()
-    if not c then return end
-    local allowed = ns.Dungeons.CLASS_ROLES[c.class] or 7
-    local order = { false, 1, 2, 4 }
-    local idx = 1
-    for i, r in ipairs(order) do
-      if (c.roleSet or false) == r then idx = i end
-    end
-    for step = 1, #order do
-      local r = order[(idx + step - 1) % #order + 1]
-      if not r or math.floor(allowed / r) % 2 == 1 then
-        c.roleSet = r or nil
-        break
-      end
-    end
-    ns.Sync.PublishMine()
-    page:Refresh()
-  end)
+  page.roleButton = W.Button(me, "", 100, 22, function() ns.UI.ChooseRoles() end)
   page.roleButton:SetPoint("LEFT", roleLabel, "RIGHT", 6, 0)
   ns.UI.Tip(page.roleButton, "Rol de este personaje", "Para contar en la Hermandad cuántos tanques, sanadores y DPS "
     .. "hay. «Auto» lo saca de tus talentos.")
@@ -244,7 +226,7 @@ ns.UI.RegisterPage("mine", function(page)
     page:Refresh()
   end)
   page.fontButton:SetPoint("TOPLEFT", 10, -252)
-  ns.UI.Tip(page.fontButton, "Letra de las listas", "Pequeña, normal o grande: Mercado, Agenda, Hermandad e Inicio.")
+  ns.UI.Tip(page.fontButton, "Letra de las listas", "Pequeña, normal o grande: Mercado, Grupos, Hermandad e Inicio.")
   page.statusButton = W.Button(ot, "Estado y números", 166, 22, function()
     page.statusBox:SetShown(not page.statusBox:IsShown())
     page:Refresh()
@@ -300,12 +282,12 @@ ns.UI.RegisterPage("mine", function(page)
       page.quiet:SetText("No molestar: no")
     end
     local main = ns.Social.MyMain()
-    page.mainButton:SetText(ns.ShortName(main))
+    page.mainButton:SetText(ns.DisplayName(main))
     local nChars = #ns.Social.MyChars()
     local D = ns.Dungeons
     if c.roleSet then
       page.roleButton:SetText(D.RoleLabel(c.roleSet))
-      page.roleHint:SetText("Elegido por ti. Pulsa hasta «Auto» para volver a los talentos.")
+      page.roleHint:SetText("Elegido por ti (puedes tener varios). Pulsa para cambiarlo.")
     else
       page.roleButton:SetText("Auto: " .. (D.RoleLabel(c.roleAuto) or "?"))
       page.roleHint:SetText(c.roleAuto and "Sale de tus talentos. Pulsa para elegirlo tú."
@@ -313,7 +295,7 @@ ns.UI.RegisterPage("mine", function(page)
     end
     page.hint:SetText(main == myName and (nChars > 1 and "Tus alts suman karma y ayudas contigo (pulsa para cambiar)."
       or "Tus alts suman karma y ayudas con tu principal.")
-      or ("Este es un alt de " .. ns.ShortName(main) .. "."))
+      or ("Este es un alt de " .. ns.DisplayName(main) .. "."))
 
     -- Avisos: un tipo apagado deja sus otras casillas en gris.
     for id, row in pairs(page.alertRows) do

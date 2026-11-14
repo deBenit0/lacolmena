@@ -30,7 +30,8 @@ local function cleanCrafts(fb)
     if n >= Offers.MAX_CRAFTS then break end
     if type(k) == "string" and k:match("^[ie]%d+$") and type(o) == "table" then
       local g = tonumber(o.g)
-      out[k] = { g = (g and g > 0) and floor(g) or nil, m = (o.m == 1) and 1 or nil, t = tonumber(o.t) or 0 }
+      out[k] = { g = (g and g > 0) and floor(g) or nil, m = (o.m == 1) and 1 or nil, t = tonumber(o.t) or 0,
+        nt = ns.CleanNote(o.nt) }
       n = n + 1
     end
   end
@@ -63,7 +64,8 @@ function Offers.SanitizeInto(out, e)
       id = tonumber(id)
       local q = type(o) == "table" and tonumber(o.q)
       if id and id > 0 and q and q >= 1 then
-        of[floor(id)] = { q = floor(q), g = tonumber(o.g) and floor(tonumber(o.g)) or nil, t = tonumber(o.t) or 0 }
+        of[floor(id)] = { q = floor(q), g = tonumber(o.g) and floor(tonumber(o.g)) or nil, t = tonumber(o.t) or 0,
+          nt = ns.CleanNote(o.nt) }
         any = true
       end
     end
@@ -135,7 +137,17 @@ end
 -- ¿Sigue pendiente un "lo quiero"? Devuelve lo que falta por enviar.
 function Offers.ClaimLeft(owner, who, id, claim, now)
   if not claim or now > (claim.t or 0) + Offers.CLAIM_TTL then return 0 end
-  return max(0, claim.q - (Offers.SentTo(owner, who, id) - (claim.b or 0)))
+  return max(0, claim.q - Offers.ClaimGot(owner, who, id, claim))
+end
+
+-- Lo que ya me ha llegado de un "lo quiero": lo enviado menos lo que ya había antes de pedirlo
+-- (b). Si el registro de envíos se borró (caduca a los días) y queda por debajo de b, se cuenta
+-- desde cero: antes salía negativo y el "lo quiero" se quedaba colgado pidiendo de más.
+function Offers.ClaimGot(owner, who, id, claim)
+  local sent = Offers.SentTo(owner, who, id)
+  local base = claim and claim.b or 0
+  if sent < base then base = 0 end
+  return sent - base
 end
 
 -- Lo que entra en mi ficha: ofertas vivas, "lo quiero" pendientes y envíos recientes.
@@ -145,7 +157,7 @@ function Offers.BuildInto(e, now)
   local of = {}
   for id, o in pairs(c.offers) do
     if o.q > 0 and now <= o.t + Offers.OFFER_TTL then
-      of[id] = { q = o.q, g = o.g, t = o.t }
+      of[id] = { q = o.q, g = o.g, t = o.t, nt = o.nt }
     else
       c.offers[id] = nil
     end
@@ -176,8 +188,9 @@ function Offers.BuildInto(e, now)
   if next(od) then e.od = od end
   local fb, n = {}, 0
   for k, o in pairs(c.crafts) do
-    if now <= (o.t or 0) + Offers.CRAFT_TTL and knows(c, k) and n < Offers.MAX_CRAFTS then
-      fb[k] = { g = o.g, m = o.m, t = o.t }
+    -- (lo que se liga al recogerlo se quita: no se le puede dar a nadie)
+    if now <= (o.t or 0) + Offers.CRAFT_TTL and knows(c, k) and n < Offers.MAX_CRAFTS and not ns.IsSoulbound(k) then
+      fb[k] = { g = o.g, m = o.m, t = o.t, nt = o.nt }
       n = n + 1
     else
       c.crafts[k] = nil
@@ -214,10 +227,11 @@ function Offers.List(now)
       of = c and c.offers
     end
     for id, o in pairs(of or {}) do
-      if o.q > 0 and now <= (o.t or 0) + Offers.OFFER_TTL then
+      local removed = ns.Social and ns.Social.IsOfferRemoved(key(owner, id), o.t)
+      if o.q > 0 and now <= (o.t or 0) + Offers.OFFER_TTL and not removed then
         local k = key(owner, id)
         local item = { owner = owner, id = id, key = k, q = o.q, g = o.g, t = o.t, claims = {}, pending = 0, myClaim = 0,
-          demo = e.demo }
+          demo = e.demo, nt = o.nt }
         for _, cb in ipairs(claimsBy[k] or {}) do
           local left = Offers.ClaimLeft(owner, cb.name, id, cb.claim, now)
           if left > 0 then
@@ -247,14 +261,15 @@ function Offers.CraftList(now)
       fb = c and c.crafts
     end
     for k, o in pairs(fb or {}) do
-      if now <= (o.t or 0) + Offers.CRAFT_TTL then
+      local removed = ns.Social and ns.Social.IsOfferRemoved(owner .. ":" .. k, o.t)
+      if now <= (o.t or 0) + Offers.CRAFT_TTL and not removed then
         local grp = groups[k]
         if not grp then
           grp = { key = k, crafters = {}, t = 0 }
           groups[k] = grp
           list[#list + 1] = grp
         end
-        grp.crafters[#grp.crafters + 1] = { name = owner, g = o.g, m = o.m, t = o.t or 0 }
+        grp.crafters[#grp.crafters + 1] = { name = owner, g = o.g, m = o.m, t = o.t or 0, nt = o.nt }
         if (o.t or 0) > grp.t then grp.t = o.t or 0 end
         if owner == me then grp.mine, grp.myT = true, o.t or 0 end
       end
@@ -288,17 +303,21 @@ function Offers.CountCrafts()
 end
 
 -- Ofrecer fabricar una receta mía (o cambiar su precio y quién pone los materiales).
-function Offers.SetCraft(k, price, mats, now)
+-- note: nil = dejar la que tenía; "" = quitarla.
+function Offers.SetCraft(k, price, mats, now, note)
   local c = mine()
   if not c or not ns.G() then return nil, "No estás en una hermandad." end
   if type(k) ~= "string" or not k:match("^[ie]%d+$") or not knows(c, k) then
     return nil, "No conozco esa receta tuya."
   end
+  if ns.IsSoulbound(k) then return nil, "Lo que hace esa receta se liga al recogerlo: se quedaría en tu personaje." end
   if not c.crafts[k] and Offers.CountCrafts() >= Offers.MAX_CRAFTS then
     return nil, "Ya ofreces " .. Offers.MAX_CRAFTS .. " recetas: quita alguna antes."
   end
   price = tonumber(price)
-  c.crafts[k] = { g = (price and price > 0) and floor(price) or nil, m = mats and 1 or nil, t = now }
+  local old = c.crafts[k]
+  if note == nil then note = old and old.nt end
+  c.crafts[k] = { g = (price and price > 0) and floor(price) or nil, m = mats and 1 or nil, t = now, nt = ns.CleanNote(note) }
   publish()
   return true
 end
@@ -315,7 +334,15 @@ end
 function Offers.RenewCrafts(now)
   local c = mine()
   if not c then return nil end
-  for _, o in pairs(c.crafts) do o.t = now end
+  local me = ns.Me()
+  for k, o in pairs(c.crafts) do
+    -- la que quitó un oficial no vuelve al renovar (sí si la ofreces otra vez a mano)
+    if ns.Social and ns.Social.IsOfferRemoved(me .. ":" .. k, o.t) then
+      c.crafts[k] = nil
+    else
+      o.t = now
+    end
+  end
   publish()
   return true
 end
@@ -331,17 +358,20 @@ end
 -- Acciones (devuelven true o nil y un error)
 ---------------------------------------------------------------------------
 -- Ofrecer "q" unidades de un objeto, con precio por unidad (0 o nil = gratis).
-function Offers.Create(id, q, price, now)
+-- note: nil = dejar la que tenía; "" = quitarla.
+function Offers.Create(id, q, price, now, note)
   local c = mine()
   if not c or not ns.G() then return nil, "No estás en una hermandad." end
   id, q = tonumber(id), floor(tonumber(q) or 0)
   if not id or id <= 0 then return nil, "Elige un objeto (arrástralo o mayús+clic en él)." end
   if q < 1 then return nil, "Indica cuántos ofreces." end
+  if ns.IsSoulbound("i" .. id) then return nil, "Ese objeto se liga al recogerlo: no se puede dar a nadie." end
   if not c.offers[id] and Offers.CountMine() >= Offers.MAX_OFFERS then
     return nil, "Ya tienes " .. Offers.MAX_OFFERS .. " ofertas."
   end
   price = tonumber(price)
-  c.offers[id] = { q = min(q, Data.MAX_QTY), g = (price and price > 0) and floor(price) or nil, t = now }
+  if note == nil then note = c.offers[id] and c.offers[id].nt end
+  c.offers[id] = { q = min(q, Data.MAX_QTY), g = (price and price > 0) and floor(price) or nil, t = now, nt = ns.CleanNote(note) }
   publish()
   return true
 end
@@ -414,6 +444,28 @@ function Offers.RegisterMail(recipient, items, now)
   return done
 end
 
+-- «Ya lo he enviado» (a mano): por si no se detectó el correo o el comercio (lo mandó un alt,
+-- se lo dio en mano...). Apunta lo que quedaba de su «lo quiero» como entregado.
+function Offers.MarkSent(who, id, now)
+  local c, g, me = mine(), ns.G(), ns.Me()
+  if not c or not g or not who then return 0 end
+  local o = c.offers[id]
+  local e = g.entries[who]
+  local claim = e and e.cl and e.cl[key(me, id)]
+  if not o or not claim then return 0 end
+  local credit = min(Offers.ClaimLeft(me, who, id, claim, now), o.q)
+  if credit <= 0 then return 0 end
+  c.sent[who] = c.sent[who] or {}
+  local d = c.sent[who][id] or { n = 0 }
+  d.n, d.t = d.n + credit, now
+  c.sent[who][id] = d
+  o.q = o.q - credit
+  if o.q <= 0 then c.offers[id] = nil end
+  ns.Extras.AddStat("offers", 1)
+  publish()
+  return credit
+end
+
 -- Recibido: cuando el que ofrece me ha enviado todo lo que pedí, quito mi "lo quiero",
 -- le apunto el karma (+1 para él, -1 para mí) y aviso.
 function Offers.CheckReceived(now)
@@ -422,7 +474,7 @@ function Offers.CheckReceived(now)
   local changed = false
   for k, claim in pairs(c.claims) do
     local owner, id = Offers.ParseKey(k)
-    local got = owner and (Offers.SentTo(owner, me, id) - (claim.b or 0)) or 0
+    local got = owner and Offers.ClaimGot(owner, me, id, claim) or 0
     if owner and got >= claim.q then
       c.claims[k] = nil
       ns.Extras.AddStat("received", 1)
@@ -432,11 +484,12 @@ function Offers.CheckReceived(now)
       karma.kc = karma.kc or {}
       karma.kc[owner] = (karma.kc[owner] or 0) + Data.KARMA_POINT
       karma.kd = (karma.kd or 0) + Data.KARMA_POINT
+      if ns.History then ns.History.Add("o", "i" .. id, claim.q, owner, now) end
       changed = true
       if ns.Alerts then
         local _, icon = ns.KeyInfo("i" .. id)
         ns.Alerts.Push({ page = "board", icon = icon,
-          text = string.format("%s te ha enviado %dx %s por correo", ns.ShortName(owner), claim.q, ns.KeyLabel("i" .. id)) })
+          text = string.format("%s te ha enviado %dx %s por correo", ns.DisplayName(owner), claim.q, ns.KeyLabel("i" .. id)) })
       end
     end
   end
@@ -457,7 +510,7 @@ function Offers.CheckClaims(name)
       if ns.Alerts then
         local _, icon = ns.KeyInfo("i" .. id)
         ns.Alerts.Push({ page = "board", icon = icon,
-          text = string.format("%s quiere %dx %s de tu oferta", ns.ShortName(name), claim.q, ns.KeyLabel("i" .. id)) })
+          text = string.format("%s quiere %dx %s de tu oferta", ns.DisplayName(name), claim.q, ns.KeyLabel("i" .. id)) })
       end
     end
   end

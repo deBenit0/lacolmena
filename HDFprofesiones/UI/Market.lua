@@ -25,16 +25,15 @@ end
 local CHIPS = {
   { id = "craft", label = "Puedo hacerlo" },
   { id = "new", label = "Nuevos" },
-  { id = "mine", label = "Míos" },
-  { id = "involved", label = "Mis encargos" },
+  { id = "mine", label = "Lo mío" }, -- lo que has puesto tú y en lo que participas
 }
 -- Tipo de objeto (como en la 0.29).
 local TYPES = {
   { id = nil, label = "Todo" },
   { id = "mats", label = "Materiales" },
-  { id = "cons", label = "Pociones y comida" },
+  { id = "cons", label = "Consumibles" },
   { id = "bags", label = "Bolsas" },
-  { id = "gear", label = "Armas y armaduras" },
+  { id = "gear", label = "Equipo" },
   { id = "other", label = "Otros" },
 }
 local ARMOR = {
@@ -54,8 +53,6 @@ local SORTS = {
   { id = "best", label = "Ordenar: lo tuyo primero" },
   { id = "new", label = "Ordenar: nuevos" },
   { id = "rush", label = "Ordenar: prisa" },
-  { id = "tip", label = "Ordenar: propina" },
-  { id = "karma", label = "Ordenar: karma" },
 }
 local PROF_FILTER = { 164, 165, 197, 171, 202, 333, 185, 186, 393, 182 }
 
@@ -87,6 +84,7 @@ local function settings()
   s.market = s.market or {}
   local m = s.market
   m.type, m.armor, m.slot, m.sort = m.type or 1, m.armor or 1, m.slot or 1, m.sort or 1
+  if not SORTS[m.sort] then m.sort = 1 end -- antes había 5 formas de ordenar
   return m
 end
 
@@ -265,7 +263,7 @@ ns.UI.RegisterPage("market", function(page)
     state.showFilters = not state.showFilters
     page:Refresh()
   end)
-  page.filtersButton:SetPoint("TOPLEFT", 4 * 114, -30)
+  page.filtersButton:SetPoint("TOPLEFT", #CHIPS * 114, -30)
   page.sortButton = W.Button(page, "", 184, 22, function()
     local m = settings()
     m.sort = m.sort % #SORTS + 1
@@ -301,7 +299,7 @@ ns.UI.RegisterPage("market", function(page)
         parts[#parts + 1] = by and ("|cff66ccfftu plazo: " .. ns.FormatDuration(math.max(0, by - now)) .. "|r")
           or "|cff66ccffpor enviar|r"
       elseif info.owner then
-        parts[#parts + 1] = "lo hace " .. ns.ShortName(info.owner)
+        parts[#parts + 1] = "lo hace " .. ns.DisplayName(info.owner)
       end
       if info.delivered > 0 and info.delivered < r.q then
         parts[#parts + 1] = string.format("|cff40ff40%d/%d entregadas|r", info.delivered, r.q)
@@ -601,7 +599,7 @@ ns.UI.RegisterPage("market", function(page)
   fbox.rush:SetPoint("LEFT", fbox.tip, "RIGHT", 90, 0)
   fbox.ended = W.Check(fbox, "Terminados", function(on) state.ended = on or nil page:Refresh() end)
   fbox.ended:SetPoint("LEFT", fbox.rush, "RIGHT", 90, 0)
-  fbox.clear = W.Button(fbox, "Quitar filtros", 100, 20, function()
+  fbox.clear = W.Button(fbox, "Quitar filtros", 120, 20, function()
     local m = settings()
     m.type, m.armor, m.slot, m.prof, m.myLevel, m.tip, m.rush = 1, 1, 1, nil, nil, nil, nil
     m.slots = nil
@@ -763,6 +761,7 @@ ns.UI.RegisterPage("market", function(page)
     if needed then lines[#lines + 1] = "|cffbbbbbbHace falta: " .. needed .. "|r" end
     lines[#lines + 1] = "Propina: " .. (payText(r) or "|cffbbbbbbninguna|r")
     lines[#lines + 1] = "Prisa: " .. (r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. "|r") or "sin prisa")
+    if r.nt then lines[#lines + 1] = "Nota: |cffffffff" .. r.nt .. "|r" end
     if info.owner then
       local cm = r.c[info.owner]
       local w = cm.w and Data.WHEN[cm.w]
@@ -776,7 +775,7 @@ ns.UI.RegisterPage("market", function(page)
     local mineCommit = r.c and r.c[me]
     if mineCommit and Data.CommitActive(mineCommit, now, r) then
       lines[#lines + 1] = string.format("|cff40ff40Envíale %d por correo a %s: se completa solo.|r",
-        mineCommit.n - Data.DeliveredOf(mineCommit), ns.ShortName(r.a))
+        mineCommit.n - Data.DeliveredOf(mineCommit), ns.DisplayName(r.a))
     end
     if r.demo then lines[#lines + 1] = "|cffff8040Pedido de ejemplo: acéptalo y pulsa «Enviar (ejemplo)».|r" end
     detail.info:SetText(table.concat(lines, "\n"))
@@ -793,13 +792,15 @@ ns.UI.RegisterPage("market", function(page)
           target = c
         end
       end
-      setButton(detail.b1, "Recibido", active and target ~= nil, function()
+      -- Se le pasó el plazo sin entregar del todo: aún se puede apuntar lo que llegue.
+      if not target and info.late then target = info.late end
+      setButton(detail.b1, "Recibido", (active or info.state == "expired") and target ~= nil, function()
         local left = math.max(1, (target.pending > 0) and target.pending or (r.q - info.delivered))
         local byMail = target.mailed or 0
         local text = byMail > 0
           and string.format("%s ya te ha enviado %d por correo (contado). ¿Cuántos MÁS te ha dado en mano?",
-            ns.ShortName(target.name), byMail)
-          or string.format("¿Cuántos te ha dado %s en mano? (lo del correo se cuenta solo)", ns.ShortName(target.name))
+            ns.DisplayName(target.name), byMail)
+          or string.format("¿Cuántos te ha dado %s en mano? (lo del correo se cuenta solo)", ns.DisplayName(target.name))
         W.AskAmount(text, left, function(n) ns.Sync.ConfirmDelivery(r.id, target.name, n) end)
       end, "Apunta lo que te han dado en mano. Lo del correo se cuenta solo.")
       setButton(detail.b2, "Renovar", active or info.state == "expired", function() ns.Sync.Renew(r.id) end,
@@ -838,13 +839,23 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.x2, isPri and "Quitar prioridad" or "Prioridad", true,
         function() ns.Social.SetPriority(r.id, not isPri, ns.Now()) end, "Solo oficiales: lo pone arriba del todo.")
       setButton(detail.x3, r.a ~= me and "Cerrar (oficial)" or nil, true, function()
-        W.Confirm("¿Cerrar este pedido de " .. ns.ShortName(r.a) .. " como oficial?", function()
+        W.Confirm("¿Cerrar este pedido de " .. ns.DisplayName(r.a) .. " como oficial?", function()
           ns.Social.ModClose(r.id, ns.Now())
         end)
       end)
     else
       setButton(detail.x2, nil)
       setButton(detail.x3, nil)
+    end
+    -- Mi pedido con encargado que no lo envía: quitárselo para que lo coja otro.
+    if r.a == me and active and info.owner then
+      local who = info.owner
+      setButton(detail.x3, "Quitar encargado", true, function()
+        W.Confirm(string.format("¿Quitarle el encargo a %s? Volverá al Mercado para que lo coja otro "
+          .. "(lo que ya te haya enviado se queda contado).", ns.DisplayName(who)), function()
+          ns.Sync.Reject(r.id, who)
+        end)
+      end, "Si no te lo envía, para que lo pueda aceptar otro.")
     end
   end
 
@@ -857,6 +868,7 @@ ns.UI.RegisterPage("market", function(page)
       .. ns.FormatDuration(now - (o.t or now)) .. "|r")
     detail.steps:SetText("Precio: " .. ns.UI.PriceText(o.g) .. "   " .. (expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) or ""))
     local lines = {}
+    if o.nt then lines[#lines + 1] = "Nota: |cffffffff" .. o.nt .. "|r" end
     lines[#lines + 1] = o.free > 0 and string.format("Quedan |cffffffff%d|r libres de %d.", o.free, o.q)
       or "|cffff9933Ya está todo pedido.|r"
     if item.mine then
@@ -871,7 +883,7 @@ ns.UI.RegisterPage("market", function(page)
         lines[#lines + 1] = "|cff999999Nadie lo ha pedido todavía.|r"
       end
     elseif item.claimed then
-      lines[#lines + 1] = string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.ShortName(o.owner))
+      lines[#lines + 1] = string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.DisplayName(o.owner))
     else
       local have = ns.Scan.Have(o.id)
       if have > 0 then lines[#lines + 1] = string.format("|cffbbbbbbTienes %d.|r", have) end
@@ -896,9 +908,35 @@ ns.UI.RegisterPage("market", function(page)
       setButton(detail.b2, "Quitar oferta", true, function()
         W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
       end)
-      setButton(detail.b3, "Editar", true, function()
-        ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g })
-      end, "Cambiar la cantidad o el precio.")
+      if first then
+        setButton(detail.b3, "Ya lo he enviado", true, function()
+          local function mark(cl)
+            local n = ns.Offers.MarkSent(cl.name, o.id, ns.Now())
+            if n > 0 then ns.Print("apuntado: %dx %s entregadas a %s.", n, ns.KeyLabel("i" .. o.id), ns.DisplayName(cl.name)) end
+          end
+          -- lo que se apunta: lo que le falta, sin pasar de lo que queda en la oferta
+          local function amount(cl) return math.min(cl.left or 0, o.q or 0) end
+          if #o.claims == 1 then
+            W.Confirm(string.format("¿Ya le has dado %dx %s a %s? Se apuntará como entregado.", amount(first),
+              ns.KeyName("i" .. o.id), ns.DisplayName(first.name)), function() mark(first) end)
+          else
+            -- La quieren varios: se elige a quién se le ha dado (hasta 4).
+            local labels, shown = {}, {}
+            for i = 1, math.min(4, #o.claims) do
+              local cl = o.claims[i]
+              shown[i] = cl
+              labels[i] = string.format("%s (%d)", ns.DisplayName(cl.name), amount(cl))
+            end
+            W.Choose("¿A quién se lo has dado?", string.format("%s · se apuntará como entregado",
+              ns.KeyName("i" .. o.id)), labels, function(i) if shown[i] then mark(shown[i]) end end)
+          end
+        end, "Si se lo diste sin que el addon lo viera (desde un alt, en mano...). Si lo mandas por correo "
+          .. "desde aquí, se apunta solo.")
+      else
+        setButton(detail.b3, "Editar", true, function()
+          ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g, note = o.nt })
+        end, "Cambiar la cantidad o el precio.")
+      end
     elseif item.claimed then
       setButton(detail.b1, "Ya no lo quiero", true, function() ns.Offers.Unclaim(o.key) end)
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
@@ -919,7 +957,14 @@ ns.UI.RegisterPage("market", function(page)
     end
     setButton(detail.x1, nil)
     setButton(detail.x2, nil)
-    setButton(detail.x3, nil)
+    if not item.mine and ns.Social.AmOfficer() then
+      setButton(detail.x3, "Quitar (oficial)", true, function()
+        W.Confirm("¿Quitar esta oferta de " .. ns.DisplayName(o.owner) .. " como oficial? Desaparecerá del Mercado de todos.",
+          function() ns.Social.ModRemoveOffer(o.key, ns.Now()) end)
+      end, "Solo oficiales.")
+    else
+      setButton(detail.x3, nil)
+    end
   end
 
   -- Ofrecen fabricarlo (una fila con todos los que lo ofrecen).
@@ -936,6 +981,7 @@ ns.UI.RegisterPage("market", function(page)
     for i = 1, math.min(2, n) do
       local c = grp.crafters[i]
       local who = c.name == me and "|cffffd100Tú|r" or ns.WhoColored(c.name)
+      if c.nt then lines[#lines + 1] = string.format("%s dice: |cffffffff%s|r", who, c.nt) end
       lines[#lines + 1] = string.format("%s: %s · %s", who, ns.UI.PriceText(c.g),
         c.m and "pone los materiales" or "|cffbbbbbbmateriales de quien lo pide|r")
     end
@@ -970,7 +1016,7 @@ ns.UI.RegisterPage("market", function(page)
         local kind, id = ns.ParseKey(item.k)
         local o = ns.Offers.MyCrafts()[item.k]
         if kind == "i" and o then
-          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1 })
+          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1, note = o.nt })
         else
           ns.UI.OpenAsk("craft")
         end
@@ -981,12 +1027,30 @@ ns.UI.RegisterPage("market", function(page)
       end)
       local first = grp.crafters[1]
       setButton(detail.b2, "Susurrar", true, function() ns.SendTell(first.name) end,
-        "Susurrar a " .. ns.ShortName(first.name) .. ".")
+        "Susurrar a " .. ns.DisplayName(first.name) .. ".")
       setButton(detail.b3, nil)
     end
     setButton(detail.x1, nil)
     setButton(detail.x2, nil)
-    setButton(detail.x3, nil)
+    -- Oficial: quitar lo que ofrece otro (si lo ofrecen varios, se elige quién).
+    local others = {}
+    for _, c in ipairs(grp.crafters) do if c.name ~= me then others[#others + 1] = c end end
+    if #others > 0 and ns.Social.AmOfficer() then
+      setButton(detail.x3, "Quitar (oficial)", true, function()
+        local function remove(c) ns.Social.ModRemoveOffer(c.name .. ":" .. item.k, ns.Now()) end
+        if #others == 1 then
+          W.Confirm("¿Quitar la oferta de " .. ns.DisplayName(others[1].name) .. " como oficial? Desaparecerá del Mercado de todos.",
+            function() remove(others[1]) end)
+        else
+          local labels = {}
+          for i = 1, math.min(4, #others) do labels[i] = ns.DisplayName(others[i].name) end
+          W.Choose("¿De quién quitas la oferta?", "Como oficial: desaparecerá del Mercado de todos.", labels,
+            function(i) if others[i] then remove(others[i]) end end)
+        end
+      end, "Solo oficiales.")
+    else
+      setButton(detail.x3, nil)
+    end
   end
 
   -- Pedido de la hermandad (aportan varios).
@@ -1089,8 +1153,7 @@ ns.UI.RegisterPage("market", function(page)
   local function chipMatch(chip, item)
     if chip == "craft" then return item.canServe or item.pending > 0 end
     if chip == "new" then return item.new end
-    if chip == "mine" then return item.mine end
-    if chip == "involved" then return item.pending > 0 or (item.claimed == true) end
+    if chip == "mine" then return item.mine or item.pending > 0 or item.claimed == true end
     return true
   end
 
@@ -1121,7 +1184,7 @@ ns.UI.RegisterPage("market", function(page)
     if m.tip and not (item.r and (item.r.g or item.r.pi)) then return false end
     if m.rush and not (item.r and item.r.pr) then return false end
     if state.search ~= "" then
-      local text = (ns.KeyName(item.k) .. " " .. ns.ShortName(item.author)):lower()
+      local text = (ns.KeyName(item.k) .. " " .. ns.DisplayName(item.author)):lower()
       if not text:find(state.search, 1, true) then return false end
     end
     return true
@@ -1137,11 +1200,6 @@ ns.UI.RegisterPage("market", function(page)
       elseif sort == "rush" then
         local ra, rb = a.r and a.r.pr or 9, b.r and b.r.pr or 9
         if ra ~= rb then return ra < rb end
-      elseif sort == "tip" then
-        local ta, tb = a.r and a.r.g or 0, b.r and b.r.g or 0
-        if ta ~= tb then return ta > tb end
-      elseif sort == "karma" then
-        if a.karma ~= b.karma then return a.karma > b.karma end
       else
         local ra, rb = ns.UI.MarketRank(a), ns.UI.MarketRank(b)
         if ra ~= rb then return ra < rb end
@@ -1289,13 +1347,11 @@ ns.UI.RegisterPage("market", function(page)
         text, button, fn = "No hay nada en el Mercado ahora mismo.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
       elseif state.chip == "craft" then
         text, button, fn = "Nadie pide nada que puedas hacer.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
-      elseif state.chip == "involved" then
-        text, button, fn = "No tienes encargos pendientes.", "Ver lo que puedo hacer", function() page:SetChip("craft") end
       elseif state.chip == "mine" then
         if state.side == "offer" then
-          text, button, fn = "No estás ofreciendo nada.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
+          text, button, fn = "No estás ofreciendo nada ni has cogido ofertas.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
         else
-          text, button, fn = "No tienes pedidos abiertos.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
+          text, button, fn = "No tienes pedidos abiertos ni encargos pendientes.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
         end
       elseif state.side == "offer" then
         text, button, fn = "Nadie ofrece nada con estos filtros.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
@@ -1392,6 +1448,7 @@ ns.UI.RegisterPage("market", function(page)
 
   -- Abre con un filtro rápido puesto (desde Inicio o los avisos).
   function page:SetChip(chip, side)
+    if chip == "involved" then chip = "mine" end -- «Mis encargos» ahora va dentro de «Lo mío»
     state.chip = chip
     state.selected = nil
     if side then

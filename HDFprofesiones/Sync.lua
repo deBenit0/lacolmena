@@ -256,7 +256,7 @@ function Sync.NotePeerVersion(sender, av)
   elseif versionNumber(av) < versionNumber(ns.VERSION) and not Sync.oldWarned[sender] then
     Sync.oldWarned[sender] = true
     ns.Print("%s tiene una versión antigua del addon (%s; la tuya es la %s): puede que no vea tus pedidos. Dile que lo actualice.",
-      ns.ShortName(sender), av, ns.VERSION)
+      ns.DisplayName(sender), av, ns.VERSION)
   end
 end
 
@@ -264,7 +264,7 @@ end
 function Sync.OtherVersions()
   local out = {}
   for name, av in pairs(Sync.peers) do
-    if av ~= ns.VERSION then out[#out + 1] = string.format("%s (%s)", ns.ShortName(name), av) end
+    if av ~= ns.VERSION then out[#out + 1] = string.format("%s (%s)", ns.DisplayName(name), av) end
   end
   table.sort(out)
   return out
@@ -299,8 +299,11 @@ Comm.Register("H", function(sender, payload)
     if theirE[me] then
       Sync.ownSeen = true
     elseif not Sync.ownSeen then
-      Sync.waitingOwn = nil
-      ns.After(0.5, Sync.PublishMine)
+      Sync.ownMissing = (Sync.ownMissing or 0) + 1
+      if Sync.ownMissing >= 3 then
+        Sync.waitingOwn = nil
+        ns.After(0.5, Sync.PublishMine)
+      end
     end
   end
   -- Lo que tengo y le falta (o tiene más antiguo): se lo envío.
@@ -326,7 +329,7 @@ Comm.Register("H", function(sender, payload)
   for id in pairs(theirR) do
     -- las copias con el nombre mal escrito no se piden si ya tengo el pedido de verdad
     local cid = Data.CanonicalRequestId(id)
-    if not g.requests[id] and not g.requests[cid] and not (cid ~= id and g.gone and g.gone[cid]) then
+    if not g.requests[id] and not g.requests[cid] and not (g.gone and (g.gone[id] or g.gone[cid])) then
       want.r[id] = true
     end
   end
@@ -337,8 +340,10 @@ Comm.Register("H", function(sender, payload)
       if type(k) == "string" and type(v) == "string" then theirM[expand(k, realm)] = v end
     end
   end
+  local knowsLeveling = versionNumber(d.av) >= versionNumber("0.34.0")
   for id, run in pairs(ns.Dungeons.Runs() or {}) do
-    if not run.demo and theirM[id] ~= ns.Dungeons.Hash(run) then
+    if not run.demo and theirM[id] ~= ns.Dungeons.Hash(run)
+      and (knowsLeveling or not ns.Dungeons.IsLeveling(run)) then
       schedule("M", id, run.a == me and rand(0.2, 1) or rand(2, 8))
     end
   end
@@ -457,6 +462,9 @@ Comm.Register("Q", function(sender, payload)
     if gone and gone[copy.id] then return end -- el de verdad ya terminó: la copia no lo resucita
     r = copy
   end
+  -- Nadie tiene más de 10 pedidos abiertos: si llegan muchos más de alguien, se ignoran (así no
+  -- se puede llenar el archivo de guardado de los demás con pedidos inventados).
+  if not ns.G().requests[r.id] and Data.CountOpenBy(r.a, ns.Now()) >= Data.MAX_OPEN * 2 then return end
   local changed, old, merged, behind = Data.ApplyRequest(r, ns.Now())
   if behind then
     schedule("Q", r.id, rand(1.5, 5)) -- teníamos algo que la recibida no tenía
@@ -481,6 +489,12 @@ Comm.Register("M", function(sender, payload)
   if Data.FromFuture(run, ns.Now()) then return end
   markInflight("M:" .. run.id, nil, ns.Dungeons.Hash(run))
   want.m[run.id] = nil
+  local runsNow = ns.Dungeons.Runs() or {}
+  if not runsNow[run.id] then
+    local n = 0
+    for _, other in pairs(runsNow) do if other.a == run.a then n = n + 1 end end
+    if n >= 10 then return end -- nadie organiza tantos grupos a la vez
+  end
   local changed, old, merged, behind = ns.Dungeons.Apply(run, ns.Now())
   if behind then
     schedule("M", run.id, rand(1.5, 5))
@@ -503,7 +517,7 @@ end
 
 Comm.Register("R", function(sender, payload)
   local ik = Codec.Deserialize(payload)
-  if type(ik) ~= "string" then return end
+  if type(ik) ~= "string" or #ik > 40 then return end
   infoAsked[ik] = GetTime() -- otro ya lo ha pedido: no repetirlo
   local info = Data.GetInfo(ik)
   if info and info.v and #info.v > 0 then schedule("I", ik, rand(0.3, 2.5)) end
@@ -565,6 +579,10 @@ end
 
 function Sync.Release(id)
   return afterRequestAction(Data.Release(id, ns.Now()))
+end
+
+function Sync.Reject(id, crafter)
+  return afterRequestAction(Data.Reject(id, crafter, ns.Now()))
 end
 
 function Sync.ConfirmDelivery(id, crafter, amount)
@@ -644,7 +662,7 @@ function Sync.Start()
   -- hermandad: si publicase ya una nueva y vacía, pisaría la buena (karma, ofertas...).
   local g = ns.G()
   if g and not g.entries[ns.Me()] then
-    Sync.waitingOwn, Sync.ownSeen = true, nil
+    Sync.waitingOwn, Sync.ownSeen, Sync.ownMissing = true, nil, 0
     local tries = 0
     local function giveUp()
       if not Sync.waitingOwn then return end
@@ -665,7 +683,7 @@ function Sync.Start()
   ns.After(45, function()
     local list = Data.ServableRequests(ns.Now())
     if #list > 0 then
-      ns.Print("hay %d %s que puedes hacer. Míralas en la ventana de hermandad (J), pestaña del addon.",
+      ns.Print("hay %d %s que puedes hacer. Míralas en el addon (pulsa la J).",
         #list, #list == 1 and "petición" or "peticiones")
       ns.Fire("DATA_CHANGED", "summary")
     end

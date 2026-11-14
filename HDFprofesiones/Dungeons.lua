@@ -48,15 +48,29 @@ function Dungeons.RoleFromTalents(class, points)
 end
 
 -- Rol válido (1 tanque, 2 sanador, 4 DPS) o nil.
+-- Rol de un personaje: uno o varios a la vez (suma de 1 tanque, 2 sanador y 4 DPS: de 1 a 7).
 function Dungeons.CleanRole(role)
   role = tonumber(role)
-  if role == 1 or role == 2 or role == 4 then return role end
+  if role and role >= 1 and role <= 7 and role % 1 == 0 then return role end
   return nil
+end
+
+function Dungeons.HasRole(mask, bit)
+  mask = tonumber(mask)
+  return mask ~= nil and math.floor(mask / bit) % 2 == 1
 end
 
 function Dungeons.RoleLabel(role, plural)
   for _, r in ipairs(Dungeons.ROLES) do
     if r.bit == role then return plural and r.plural or r.label end
+  end
+  -- varios a la vez: «Tanque/DPS»
+  if Dungeons.CleanRole(role) then
+    local parts = {}
+    for _, r in ipairs(Dungeons.ROLES) do
+      if Dungeons.HasRole(role, r.bit) then parts[#parts + 1] = r.label end
+    end
+    return table.concat(parts, "/")
   end
   return nil
 end
@@ -75,9 +89,18 @@ function Dungeons.RoleCounts(entries, roster)
     seen[name] = true
     if (tonumber(level) or 0) < Dungeons.ROLE_MIN_LEVEL then return end
     role = Dungeons.CleanRole(role) or (Dungeons.CLASS_ROLES[class] == Dungeons.DPS and Dungeons.DPS) or nil
-    local key = role or "unknown"
-    out[key] = out[key] + 1
-    table.insert(out.names[key], name)
+    if not role then
+      out.unknown = out.unknown + 1
+      table.insert(out.names.unknown, name)
+      return
+    end
+    -- con varios roles, cuenta en cada uno
+    for _, r in ipairs(Dungeons.ROLES) do
+      if Dungeons.HasRole(role, r.bit) then
+        out[r.bit] = out[r.bit] + 1
+        table.insert(out.names[r.bit], name)
+      end
+    end
   end
   for name, e in pairs(entries or {}) do
     local r = roster and roster[name]
@@ -120,8 +143,75 @@ Dungeons.LIST = {
   { id = 19, name = "Scholomance", min = 58, max = 60 },
   { id = 109, name = "Terraza del Modelador", min = 58, max = 60, new = true },
 }
+-- Grupos de leveo: hacer misiones juntos en una zona. Mismo sistema que las mazmorras, pero sin
+-- reparto de roles: el grupo son los 5 primeros en apuntarse. Números desde 1001 (fijos).
+Dungeons.ZONES = {
+  { id = 1001, map = 1429, name = "Bosque de Elwynn", min = 1, max = 10, side = "Alliance" },
+  { id = 1002, map = 1426, name = "Dun Morogh", min = 1, max = 10, side = "Alliance" },
+  { id = 1003, map = 1438, name = "Teldrassil", min = 1, max = 10, side = "Alliance" },
+  { id = 1004, map = 1411, name = "Durotar", min = 1, max = 10, side = "Horde" },
+  { id = 1005, map = 1412, name = "Mulgore", min = 1, max = 10, side = "Horde" },
+  { id = 1006, map = 1420, name = "Claros de Tirisfal", min = 1, max = 10, side = "Horde" },
+  { id = 1007, map = 1436, name = "Páramos de Poniente", min = 10, max = 20, side = "Alliance" },
+  { id = 1008, map = 1432, name = "Loch Modan", min = 10, max = 20, side = "Alliance" },
+  { id = 1009, map = 1439, name = "Costa Oscura", min = 10, max = 20, side = "Alliance" },
+  { id = 1010, map = 1413, name = "Los Baldíos", min = 10, max = 25, side = "Horde" },
+  { id = 1011, map = 1421, name = "Bosque de Argénteos", min = 10, max = 20, side = "Horde" },
+  { id = 1012, map = 1433, name = "Montañas Crestagrana", min = 15, max = 25, side = "Alliance" },
+  { id = 1013, map = 1442, name = "Sierra Espolón", min = 15, max = 27 },
+  { id = 1014, map = 1440, name = "Vallefresno", min = 18, max = 30 },
+  { id = 1015, map = 1431, name = "Bosque del Ocaso", min = 18, max = 30 },
+  { id = 1016, map = 1437, name = "Los Humedales", min = 20, max = 30 },
+  { id = 1017, map = 1424, name = "Laderas de Trabalomas", min = 20, max = 30 },
+  { id = 1018, map = 1441, name = "Las Mil Agujas", min = 25, max = 35 },
+  { id = 1019, map = 1416, name = "Montañas de Alterac", min = 30, max = 40 },
+  { id = 1020, map = 1417, name = "Tierras Altas de Arathi", min = 30, max = 40 },
+  { id = 1021, map = 1443, name = "Desolace", min = 30, max = 40 },
+  { id = 1022, map = 1434, name = "Vega de Tuercespina", min = 30, max = 45 },
+  { id = 1023, map = 1445, name = "Marjal Revolcafango", min = 35, max = 45 },
+  { id = 1024, map = 1418, name = "Tierras Inhóspitas", min = 35, max = 45 },
+  { id = 1025, map = 1435, name = "Pantano de las Penas", min = 35, max = 45 },
+  { id = 1026, map = 1444, name = "Feralas", min = 40, max = 50 },
+  { id = 1027, map = 1425, name = "Tierras del Interior", min = 40, max = 50 },
+  { id = 1028, map = 1446, name = "Tanaris", min = 40, max = 50 },
+  { id = 1029, map = 1427, name = "La Garganta de Fuego", min = 43, max = 50 },
+  { id = 1030, map = 1447, name = "Azshara", min = 45, max = 55 },
+  { id = 1031, map = 1419, name = "Las Tierras Devastadas", min = 45, max = 55 },
+  { id = 1032, map = 1449, name = "Cráter de Un'Goro", min = 48, max = 55 },
+  { id = 1033, map = 1448, name = "Frondavil", min = 48, max = 55 },
+  { id = 1034, map = 1428, name = "Las Estepas Ardientes", min = 50, max = 58 },
+  { id = 1035, map = 1422, name = "Tierras de la Peste del Oeste", min = 51, max = 58 },
+  { id = 1036, map = 1423, name = "Tierras de la Peste del Este", min = 53, max = 60 },
+  { id = 1037, map = 1452, name = "Cuna del Invierno", min = 55, max = 60 },
+  { id = 1038, map = 1451, name = "Silithus", min = 55, max = 60 },
+}
+for _, z in ipairs(Dungeons.ZONES) do z.zone = true end
+Dungeons.LEVELING_SIZE = 5
+
 Dungeons.BY_ID = {}
 for _, dg in ipairs(Dungeons.LIST) do Dungeons.BY_ID[dg.id] = dg end
+for _, z in ipairs(Dungeons.ZONES) do Dungeons.BY_ID[z.id] = z end
+
+-- ¿Es un grupo de leveo (zona) y no una mazmorra?
+function Dungeons.IsLeveling(r)
+  local dg = r and Dungeons.BY_ID[r.d]
+  return dg ~= nil and dg.zone == true
+end
+
+-- La zona que va mejor con mi nivel.
+function Dungeons.RecommendedZone(level)
+  level = level or 1
+  local side = UnitFactionGroup and UnitFactionGroup("player")
+  local best, bestScore
+  for _, z in ipairs(Dungeons.ZONES) do
+    -- las de inicio del otro bando, no
+    if not (z.side and side and z.side ~= side) then
+      local score = (level < z.min and (z.min - level) * 2) or (level > z.max and (level - z.max)) or 0
+      if not best or score < bestScore then best, bestScore = z, score end
+    end
+  end
+  return best.id
+end
 
 -- Un icono del juego distinto para cada mazmorra (la llave si no tiene).
 Dungeons.KEY_ICON = "Interface\\Icons\\INV_Misc_Key_03"
@@ -138,6 +228,7 @@ local ICONS = {
   [109] = "Spell_Arcane_StarFire",
 }
 function Dungeons.Icon(d)
+  if d and d >= 1001 then return "Interface\\Icons\\INV_Misc_Map_01" end
   local name = ICONS[d]
   return name and ("Interface\\Icons\\" .. name) or Dungeons.KEY_ICON
 end
@@ -259,21 +350,23 @@ function Dungeons.Sanitize(r)
   if tonumber(r.x) then out.x = tonumber(r.x) end
   if type(r.gp) == "table" then
     local gp = {}
-    if type(r.gp.t) == "string" then gp.t = r.gp.t end
-    if type(r.gp.h) == "string" then gp.h = r.gp.h end
+    gp.t = ns.CleanText(r.gp.t, 80)
+    gp.h = ns.CleanText(r.gp.h, 80)
     gp.d = nameList(r.gp.d, 3)
     gp.b = nameList(r.gp.b, 40)
     out.gp = gp
   end
   if type(r.s) == "table" then
-    local s, any = {}, false
+    local s, any, count = {}, false, 0
     for name, su in pairs(r.s) do
-      if type(name) == "string" and type(su) == "table" then
+      count = count + 1
+      if count > 40 then break end -- nunca hay más de 40 apuntados
+      if type(name) == "string" and #name <= 80 and not name:find("|", 1, true) and type(su) == "table" then
         local o = {}
         local mask = tonumber(su.r)
         if mask and mask >= 0 and mask <= 7 then o.r = floor(mask) end
         if tonumber(su.l) then o.l = floor(tonumber(su.l)) end
-        if type(su.c) == "string" then o.c = su.c end
+        o.c = ns.CleanText(su.c, 20)
         if tonumber(su.st) then o.st = tonumber(su.st) end
         if su.o == true then o.o = true end
         if tonumber(su.sv) then o.sv = tonumber(su.sv) end
@@ -371,6 +464,25 @@ end
 -- prefer = { [nombre] = 1 (delante de todos) o 3 (detrás de todos) } (para "Rehacer grupo").
 function Dungeons.Pick(r, prefer)
   local list = Dungeons.SignUps(r)
+  if Dungeons.IsLeveling(r) then
+    -- Grupo de leveo: sin roles, los primeros en apuntarse (quien lo propone delante).
+    table.sort(list, function(a, b)
+      local pa, pb = prefer and prefer[a.name] or 2, prefer and prefer[b.name] or 2
+      if pa ~= pb then return pa < pb end
+      if (a.name == r.a) ~= (b.name == r.a) then return a.name == r.a end
+      return (a.st or 0) < (b.st or 0)
+    end)
+    local gp = { d = {}, b = {} }
+    for i, su in ipairs(list) do
+      if i == 1 then gp.t = su.name
+      elseif i == 2 then gp.h = su.name
+      elseif i <= Dungeons.LEVELING_SIZE then gp.d[#gp.d + 1] = su.name
+      else gp.b[#gp.b + 1] = su.name end
+    end
+    if #gp.d == 0 then gp.d = nil end
+    if #gp.b == 0 then gp.b = nil end
+    return gp
+  end
   if prefer and next(prefer) then
     local groups = { {}, {}, {} }
     for _, su in ipairs(list) do
@@ -439,6 +551,13 @@ function Dungeons.MyPlace(r, name)
   local gp = r and r.gp
   if not gp then return nil end
   name = name or ns.Me()
+  if Dungeons.IsLeveling(r) then
+    -- en los de leveo no hay papeles: o vas en el grupo o de suplente
+    if gp.t == name or gp.h == name then return "en el grupo" end
+    for _, n in ipairs(gp.d or {}) do if n == name then return "en el grupo" end end
+    for _, n in ipairs(gp.b or {}) do if n == name then return "suplente" end end
+    return nil
+  end
   if gp.t == name then return "tanque" end
   if gp.h == name then return "sanador" end
   for _, n in ipairs(gp.d or {}) do if n == name then return "DPS" end end
@@ -606,6 +725,8 @@ local function inviteCandidates(full)
       list[#list + 1] = n
     end
   end
+  -- Con apellido (WoW Forever) primero el nombre completo; si no, el corto.
+  if ns.TellName then add(ns.TellName(full)) end
   add(short)
   local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(full)
   if info and info.raw then add(info.raw) end
@@ -681,3 +802,99 @@ function Dungeons.Purge(now)
     end
   end
 end
+
+---------------------------------------------------------------------------
+-- Grupos de leveo automáticos: si vas en grupo con alguien más de la hermandad por una zona de
+-- leveo, el jefe del grupo lo publica solo en Grupos (para que se pueda unir quien ande cerca) y
+-- los demás de la hermandad que van en ese grupo se apuntan solos. Si el grupo se deshace o
+-- cambiáis de zona, se cancela (o se cambia de zona).
+---------------------------------------------------------------------------
+-- La zona de leveo en la que estoy (o nil).
+function Dungeons.CurrentZone()
+  if IsInInstance then
+    local inside = IsInInstance()
+    if inside then return nil end
+  end
+  local mapId = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local name = GetRealZoneText and GetRealZoneText()
+  for _, z in ipairs(Dungeons.ZONES) do
+    if (mapId and z.map == mapId) or (name and name == z.name) then return z.id end
+  end
+end
+
+-- Los de la hermandad que van en mi grupo (sin contarme).
+local function guildmatesInParty()
+  local out = {}
+  if not UnitName then return out end
+  for i = 1, 4 do
+    local name = UnitName("party" .. i)
+    if name and name ~= UNKNOWNOBJECT then
+      local _, full = ns.Guild.Find(ns.FullName(name))
+      if full then out[full] = true end
+    end
+  end
+  return out
+end
+
+local function amLeader()
+  if UnitIsGroupLeader then return UnitIsGroupLeader("player") end
+  return IsPartyLeader and IsPartyLeader() or false
+end
+
+function Dungeons.CheckAutoLeveling()
+  local c, g = ns.MyChar(), ns.G()
+  if not c or not g or not ns.Sync then return end
+  local now, me = ns.Now(), ns.Me()
+  local list = runs()
+  local mates = guildmatesInParty()
+  local zone = Dungeons.CurrentZone()
+  local together = next(mates) ~= nil and zone ~= nil
+  -- El mío (si soy el jefe): publicarlo, o cancelarlo con margen. No se cancela al momento: al
+  -- entrar (la lista aún no ha cargado), al cruzar a otra zona, al entrar en una ciudad o una
+  -- mazmorra... se espera; así no salen avisos a toda la hermandad cada dos por tres.
+  local mine = c.autoRun and list and list[c.autoRun]
+  if mine and (mine.x or Dungeons.State(mine, now) ~= "open") then mine, c.autoRun = nil, nil end
+  local auto = Dungeons.auto or {}
+  Dungeons.auto = auto
+  if mine then
+    local lost = next(mates) == nil or not amLeader()
+    auto.lostSince = lost and (auto.lostSince or now) or nil
+    -- otra zona de leveo (no una ciudad ni una mazmorra) durante un buen rato
+    local moved = zone ~= nil and zone ~= mine.d
+    auto.movedSince = moved and (auto.movedSince or now) or nil
+    if (auto.lostSince and now - auto.lostSince >= Dungeons.AUTO_LOST)
+      or (auto.movedSince and now - auto.movedSince >= Dungeons.AUTO_MOVED) then
+      ns.Sync.CancelRun(mine.id)
+      mine, c.autoRun, auto.lostSince, auto.movedSince = nil, nil, nil, nil
+    end
+  else
+    auto.lostSince, auto.movedSince = nil, nil
+  end
+  if together and amLeader() and not mine then
+    local allowed = Dungeons.RolesFor(Dungeons.MyClass())
+    local r = ns.Sync.CreateRun({ d = zone, roles = allowed > 0 and allowed or Dungeons.DPS })
+    if r then c.autoRun = r.id end
+  end
+  -- Los de los demás: si el jefe de mi grupo ha publicado uno en esta zona, me apunto.
+  if together and list then
+    for id, r in pairs(list) do
+      local su = r.s and r.s[me]
+      -- solo si nunca me he apuntado (si me desapunté, no me vuelve a meter) y es para ahora
+      if mates[r.a] and r.d == zone and not r.x and Dungeons.State(r, now) == "open" and not su
+        and Dungeons.IsLeveling(r) and (r.at or 0) <= now + 600 then
+        local allowed = Dungeons.RolesFor(Dungeons.MyClass())
+        ns.Sync.SignUpRun(id, allowed > 0 and allowed or Dungeons.DPS)
+      end
+    end
+  end
+end
+
+Dungeons.AUTO_LOST = 120   -- sin nadie de la hermandad en el grupo (o sin ser jefe): se cancela a los 2 min
+Dungeons.AUTO_MOVED = 600  -- en otra zona de leveo: se cambia a los 10 min
+local function scheduleAuto() ns.Coalesce("autoLeveling", 3, Dungeons.CheckAutoLeveling) end
+ns.On("GROUP_ROSTER_UPDATE", scheduleAuto)
+ns.On("PARTY_MEMBERS_CHANGED", scheduleAuto)
+ns.On("ZONE_CHANGED_NEW_AREA", scheduleAuto)
+ns.Listen("LOGIN", function()
+  if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(60, function() ns.SafeCall(Dungeons.CheckAutoLeveling) end) end
+end)

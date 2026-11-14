@@ -68,7 +68,7 @@ function Extras.CheckLearned()
         for _, who in ipairs(e.askers) do if who == me then mine = true end end
         if mine and ns.Alerts then
           local rec = Data.GetIndex()[key]
-          local who = rec and rec.crafters[1] and ns.ShortName(rec.crafters[1].n) or "Alguien"
+          local who = rec and rec.crafters[1] and ns.DisplayName(rec.crafters[1].n) or "Alguien"
           local _, icon = ns.KeyInfo(key)
           ns.Alerts.Push({ page = "board", icon = icon,
             text = string.format("%s ya sabe hacer %s (lo pediste)", who, ns.KeyLabel(key)) })
@@ -110,20 +110,22 @@ function Extras.AnnounceText(kind, obj)
   end
   if kind == "request" then
     local text = tag .. "Pido " .. itemText(obj.k, obj.q)
-    if obj.g then text = text .. " (propina " .. math.floor(obj.g / 10000) .. " oro)" end
+    if obj.g then text = text .. " (propina " .. ns.MoneyWords(obj.g) .. ")" end
+    if obj.nt then text = text .. " - " .. obj.nt end
     return text .. ". ¿Quién puede hacerlo? Susurradme."
   elseif kind == "offer" then
     local text = tag .. "Ofrezco " .. itemText("i" .. obj.id, obj.free or obj.q)
-    text = text .. ((obj.g and obj.g > 0) and (" a " .. math.floor(obj.g / 10000) .. " oro c/u") or " gratis")
+    text = text .. ((obj.g and obj.g > 0) and (" a " .. ns.MoneyWords(obj.g) .. " c/u") or " gratis")
+    if obj.nt then text = text .. " - " .. obj.nt end
     return text .. ". Susurradme si lo queréis."
   elseif kind == "need" then
     return tag .. "La hermandad necesita " .. itemText("i" .. obj.id, obj.left or obj.q)
-      .. ". Si podéis aportar, mandádselo a " .. ns.ShortName(obj.owner) .. "."
+      .. ". Si podéis aportar, mandádselo a " .. ns.DisplayName(obj.owner) .. "."
   elseif kind == "run" then
     local D, now = ns.Dungeons, ns.Now()
     local when = obj.at <= now + 120 and "ahora" or (D.DayText(obj.at, now) .. " a las " .. D.Clock(obj.at))
     return tag .. "Quedada: " .. D.Dungeon(obj.d).name .. " (" .. D.LevelText(obj.d) .. "), " .. when
-      .. ". Apuntaos en la Agenda del addon o susurradme."
+      .. ". Apuntaos en Grupos del addon o susurradme."
   end
 end
 

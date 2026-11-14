@@ -11,7 +11,7 @@ local HELP = {
   { "Mercado", "Lo que se busca y lo que se ofrece. Pulsa una fila para ver el detalle: quién lo fabrica, "
     .. "aceptar el encargo, susurrar o preparar el correo. Al enviarlo por correo se completa solo." },
   { "+ Pedir y + Ofrecer", "Elige un objeto del catálogo o arrástralo desde tus bolsas al botón." },
-  { "Agenda", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
+  { "Grupos", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
     .. "y «Hacer grupo» elige 1 tanque, 1 sanador y 3 de daño." },
   { "Hermandad", "Miembro de la semana, karma, quién fabrica qué y, para oficiales, anuncios y pedidos de la hermandad." },
   { "Karma", "+1 por cada pedido u oferta que das y -1 por cada uno que recibes (tus alts suman contigo)." },
@@ -148,7 +148,7 @@ ns.UI.RegisterPage("home", function(page)
       local plazo = left and (left > 0 and ("quedan " .. ns.FormatDuration(left)) or "|cffff4040se acaba|r") or ""
       local _, icon = ns.KeyInfo(it.r.k)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999para %s · %s|r", it.n, ns.KeyLabel(it.r.k),
-        ns.ShortName(it.r.a), plazo) }
+        ns.DisplayName(it.r.a), plazo) }
     end
     page.cards.commits:Fill(#items, lines, "Nadie te ha encargado nada.\nMira lo que puedes hacer.",
       #items > 0 and "Mis encargos" or "Lo que puedo hacer",
@@ -164,7 +164,7 @@ ns.UI.RegisterPage("home", function(page)
     table.sort(mine, function(a, b) return (a.r.t or 0) > (b.r.t or 0) end)
     local lines = {}
     for _, it in ipairs(mine) do
-      local who = it.info.owner and ("lo hace " .. ns.ShortName(it.info.owner)) or "nadie lo ha cogido"
+      local who = it.info.owner and ("lo hace " .. ns.DisplayName(it.info.owner)) or "nadie lo ha cogido"
       local _, icon = ns.KeyInfo(it.r.k)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999%s|r", it.r.q, ns.KeyLabel(it.r.k), who) }
     end
@@ -186,12 +186,12 @@ ns.UI.RegisterPage("home", function(page)
     for _, r in ipairs(runs) do
       local when = r.at <= now + 120 and "ahora" or (D.DayText(r.at, now) .. " " .. D.Clock(r.at))
       local place = D.MyPlace(r)
-      local extra = place and ("vas de " .. place) or (r.gp and "grupo hecho" or (#D.SignUps(r) .. " apuntados"))
+      local extra = place and ("vas " .. (place == "en el grupo" and "" or "de ") .. place) or (r.gp and "grupo hecho" or (#D.SignUps(r) .. " apuntados"))
       lines[#lines + 1] = { D.Icon(r.d),
         string.format("%s\n|cff999999%s · %s|r", D.Dungeon(r.d).name, when, extra) }
     end
     page.cards.runs:Fill(#runs, lines, "No hay quedadas.\nPropón una.",
-      #runs > 0 and "Ver quedadas" or "+ Proponer quedada",
+      #runs > 0 and "Ver grupos" or "+ Hacer grupo",
       function()
         local f = ns.UI.Open("dungeons")
         if #runs > 0 then
@@ -209,7 +209,7 @@ ns.UI.RegisterPage("home", function(page)
     page.status:SetShown(inGuild)
     page.goMarket:SetShown(inGuild)
     local an = inGuild and ns.Social.Announcement()
-    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.ShortName(an.name), an.x) or "")
+    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.DisplayName(an.name), an.x) or "")
     if not inGuild then return end
 
     local g, me, now = ns.G(), ns.Me(), ns.Now()

@@ -13,13 +13,13 @@ function ns.UI.ContributeNeed(item)
         ns.Mail.PrepareNeed(item.owner, item.id, n)
       else
         ns.Print("mándale %dx %s por correo a %s: la aportación se apunta sola al enviarlo.",
-          n, ns.KeyLabel("i" .. item.id), ns.ShortName(item.owner))
+          n, ns.KeyLabel("i" .. item.id), ns.DisplayName(item.owner))
       end
     end)
 end
 
 -- Profesiones que salen en «Quién fabrica qué», en este orden.
-local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182, 755, 773, 40 }
+local WHO_PROFS = { 164, 165, 197, 171, 202, 333, 185, 129, 186, 393, 182 }
 
 -- Todos los de la hermandad con una profesión, con su nivel (de más a menos) o, con byKarma, por
 -- el karma de la persona (su principal) y luego por nivel.
@@ -98,7 +98,85 @@ local function karmaRanking()
   return out
 end
 
+-- Ventana para elegir el rol (o los roles) de este personaje. Con "force" no se puede cerrar
+-- sin elegir: sale la primera vez que se abre la Hermandad.
+local rolesFrame
+function ns.UI.ChooseRoles(force)
+  local D = ns.Dungeons
+  local c = ns.MyChar()
+  if not c then return end
+  if not rolesFrame then
+    local f = W.Panel("HDFProfRoles", UIParent, 380, 176)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 80)
+    f:Hide()
+    f.title = W.Text(f, "GameFontNormalLarge", "CENTER")
+    f.title:SetPoint("TOP", 0, -16)
+    f.title:SetText("¿Qué rol haces con este personaje?")
+    f.sub = W.Text(f, "GameFontHighlightSmall", "CENTER")
+    f.sub:SetPoint("TOP", f.title, "BOTTOM", 0, -6)
+    f.sub:SetWidth(350)
+    f.sub:SetText("Puedes marcar varios. Sirve para saber cuántos tanques, sanadores y DPS tiene la hermandad.")
+    local ICONS = { [1] = "Interface\\Icons\\Ability_Defend", [2] = "Interface\\Icons\\Spell_Holy_FlashHeal",
+      [4] = "Interface\\Icons\\INV_Sword_04" }
+    f.buttons = {}
+    for i, r in ipairs(D.ROLES) do
+      local b = W.Chip(f, "      " .. r.label, 108, function()
+        f.mask = D.HasRole(f.mask, r.bit) and (f.mask - r.bit) or (f.mask + r.bit)
+        f:Update()
+      end)
+      b:SetHeight(30)
+      b:SetPoint("TOPLEFT", 16 + (i - 1) * 118, -74)
+      b.icon = b:CreateTexture(nil, "OVERLAY")
+      b.icon:SetSize(20, 20)
+      b.icon:SetPoint("LEFT", 8, 0)
+      b.icon:SetTexture(ICONS[r.bit])
+      b.bit = r.bit
+      f.buttons[i] = b
+    end
+    f.ok = W.Button(f, "Aceptar", 110, 24, function()
+      local me = ns.MyChar()
+      if not me or f.mask == 0 then return end
+      me.roleSet = f.mask
+      f:Hide()
+      ns.Sync.PublishMine()
+      ns.Fire("DATA_CHANGED", "role")
+    end)
+    f.ok:SetPoint("BOTTOM", 0, 16)
+    f.close = W.CloseButton(f)
+    f.close:SetPoint("TOPRIGHT", -2, -2)
+    function f:Update()
+      local me = ns.MyChar()
+      local allowed = D.CLASS_ROLES[(me and me.class) or D.MyClass()] or 7
+      for _, b in ipairs(self.buttons) do
+        local can = D.HasRole(allowed, b.bit)
+        b:SetEnabled(can)
+        b.icon:SetDesaturated(not can)
+        b:SetOn(D.HasRole(self.mask, b.bit))
+      end
+      self.ok:SetEnabled(self.mask > 0)
+    end
+    rolesFrame = f
+  end
+  local allowed = D.CLASS_ROLES[c.class or D.MyClass()] or 7
+  local mask = D.CleanRole(c.roleSet) or 0
+  -- solo los roles que puede hacer su clase
+  for _, r in ipairs(D.ROLES) do
+    if D.HasRole(mask, r.bit) and not D.HasRole(allowed, r.bit) then mask = mask - r.bit end
+  end
+  rolesFrame.mask = mask
+  rolesFrame.close:SetShown(not force)
+  rolesFrame:Update()
+  rolesFrame:Show()
+end
+
 ns.UI.RegisterPage("guild", function(page)
+  -- La primera vez (sin rol elegido) hay que decir qué rol haces.
+  page:HookScript("OnShow", function()
+    local c = ns.MyChar()
+    if c and not c.roleSet then ns.UI.ChooseRoles(true) end
+  end)
   -- Columnas: karma (izquierda), «Quién fabrica qué» (centro) y oficiales (derecha, solo si lo eres).
   -- Si no eres oficial, «Quién fabrica qué» se queda también con el sitio de los oficiales.
   local COL1, COL2, COL3 = 0, 262, 604
@@ -135,8 +213,11 @@ ns.UI.RegisterPage("guild", function(page)
   karmaHint:SetText("+1 por dar, -1 por recibir")
   page.bars = {}
   for i = 1, 6 do
-    local bar = CreateFrame("Frame", nil, page)
+    local bar = CreateFrame("Button", nil, page)
     bar:SetSize(250, 28)
+    bar:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
+    bar:SetScript("OnClick", function(self) if self.who then ns.UI.ShowHistory(self.who) end end)
+    ns.UI.Tip(bar, "Historial", "Clic: lo que ha pedido, hecho y aportado.")
     bar:SetPoint("TOPLEFT", COL1, -136 - (i - 1) * 30)
     bar.fill = bar:CreateTexture(nil, "ARTWORK")
     bar.fill:SetPoint("LEFT", 0, 0)
@@ -159,23 +240,26 @@ ns.UI.RegisterPage("guild", function(page)
   title("Roles", COL1 + 4, -322)
   local rolesHint = W.Text(page, "GameFontDisableSmall")
   rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324)
-  rolesHint:SetText("desde nivel 10 · pulsa el tuyo")
+  rolesHint:SetText("desde nivel 10 · pulsa los tuyos")
 
-  -- Pulsar tanque, sanador o DPS pone ese rol a este personaje (como en Opciones); pulsar el que
-  -- ya elegiste vuelve a «Auto» (talentos).
+  -- Pulsar tanque, sanador o DPS lo añade a los roles de este personaje (puede tener varios);
+  -- pulsar uno que ya tiene lo quita. Sin ninguno, vuelve a «Auto» (talentos).
   local function setMyRole(role)
     local c = ns.MyChar()
     if not c then return end
-    if c.roleSet == role then
-      c.roleSet = nil
+    local D = ns.Dungeons
+    local mask = D.CleanRole(c.roleSet) or 0
+    if D.HasRole(mask, role) then
+      mask = mask - role
     else
-      local allowed = ns.Dungeons.CLASS_ROLES[c.class or ns.Dungeons.MyClass()] or 7
-      if math.floor(allowed / role) % 2 ~= 1 then
-        ns.Print("tu clase no puede ser %s.", ns.Dungeons.RoleLabel(role):lower())
+      local allowed = D.CLASS_ROLES[c.class or D.MyClass()] or 7
+      if not D.HasRole(allowed, role) then
+        ns.Print("tu clase no puede ser %s.", D.RoleLabel(role):lower())
         return
       end
-      c.roleSet = role
+      mask = mask + role
     end
+    c.roleSet = mask > 0 and mask or nil
     ns.Sync.PublishMine()
     page:Refresh()
   end
@@ -235,14 +319,14 @@ ns.UI.RegisterPage("guild", function(page)
         local c = ns.MyChar()
         if s.key == "unknown" then
           GameTooltip:AddLine(s.text, 1, 1, 1, true)
-        elseif c and c.roleSet == s.key then
-          GameTooltip:AddLine("Es el tuyo: lo has elegido tú. Pulsa otra vez para volver a «Auto» (talentos).",
+        elseif c and ns.Dungeons.HasRole(c.roleSet, s.key) then
+          GameTooltip:AddLine("Es uno de los tuyos: lo has elegido tú. Pulsa otra vez para quitarlo.",
             0.25, 1, 0.25, true)
         elseif c and not c.roleSet and c.roleAuto == s.key then
           GameTooltip:AddLine("Es el tuyo: sale de tus talentos. Pulsa para fijarlo a mano.", 0.25, 1, 0.25, true)
         else
-          GameTooltip:AddLine("Pulsa si este personaje es " .. ns.Dungeons.RoleLabel(s.key):lower()
-            .. " (como el rol de Opciones). Otra vez: vuelve a «Auto».", 1, 1, 1, true)
+          GameTooltip:AddLine("Pulsa si este personaje también hace de " .. ns.Dungeons.RoleLabel(s.key):lower()
+            .. " (puedes marcar varios). Otra vez: lo quita.", 1, 1, 1, true)
         end
         local names = page.roleNames and page.roleNames[s.key] or {}
         if #names > 0 then
@@ -284,7 +368,7 @@ ns.UI.RegisterPage("guild", function(page)
   end
   page.profTitle = W.Text(page, "GameFontNormalSmall")
   page.profTitle:SetPoint("TOPLEFT", COL2 + 4, -106)
-  page.who = W.Crafters(page, WHO_W, 13)
+  page.who = W.Crafters(page, WHO_W, 13, nil, nil, function(c) ns.UI.ShowHistory(c.name) end)
   page.who:SetPoint("TOPLEFT", COL2, -120)
   -- Ordenar por nivel (como siempre) o por karma; se recuerda.
   page.whoSort = W.Button(page, "", 128, 18, function()
@@ -301,12 +385,21 @@ ns.UI.RegisterPage("guild", function(page)
   page.noWho:SetTextColor(0.6, 0.6, 0.6)
 
   -- Columna 3: oficiales.
+  -- Abajo a la derecha: la ventana de hermandad del juego (la J abre esta página).
+  page.gameGuild = W.Button(page, "Ventana del juego", 146, 22, function() ns.UI.OpenGameGuild() end)
+  page.gameGuild:SetPoint("BOTTOMRIGHT", 0, 2)
+  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: lista de miembros, rangos, noticias...")
+  page.guildKey = W.Check(page, "La J abre el addon", function(checked) ns.UI.SetGuildKey(checked) end)
+  page.guildKey:SetPoint("RIGHT", page.gameGuild, "LEFT", -150, 0)
+  ns.UI.Tip(page.guildKey, "La J abre el addon", "La J abre esta ventana (en Miembros) en lugar de la de hermandad "
+    .. "del juego. Quítalo para que la J abra la del juego, como siempre.")
+
   page.officerTitle = title("Oficiales", COL3 + 4, -6)
-  page.announce = W.Input(page, OFF_W - 66)
+  page.announce = W.Input(page, OFF_W - 86)
   page.announce:SetPoint("TOPLEFT", COL3 + 8, -28)
   page.announce:SetMaxLetters(S.ANNOUNCE_MAX)
   W.Placeholder(page.announce, "Anuncio para el Inicio…")
-  page.publish = W.Button(page, "Publicar", 60, 20, function()
+  page.publish = W.Button(page, "Publicar", 80, 20, function()
     local ok, err = S.SetAnnouncement(page.announce:GetText(), ns.Now())
     if not ok then ns.Print(err) else ns.Print("anuncio publicado en el Inicio de todos.") end
   end)
@@ -333,6 +426,7 @@ ns.UI.RegisterPage("guild", function(page)
   page.inactive:SetSpacing(2)
 
   function page:Refresh()
+    page.guildKey:SetChecked(ns.UI.GuildKeyOn())
     local now = ns.Now()
     local officer = S.AmOfficer()
 
@@ -352,6 +446,7 @@ ns.UI.RegisterPage("guild", function(page)
     for i, bar in ipairs(page.bars) do
       local e = ranking[i]
       bar:SetShown(e ~= nil)
+      bar.who = e and e.name
       if e then
         bar.name:SetText(i .. ". " .. ns.WhoColored(e.name))
         bar.value:SetText(ns.Data.KarmaText(e.name))
@@ -370,7 +465,7 @@ ns.UI.RegisterPage("guild", function(page)
     for _, b in ipairs(page.roleSlots) do
       b.count:SetText(rc[b.key] or 0)
       if b.ring then
-        local mine = myRole ~= nil and b.key == myRole
+        local mine = myRole ~= nil and type(b.key) == "number" and ns.Dungeons.HasRole(myRole, b.key)
         b.ring:SetShown(mine)
         -- elegido a mano: dorado; sacado de los talentos: más apagado
         if mine and c.roleSet then b.ringBorder:SetColor(1, 0.82, 0, 1) else b.ringBorder:SetColor(0.6, 0.5, 0.25, 1) end
@@ -414,16 +509,93 @@ ns.UI.RegisterPage("guild", function(page)
       local inactive, noAddon = S.Inactive(now)
       local out = { string.format("|cffffd100Inactivos (más de %d días): %d|r", S.INACTIVE_DAYS, #inactive) }
       for i = 1, math.min(6, #inactive) do
-        out[#out + 1] = string.format("  %s  |cff999999%d días|r", ns.ShortName(inactive[i].name), inactive[i].days)
+        out[#out + 1] = string.format("  %s  |cff999999%d días|r", ns.DisplayName(inactive[i].name), inactive[i].days)
       end
       out[#out + 1] = string.format("|cffffd100Sin el addon: %d|r", #noAddon)
       local names = {}
-      for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.ShortName(noAddon[i]) end
+      for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.DisplayName(noAddon[i]) end
       if #names > 0 then out[#out + 1] = "  " .. table.concat(names, ", ") .. (#noAddon > 8 and "…" or "") end
       page.inactive:SetText(table.concat(out, "\n"))
     end
   end
 end)
+
+-- Ventana del historial de una persona: lo que ha pedido (y quién se lo hizo) y lo que ha hecho
+-- o aportado. Sale de las fichas de la hermandad (ver History.lua).
+local historyWindow
+local HISTORY_LINES = 60
+local KIND_TEXT = { p = "pedido", o = "oferta", a = "aportación" }
+
+local function historyLine(h, now, gave)
+  local other = ns.DisplayName(h.who)
+  local text
+  if h.kind == "a" then
+    text = string.format("aportado a %s", other)
+  elseif gave then
+    text = string.format("para %s", other)
+  else
+    text = string.format("lo hizo %s", other)
+  end
+  return string.format("%dx %s\n   |cffbbbbbb%s (%s) · hace %s|r", h.n, ns.KeyLabel(h.key), text, KIND_TEXT[h.kind] or "",
+    ns.FormatDuration(now - h.t))
+end
+
+function ns.UI.ShowHistory(name)
+  if not name then return end
+  if not historyWindow then
+    local f = W.Panel("HDFProfHistory", UIParent, 640, 420)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 40)
+    f:Hide()
+    tinsert(UISpecialFrames, "HDFProfHistory")
+    f.title = W.Text(f, "GameFontNormalLarge")
+    f.title:SetPoint("TOP", 0, -16)
+    local close = W.CloseButton(f)
+    close:SetPoint("TOPRIGHT", -10, -10)
+    f.cols = {}
+    for i, label in ipairs({ "Ha pedido", "Ha hecho y aportado" }) do
+      local x = 20 + (i - 1) * 310
+      local head = W.Text(f, "GameFontNormal")
+      head:SetPoint("TOPLEFT", x, -46)
+      -- Con rueda o barra para bajar: caben las 30 de cada uno.
+      local scroll = CreateFrame("ScrollFrame", "HDFProfHistoryScroll" .. i, f, "UIPanelScrollFrameTemplate")
+      scroll:SetPoint("TOPLEFT", x, -66)
+      scroll:SetSize(270, 300)
+      local child = CreateFrame("Frame", nil, scroll)
+      child:SetSize(270, 300)
+      scroll:SetScrollChild(child)
+      local text = W.Text(child, "GameFontHighlightSmall")
+      text:SetPoint("TOPLEFT", 0, 0)
+      text:SetWidth(266)
+      text:SetJustifyH("LEFT")
+      text:SetJustifyV("TOP")
+      text:SetSpacing(2)
+      f.cols[i] = { label = label, head = head, text = text, scroll = scroll, child = child }
+    end
+    f.hint = W.Text(f, "GameFontDisableSmall")
+    f.hint:SetPoint("BOTTOMLEFT", 20, 14)
+    f.hint:SetWidth(600)
+    f.hint:SetText("Lo hecho lo apunta quien lo recibe. Cada personaje guarda sus últimos 30. "
+      .. "Solo lo de quien tiene la versión 0.33 o más nueva.")
+    historyWindow = f
+  end
+  local f, now = historyWindow, ns.Now()
+  local got, gave = ns.History.For(name)
+  f.title:SetText("Historial de " .. ns.WhoColored(name))
+  for i, list in ipairs({ got, gave }) do
+    local col = f.cols[i]
+    col.head:SetText(string.format("%s |cffbbbbbb(%d)|r", col.label, #list))
+    local lines = {}
+    for j = 1, math.min(#list, HISTORY_LINES) do lines[#lines + 1] = historyLine(list[j], now, i == 2) end
+    if #list > HISTORY_LINES then lines[#lines + 1] = string.format("|cff999999y %d más...|r", #list - HISTORY_LINES) end
+    col.text:SetText(#lines > 0 and table.concat(lines, "\n") or "|cff999999Nada todavía.|r")
+    col.child:SetHeight(math.max(300, (col.text:GetStringHeight() or 0) + 8))
+    col.scroll:SetVerticalScroll(0)
+  end
+  f:Show()
+  return f
+end
 
 -- Ventana "Recetas que faltan".
 local missingWindow
@@ -455,7 +627,7 @@ function ns.UI.ShowMissingRecipes()
   local lines = {}
   for i = 1, math.min(15, #list) do
     local e = list[i]
-    local who = ns.ShortName(e.askers[1]) .. (#e.askers > 1 and (" y " .. (#e.askers - 1) .. " más") or "")
+    local who = ns.DisplayName(e.askers[1]) .. (#e.askers > 1 and (" y " .. (#e.askers - 1) .. " más") or "")
     lines[#lines + 1] = string.format("%s  |cff999999(lo pide %s)|r", ns.KeyLabel(e.key), who)
   end
   if #list > 15 then lines[#lines + 1] = string.format("|cff999999y %d más...|r", #list - 15) end

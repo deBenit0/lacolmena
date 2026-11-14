@@ -17,7 +17,7 @@ local function personText(su, dg)
   local level = su.level and tostring(su.level) or "?"
   if su.level and su.level < dg.min then level = "|cffff4040" .. level .. "|r" end
   local text = name .. " (" .. level .. ")"
-  if not su.online then text = "|cff888888" .. ns.ShortName(su.name) .. " (" .. (su.level or "?") .. ", desc.)|r" end
+  if not su.online then text = "|cff888888" .. ns.DisplayName(su.name) .. " (" .. (su.level or "?") .. ", desc.)|r" end
   return text
 end
 
@@ -63,13 +63,13 @@ local function makeSlot(card, i)
   slot:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     if self.name then
-      GameTooltip:SetText(ns.ShortName(self.name), ns.ClassColor(self.class))
+      GameTooltip:SetText(ns.DisplayName(self.name), ns.ClassColor(self.class))
       local c = self.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[self.class]
-      GameTooltip:AddLine(SLOT_ROLES[i] .. (c and (" · " .. c) or ""), 1, 1, 1)
+      GameTooltip:AddLine((self.leveling and "En el grupo" or SLOT_ROLES[i]) .. (c and (" · " .. c) or ""), 1, 1, 1)
       if self.inParty then GameTooltip:AddLine("Ya está en tu grupo", 0.25, 1, 0.25) end
     else
-      GameTooltip:SetText(SLOT_ROLES[i])
-      GameTooltip:AddLine("Hueco libre", 0.7, 0.7, 0.7)
+      GameTooltip:SetText(self.leveling and "Plaza libre" or SLOT_ROLES[i])
+      GameTooltip:AddLine(self.leveling and "Entran los 5 primeros en apuntarse" or "Hueco libre", 0.7, 0.7, 0.7)
     end
     GameTooltip:Show()
   end)
@@ -87,9 +87,9 @@ local function groupCard(parent)
   card.crown:SetSize(16, 16)
   card.crown:SetPoint("TOPLEFT", 8, -8)
   card.crown:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-  card.leader = W.Text(card, "GameFontNormalLarge")
+  card.leader = W.Text(card, "GameFontNormal")
   card.leader:SetPoint("LEFT", card.crown, "RIGHT", 4, 0)
-  card.leader:SetWidth(130)
+  card.leader:SetWidth(134)
   card.leader:SetWordWrap(false)
   card.leader:SetTextColor(0.3, 0.75, 1)
   card.dungeon = W.Text(card, "GameFontHighlightSmall")
@@ -107,10 +107,14 @@ local function groupCard(parent)
   function card:Set(r)
     local D = ns.Dungeons
     local gp = r.gp or {}
-    self.leader:SetText(ns.ShortName(r.a))
+    self.leader:SetText(ns.DisplayName(r.a))
     self.dungeon:SetText(D.Dungeon(r.d).name)
     local missing = D.Missing(gp)
-    if #missing == 0 then
+    if D.IsLeveling(r) then
+      local n = #D.Members(gp)
+      self.status:SetText(n >= D.LEVELING_SIZE and "|cff40ff40Grupo completo|r"
+        or string.format("|cffffd100%d de %d|r", n, D.LEVELING_SIZE))
+    elseif #missing == 0 then
       self.status:SetText("|cff40ff40Grupo completo|r")
     else
       self.status:SetText("|cffffd100Falta: " .. table.concat(missing, ", ") .. "|r")
@@ -123,6 +127,7 @@ local function groupCard(parent)
     local names = { gp.t or false, gp.h or false }
     for k = 1, D.GROUP_SIZE.dps do names[#names + 1] = gp.d and gp.d[k] or false end
     for i, slot in ipairs(self.slots) do
+      slot.leveling = D.IsLeveling(r) or nil
       local name = names[i] or nil
       local su = name and r.s and r.s[name]
       slot.name = name
@@ -180,6 +185,30 @@ local function checkedMask(checks)
   return mask
 end
 
+-- Roles de partida: los de mi última vez (si mi clase aún puede hacerlos). La primera vez, nada:
+-- hay que elegir antes de apuntarse. Si mi clase solo puede hacer uno, ese.
+local function lastRoles()
+  local allowed = D.RolesFor(D.MyClass())
+  local c = ns.MyChar()
+  local last = c and D.CleanRole(c.runRoles)
+  local mask = 0
+  for _, role in ipairs(D.ROLES) do
+    if last and D.HasRole(last, role.bit) and D.HasRole(allowed, role.bit) then mask = mask + role.bit end
+  end
+  if mask == 0 and (allowed == D.TANK or allowed == D.HEAL or allowed == D.DPS) then mask = allowed end
+  return mask
+end
+
+local function rememberRoles(mask)
+  local c = ns.MyChar()
+  if c and mask and mask > 0 then c.runRoles = mask end
+end
+
+-- El botón (Apuntarme / Proponer) solo se enciende con algún rol marcado.
+local function watchChecks(checks, onChange)
+  for _, c in ipairs(checks) do c:HookScript("OnClick", onChange) end
+end
+
 -- Horas fijas al proponer (nil = ahora).
 local HOURS = { "now", 18, 20, 21, 22, 23 }
 
@@ -192,37 +221,64 @@ local function createDialog()
   tinsert(UISpecialFrames, "HDFProfDungeonDialog")
   local title = W.Text(dialog, "GameFontNormal")
   title:SetPoint("TOP", 0, -18)
-  title:SetText("Proponer quedada")
+  title:SetText("Hacer grupo")
   local close = W.CloseButton(dialog)
   close:SetPoint("TOPRIGHT", -10, -10)
 
-  -- Mazmorra: botón con menú desplegable.
+  -- Mazmorra o grupo de leveo (en una zona).
+  dialog.typeChips = {}
+  for i, t in ipairs({ { id = false, label = "Mazmorra" }, { id = true, label = "Grupo de leveo" } }) do
+    local chip = W.Chip(dialog, t.label, i == 1 and 90 or 120, function() dialog:SetLeveling(t.id) end)
+    chip:SetPoint("TOPLEFT", 24 + (i - 1) * 96, -32)
+    chip.leveling = t.id
+    dialog.typeChips[i] = chip
+  end
+  -- Mazmorra (o zona): botón con menú desplegable.
   local dLabel = W.Text(dialog, "GameFontNormalSmall")
-  dLabel:SetPoint("TOPLEFT", 24, -52)
+  dLabel:SetPoint("TOPLEFT", 24, -66)
   dLabel:SetText("Mazmorra")
+  dLabel:SetWidth(60)
+  dialog.dLabel = dLabel
   dialog.dungeonButton = W.Button(dialog, "", 260, 22)
   dialog.dungeonButton:SetPoint("LEFT", dLabel, "RIGHT", 12, 0)
-  dialog.menu = W.Panel(nil, dialog, 290, #D.LIST * 16 + 16)
-  dialog.menu:SetFrameStrata("FULLSCREEN_DIALOG")
-  dialog.menu:SetPoint("TOPLEFT", dialog.dungeonButton, "BOTTOMLEFT", -4, 0)
-  dialog.menu:Hide()
-  dialog.menu.buttons = {}
-  for i, dg in ipairs(D.LIST) do
-    local b = CreateFrame("Button", nil, dialog.menu)
-    b:SetSize(270, 16)
-    b:SetPoint("TOPLEFT", 10, -8 - (i - 1) * 16)
-    b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-    b.text = W.Text(b, "GameFontHighlightSmall")
-    b.text:SetPoint("LEFT", 2, 0)
-    b.text:SetText(dg.name .. " |cff999999(" .. dg.min .. "-" .. dg.max .. ")|r"
-      .. (dg.new and " |cff40c0ffnueva|r" or ""))
-    b:SetScript("OnClick", function()
-      dialog.menu:Hide()
-      dialog:SetDungeon(dg.id)
-    end)
-    dialog.menu.buttons[i] = b
+  -- Un menú para las mazmorras y otro para las zonas (en dos columnas: son muchas).
+  local function makeMenu(list, cols)
+    local perCol = math.ceil(#list / cols)
+    local menu = W.Panel(nil, dialog, 20 + cols * 230, perCol * 16 + 16)
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+    menu:SetPoint("TOPLEFT", dialog.dungeonButton, "BOTTOMLEFT", -4, 0)
+    menu:Hide()
+    for i, dg in ipairs(list) do
+      local col, rowN = math.floor((i - 1) / perCol), (i - 1) % perCol
+      local b = CreateFrame("Button", nil, menu)
+      b:SetSize(226, 16)
+      b:SetPoint("TOPLEFT", 10 + col * 230, -8 - rowN * 16)
+      b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+      b.text = W.Text(b, "GameFontHighlightSmall")
+      b.text:SetPoint("LEFT", 2, 0)
+      b.text:SetText(dg.name .. " |cff999999(" .. dg.min .. "-" .. dg.max .. ")|r"
+        .. (dg.new and " |cff40c0ffnueva|r" or ""))
+      b:SetScript("OnClick", function()
+        menu:Hide()
+        dialog:SetDungeon(dg.id)
+      end)
+    end
+    return menu
   end
+  dialog.dungeonMenu = makeMenu(D.LIST, 1)
+  dialog.zoneMenu = makeMenu(D.ZONES, 2)
+  dialog.menu = dialog.dungeonMenu
   dialog.dungeonButton:SetScript("OnClick", function() dialog.menu:SetShown(not dialog.menu:IsShown()) end)
+  function dialog:SetLeveling(on)
+    self.leveling = on and true or false
+    for _, chip in ipairs(self.typeChips) do chip:SetOn(chip.leveling == self.leveling) end
+    self.dungeonMenu:Hide()
+    self.zoneMenu:Hide()
+    self.menu = self.leveling and self.zoneMenu or self.dungeonMenu
+    self.dLabel:SetText(self.leveling and "Zona" or "Mazmorra")
+    local level = D.MyLevel()
+    self:SetDungeon(self.leveling and D.RecommendedZone(level) or D.Recommended(level))
+  end
   function dialog:SetDungeon(d)
     self.d = d
     local dg = D.Dungeon(d)
@@ -231,7 +287,7 @@ local function createDialog()
     self.levelNote:SetText(level < dg.min and string.format("|cffff4040Tu nivel (%d) no llega al recomendado.|r", level) or "")
   end
   dialog.levelNote = W.Text(dialog, "GameFontHighlightSmall")
-  dialog.levelNote:SetPoint("TOPLEFT", 90, -76)
+  dialog.levelNote:SetPoint("TOPLEFT", 98, -82)
 
   -- Día (hoy y hasta 2 semanas) y hora: botones de horas fijas y -/+ de 15 en 15 minutos.
   local dayLabel = W.Text(dialog, "GameFontNormalSmall")
@@ -343,18 +399,30 @@ local function createDialog()
 
   dialog.chat = W.Check(dialog, "Avisar en el chat de hermandad")
   dialog.chat:SetPoint("BOTTOMLEFT", 20, 16)
-  local publish = W.Button(dialog, "Proponer", 96, 22, function() dialog:Publish() end)
+  local publish = W.Button(dialog, "Crear", 96, 22, function() dialog:Publish() end)
+  dialog.publish = publish
+  function dialog:UpdatePublish() end -- se puede proponer sin ir (se pregunta)
+  watchChecks(dialog.checks, function() dialog:UpdatePublish() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
   local cancel = W.Button(dialog, "Cancelar", 86, 22, function() dialog:Hide() end)
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
   cancel:Hide() -- con la casilla del chat no cabe: se cierra con la X o con Esc
 
   function dialog:Publish()
-    local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = checkedMask(self.checks) })
-    if r then
-      self:Hide()
-      if self.chat:GetChecked() then ns.Extras.Announce("run", r, r.id) end
-      ns.UI.Open("dungeons", r.id)
+    local mask = checkedMask(self.checks)
+    local function go()
+      rememberRoles(mask)
+      local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = mask })
+      if r then
+        self:Hide()
+        if self.chat:GetChecked() then ns.Extras.Announce("run", r, r.id) end
+        ns.UI.Open("dungeons", r.id)
+      end
+    end
+    if mask == 0 then
+      W.Confirm("No has marcado ningún rol: ¿la organizas sin ir tú?", go)
+    else
+      go()
     end
   end
 end
@@ -365,11 +433,11 @@ function ns.UI.OpenDungeonDialog()
     return
   end
   if not dialog then createDialog() end
-  dialog:SetDungeon(D.Recommended(D.MyLevel()))
+  dialog:SetLeveling(false)
   dialog:SetSlot(0)
   dialog.chat:SetChecked(true)
-  local allowed = D.RolesFor(D.MyClass())
-  setupChecks(dialog.checks, D.HasRole(allowed, D.DPS) and D.DPS or allowed)
+  setupChecks(dialog.checks, lastRoles())
+  dialog:UpdatePublish()
   dialog.menu:Hide()
   dialog:Show()
 end
@@ -383,6 +451,7 @@ local ROLE_ICONS = {
 local KINDS = {
   { id = "all", label = "Todo" },
   { id = "dungeons", label = "Mazmorras" },
+  { id = "leveling", label = "Leveo" },
   { id = "events", label = "Eventos · pronto", soon = true },
   { id = "raids", label = "Raids · pronto", soon = true },
 }
@@ -390,6 +459,12 @@ local KINDS = {
 -- Lo que le falta a una quedada: con el grupo hecho, lo que no se ha cubierto; antes, los
 -- papeles que nadie de los apuntados puede hacer.
 local function missingText(r)
+  if D.IsLeveling(r) then
+    local n = #D.SignUps(r)
+    local size = D.LEVELING_SIZE
+    if n >= size then return "|cff40ff40grupo completo|r" end
+    return string.format("|cffffd100%d de %d apuntados|r", n, size)
+  end
   if r.gp then
     local m = D.Missing(r.gp)
     return #m == 0 and "|cff40ff40grupo hecho|r" or ("|cffffd100falta " .. table.concat(m, ", "):lower() .. "|r")
@@ -405,9 +480,36 @@ end
 
 -- Los 5 huecos de una tarjeta: icono del papel; con el grupo hecho, la clase de quien va.
 -- Antes de hacerlo se encienden los papeles que alguien de los apuntados puede cubrir.
+local LEVELING_ICON = "Interface\\Icons\\INV_Misc_GroupLooking"
 local function fillSlots(slots, r)
   local gp = r.gp
   local t, h, dps = roleCounts(r)
+  if D.IsLeveling(r) then
+    -- Grupo de leveo: plazas, sin papeles. Antes de hacerlo, una encendida por apuntado.
+    local count = #D.SignUps(r)
+    local names = gp and { gp.t or false, gp.h or false, gp.d and gp.d[1] or false, gp.d and gp.d[2] or false,
+      gp.d and gp.d[3] or false } or {}
+    for i, slot in ipairs(slots) do
+      slot.leveling = true
+      local name = names[i]
+      local su = name and r.s and r.s[name]
+      local coords = su and su.c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[su.c]
+      if coords then
+        slot.icon:SetTexture(CLASS_ICONS)
+        slot.icon:SetTexCoord(unpack(coords))
+        slot.icon:SetDesaturated(false)
+        slot.icon:SetAlpha(1)
+      else
+        slot.icon:SetTexture(LEVELING_ICON)
+        slot.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local covered = gp and (name and true or false) or i <= count
+        slot.icon:SetDesaturated(not covered)
+        slot.icon:SetAlpha(covered and 1 or 0.35)
+      end
+    end
+    return
+  end
+  for _, slot in ipairs(slots) do slot.leveling = nil end
   local names = gp and { gp.t or false, gp.h or false, gp.d and gp.d[1] or false, gp.d and gp.d[2] or false,
     gp.d and gp.d[3] or false } or {}
   for i, slot in ipairs(slots) do
@@ -453,11 +555,11 @@ ns.UI.RegisterPage("dungeons", function(page)
     if k.soon then
       b:Disable()
       if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
-      ns.UI.Tip(b, (k.label:gsub(" · pronto", "")), "Próximamente: entrarán aquí, en la misma Agenda.")
+      ns.UI.Tip(b, (k.label:gsub(" · pronto", "")), "Próximamente: entrarán aquí, en la misma pestaña Grupos.")
     end
     page.kinds[i] = b
   end
-  page.propose = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.propose = W.Button(page, "+ Hacer grupo", 160, 24, function() ns.UI.OpenDungeonDialog() end)
   page.propose:SetPoint("TOPRIGHT", 0, 0)
 
   -- Fila 2: la semana. Cada día con sus quedadas (puntos); al pulsarlo se ven solo las suyas.
@@ -564,7 +666,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   page.empty:SetPoint("CENTER", list, "CENTER", 0, 20)
   page.empty:SetWidth(380)
   page.empty:SetTextColor(0.7, 0.7, 0.7)
-  page.emptyButton = W.Button(page, "+ Proponer quedada", 160, 24, function() ns.UI.OpenDungeonDialog() end)
+  page.emptyButton = W.Button(page, "+ Hacer grupo", 160, 24, function() ns.UI.OpenDungeonDialog() end)
   page.emptyButton:SetPoint("TOP", page.empty, "BOTTOM", 0, -12)
 
   local detail = W.Box(page, 350, 414)
@@ -604,15 +706,17 @@ ns.UI.RegisterPage("dungeons", function(page)
   rolesLabel:SetText("Me apunto de:")
   detail.rolesLabel = rolesLabel
   detail.checks = roleChecks(detail, 10, -276)
+  watchChecks(detail.checks, function() if detail.updateJoin then detail.updateJoin() end end)
   detail.join = W.Button(detail, "Apuntarme", 110, 22)
   detail.join:SetPoint("TOPLEFT", 12, -304)
-  detail.leave = W.Button(detail, "Desapuntarme", 110, 22)
+  detail.leave = W.Button(detail, "Desapuntarme", 120, 22)
   detail.leave:SetPoint("LEFT", detail.join, "RIGHT", 4, 0)
 
-  detail.make = W.Button(detail, "Hacer grupo", 104, 22)
+  detail.make = W.Button(detail, "Elegir grupo", 126, 22)
   detail.make:SetPoint("BOTTOMLEFT", 8, 8)
-  detail.invite = W.Button(detail, "Invitar al grupo", 120, 22)
+  detail.invite = W.Button(detail, "Invitar", 96, 22)
   detail.invite:SetPoint("LEFT", detail.make, "RIGHT", 4, 0)
+  ns.UI.Tip(detail.invite, "Invitar al grupo", "Invita a los elegidos al grupo del juego.")
   detail.cancel = W.Button(detail, "Cancelar", 96, 22)
   detail.cancel:SetPoint("LEFT", detail.invite, "RIGHT", 4, 0)
 
@@ -652,7 +756,13 @@ ns.UI.RegisterPage("dungeons", function(page)
     -- Apuntados por rol (alguien puede salir en varios).
     local signups = D.SignUps(r)
     local lines = {}
-    for _, role in ipairs(D.ROLES) do
+    if D.IsLeveling(r) then
+      local names = {}
+      for _, su in ipairs(signups) do names[#names + 1] = personText(su, dg) end
+      lines[#lines + 1] = string.format("|cffffd100Apuntados (%d de %d):|r %s", #signups, D.LEVELING_SIZE,
+        #names > 0 and table.concat(names, ", ") or "|cff888888nadie|r")
+    end
+    for _, role in ipairs(D.IsLeveling(r) and {} or D.ROLES) do
       local names = {}
       for _, su in ipairs(signups) do
         if D.HasRole(su.roles, role.bit) then names[#names + 1] = personText(su, dg) end
@@ -674,13 +784,13 @@ ns.UI.RegisterPage("dungeons", function(page)
       detail.group:SetPoint("TOPLEFT", 12, -230)
       local g = {}
       local bench = {}
-      for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.ShortName(name) end
+      for _, name in ipairs(r.gp.b or {}) do bench[#bench + 1] = ns.DisplayName(name) end
       -- En una sola línea: con muchos suplentes se pisaría con «Me apunto de».
       local more = #bench > 4 and (" y " .. (#bench - 4) .. " más") or ""
       for i = #bench, 5, -1 do bench[i] = nil end
       if #bench > 0 then g[#g + 1] = "|cffbbbbbbSuplentes: " .. table.concat(bench, ", ") .. more .. "|r" end
       local place = D.MyPlace(r)
-      if place then g[#g + 1] = "|cff66ccffTú vas de " .. place .. ".|r" end
+      if place then g[#g + 1] = "|cff66ccffTú vas " .. (place == "en el grupo" and "" or "de ") .. place .. ".|r" end
       detail.group:SetText(table.concat(g, "\n"))
     else
       detail.group:SetPoint("TOPLEFT", 12, -170)
@@ -692,15 +802,24 @@ ns.UI.RegisterPage("dungeons", function(page)
     local joined = su and not su.o
     if not page.checksFor or page.checksFor ~= r.id then
       page.checksFor = r.id
-      local allowed = D.RolesFor(D.MyClass())
-      setupChecks(detail.checks, joined and su.r or (D.HasRole(allowed, D.DPS) and D.DPS or allowed))
+      setupChecks(detail.checks, joined and su.r or lastRoles())
     end
     for _, c in ipairs(detail.checks) do
       if not open then c:SetEnabled(false) end
     end
     detail.join:SetText(joined and "Cambiar roles" or "Apuntarme")
-    detail.join:SetEnabled(open)
-    detail.join:SetScript("OnClick", function() ns.Sync.SignUpRun(r.id, checkedMask(detail.checks)) end)
+    detail.updateJoin = function()
+      local none = checkedMask(detail.checks) == 0
+      detail.join:SetEnabled(open and not none)
+      detail.rolesLabel:SetText((open and none) and "Me apunto de: |cffff8040(elige tu rol)|r" or "Me apunto de:")
+    end
+    detail.updateJoin()
+    detail.join:SetScript("OnClick", function()
+      local mask = checkedMask(detail.checks)
+      if mask == 0 then return end
+      rememberRoles(mask)
+      ns.Sync.SignUpRun(r.id, mask)
+    end)
     detail.leave:SetEnabled(open and joined or false)
     detail.leave:SetScript("OnClick", function() ns.Sync.LeaveRun(r.id) end)
 
@@ -711,12 +830,16 @@ ns.UI.RegisterPage("dungeons", function(page)
     detail.cancel:SetShown(author)
     detail.done:SetEnabled(open)
     detail.done:SetScript("OnClick", function()
-      W.Confirm("¿Ya habéis hecho la mazmorra? La quedada se cierra para todos.", function()
+      W.Confirm(D.IsLeveling(r) and "¿Ya habéis terminado? El grupo se cierra para todos."
+        or "¿Ya habéis hecho la mazmorra? La quedada se cierra para todos.", function()
         ns.Sync.FinishRun(r.id)
       end)
     end)
     detail.make:SetEnabled(open and #signups > 0)
-    detail.make:SetText(r.gp and "Rehacer grupo" or "Hacer grupo")
+    detail.make:SetText(r.gp and "Volver a elegir" or "Elegir grupo")
+    if D.IsLeveling(r) then
+      ns.UI.Tip(detail.make, "Grupo de leveo", "Sin roles: entran los 5 primeros en apuntarse (tú delante).")
+    end
     detail.make:SetScript("OnClick", function() ns.Sync.MakeGroup(r.id) end)
     detail.invite:SetEnabled(open and r.gp ~= nil)
     detail.invite:SetScript("OnClick", function()
@@ -740,7 +863,8 @@ ns.UI.RegisterPage("dungeons", function(page)
     local perDay = {}
     local items = {}
     for _, r in pairs(D.Runs() or {}) do
-      if D.State(r, now) == "open" then
+      local kindOk = state.kind == "all" or (state.kind == "leveling") == D.IsLeveling(r)
+      if D.State(r, now) == "open" and kindOk then
         local day = math.max(today, D.DayNumber(r.at))
         perDay[day] = (perDay[day] or 0) + 1
         if not state.day or state.day == day then

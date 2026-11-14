@@ -213,8 +213,30 @@ function W.Button(parent, text, width, height, onClick)
   if onClick then b:SetScript("OnClick", onClick) end
   -- Botón principal (PEDIR, APORTAR...): con la plantilla del juego basta la letra grande.
   function b:SetPrimary(v) end
+  local rawSetText = b.SetText
+  function b:SetText(t)
+    rawSetText(self, t)
+    if self.fixedFont or not self.SetNormalFontObject then return end
+    local fs = self.GetFontString and self:GetFontString()
+    if type(fs) ~= "table" or not fs.GetStringWidth then return end
+    if self.autoSmall then
+      self.autoSmall = nil
+      self:SetNormalFontObject("GameFontNormal")
+      self:SetHighlightFontObject("GameFontHighlight")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisable") end
+    end
+    local room = (self:GetWidth() or 0) - 14
+    if room > 0 and (fs:GetStringWidth() or 0) > room then
+      self.autoSmall = true
+      self:SetNormalFontObject("GameFontNormalSmall")
+      self:SetHighlightFontObject("GameFontHighlightSmall")
+      if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisableSmall") end
+    end
+  end
+  b:SetText(text)
   -- Letra: "small", "normal" o "large".
   function b:SetFontSize(size)
+    self.fixedFont = true
     if not self.SetNormalFontObject then return end
     if size == "small" then
       self:SetNormalFontObject("GameFontNormalSmall")
@@ -554,6 +576,9 @@ function W.Choose(title, sub, labels, callback)
   end
   local n = #labels
   local width = n * 132 - 8
+  choice:SetWidth(math.max(430, width + 36)) -- con 4 botones no cabían
+  choice.title:SetWidth(choice:GetWidth() - 30)
+  choice.sub:SetWidth(choice:GetWidth() - 30)
   for i, b in ipairs(choice.buttons) do
     b:ClearAllPoints()
     b:SetPoint("BOTTOMLEFT", choice, "BOTTOM", -width / 2 + (i - 1) * 132, 40)
@@ -570,7 +595,7 @@ function W.AcceptRequest(r)
   for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
   local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
   sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al Mercado.", info.remaining)
-  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.ShortName(r.a)),
+  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.DisplayName(r.a)),
     sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
 end
 
@@ -585,7 +610,7 @@ function W.ExtendRequest(r)
   local labels = {}
   for i, w in ipairs(options) do labels[i] = w.label end
   W.Choose(string.format("¿Para cuándo tendrás %s?", ns.KeyLabel(r.k)),
-    "Solo puedes pedir más tiempo una vez. A " .. ns.ShortName(r.a) .. " le llegará un aviso.",
+    "Solo puedes pedir más tiempo una vez. A " .. ns.DisplayName(r.a) .. " le llegará un aviso.",
     labels, function(i) ns.Sync.Extend(r.id, options[i].id) end)
 end
 
@@ -616,8 +641,19 @@ W.LinkHooked = hookedInsert
 -- guarda su nombre con el reino interno que le da su juego ("Kael-CAMWOWEU4Realm4PvP") y el
 -- servidor no encuentra a nadie así (el mismo fallo que tuvo invitar en la 0.28). Vale el nombre
 -- tal como lo da la lista de la hermandad y, si es de mi reino o no está en la lista, el corto.
+-- Con apellidos (WoW Forever: «Exagono Exagonal») hace falta el nombre completo: sale de la
+-- lista de la hermandad o de lo que se ha visto en el chat. Sin él, el correo iría a otro
+-- «Exagono» o a nadie.
 function ns.TellName(name)
   if type(name) ~= "string" or name == "" then return nil end
+  local base = name:match("^([^%-]+)") or name
+  if base:find(ns.SurnameSeparator(), 1, true) then return base end
+  local info = ns.Guild and ns.Guild.Find and ns.Guild.Find(name)
+  local raw = info and type(info.raw) == "string" and info.raw ~= "" and info.raw or nil
+  local key = ns.FullName(name)
+  local complete = (raw and (raw:match("^([^%-]+)") or raw)) or (key and ns.fullNames[key])
+  if not complete and ns.fullNames[name] then complete = ns.fullNames[name] end
+  if complete and complete:find(ns.SurnameSeparator(), 1, true) then return complete end
   local short = ns.ShortName(name)
   -- ¿Hay otro en la hermandad con el mismo nombre corto? Entonces el corto no basta.
   local twins = 0
@@ -632,11 +668,37 @@ function ns.TellName(name)
   return short
 end
 
--- Abrir un susurro: la función nueva del juego o la antigua y, si fallan, la caja del chat con
+-- Abrir un susurro: la caja del chat en modo susurro (como Responder); si no, la función del juego o la caja con
 -- "/w Nombre " ya escrito. Devuelve el nombre usado.
 function ns.SendTell(name)
   local target = ns.TellName(name)
   if not target then return nil end
+  -- Como "Responder" del juego: se pone la caja en modo susurro sin escribir ningún comando.
+  -- (Con el comando escrito, en el cliente en español la caja se quedaba en Hermandad con
+  -- "/cw Nombre" dentro, sin pasar a susurro.)
+  local choose = ChatEdit_ChooseBoxForSend or (ChatFrameUtil and ChatFrameUtil.ChooseBoxForSend)
+  local okBox, edit = false, nil
+  if choose then okBox, edit = pcall(choose) end
+  if okBox and type(edit) == "table" and edit.SetAttribute then
+    edit:SetAttribute("chatType", "WHISPER")
+    edit:SetAttribute("tellTarget", target)
+    if ChatEdit_UpdateHeader then
+      pcall(ChatEdit_UpdateHeader, edit)
+    elseif edit.UpdateHeader then
+      pcall(edit.UpdateHeader, edit)
+    end
+    local active = ChatEdit_GetActiveWindow or (ChatFrameUtil and ChatFrameUtil.GetActiveWindow)
+    local open = ChatFrame_OpenChat or (ChatFrameUtil and ChatFrameUtil.OpenChat)
+    local isActive = false
+    if active then
+      local ok, w = pcall(active)
+      isActive = ok and w == edit
+    end
+    if open and not isActive then pcall(open, "") end
+    if edit:GetAttribute("chatType") == "WHISPER" and edit:GetAttribute("tellTarget") == target then
+      return target, "reply"
+    end
+  end
   local send = (ChatFrameUtil and ChatFrameUtil.SendTell) or ChatFrame_SendTell
   if send and pcall(send, target) then return target, "tell" end
   local text = "/w " .. target .. " "
@@ -682,7 +744,7 @@ end
 function ns.WhoColored(name)
   local text = ns.ColoredName(name, ns.ClassOf(name))
   local main = ns.Social and ns.Social.MainOf(name)
-  if main and main ~= name then text = text .. " |cff999999(" .. ns.ShortName(main) .. ")|r" end
+  if main and main ~= name then text = text .. " |cff999999(" .. ns.DisplayName(main) .. ")|r" end
   return text
 end
 
@@ -690,7 +752,7 @@ end
 function ns.AuthorText(name)
   local text = ns.ColoredName(name, ns.ClassOf(name))
   local main = ns.Social and ns.Social.MainOf(name)
-  if main and main ~= name then text = text .. " |cff999999(alt de " .. ns.ShortName(main) .. ")|r" end
+  if main and main ~= name then text = text .. " |cff999999(alt de " .. ns.DisplayName(main) .. ")|r" end
   return text
 end
 
@@ -710,7 +772,7 @@ end
 -- Hermandad.
 --   rows = { { name, class, pk, r (nivel), online, seen, unavailable, gather, extra, karma, level }, ... }
 --   rowHeight: alto de cada fila (22 si no se dice); bare: sin recuadro alrededor.
-function W.Crafters(parent, width, nrows, rowHeight, bare)
+function W.Crafters(parent, width, nrows, rowHeight, bare, onSelect)
   rowHeight = rowHeight or 22
   -- Con sitio, el estado (en línea, visto hace...) va en su columna; si no, junto al nivel.
   local wide = width >= 380
@@ -720,6 +782,7 @@ function W.Crafters(parent, width, nrows, rowHeight, bare)
     card = true,
     bare = bare,
     keyOf = function(c) return c.name .. ":" .. tostring(c.pk) end,
+    onSelect = onSelect,
     buildRow = function(row)
       local iconSize = math.min(20, rowHeight - 6)
       row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -736,12 +799,12 @@ function W.Crafters(parent, width, nrows, rowHeight, bare)
         row.level:SetWidth(math.floor(width * 0.24))
         row.state = W.ListText(row, "GameFontHighlightSmall")
         row.state:SetPoint("LEFT", row.level, "RIGHT", 4, 0)
-        row.state:SetPoint("RIGHT", row, "RIGHT", -64, 0)
+        row.state:SetPoint("RIGHT", row, "RIGHT", -74, 0)
         row.state:SetWordWrap(false)
       else
-        row.level:SetPoint("RIGHT", row, "RIGHT", -62, 0)
+        row.level:SetPoint("RIGHT", row, "RIGHT", -72, 0)
       end
-      row.tell = W.Button(row, "Susurrar", 56, math.min(20, rowHeight - 6))
+      row.tell = W.Button(row, "Susurrar", 66, math.min(20, rowHeight - 6))
       row.tell:SetFontSize("small")
       row.tell:SetPoint("RIGHT", -4, 0)
       row.tell:SetScript("OnClick", function(self) ns.SendTell(self:GetParent().item.name) end)
@@ -752,6 +815,7 @@ function W.Crafters(parent, width, nrows, rowHeight, bare)
         GameTooltip:SetText(ns.ColoredName(c.name, c.class) .. (c.level and (" (nivel " .. c.level .. ")") or ""))
         GameTooltip:AddLine(ns.ProfessionName(c.pk) .. (c.r and (" " .. c.r) or ""), 1, 1, 1)
         if c.karma then GameTooltip:AddLine("Karma: " .. c.karma .. "   Encargos completados: " .. (c.thanks or 0), 0.8, 0.8, 0.8) end
+        if onSelect then GameTooltip:AddLine("Clic: ver su historial", 0.5, 0.8, 1) end
         GameTooltip:Show()
       end)
       row:SetScript("OnLeave", function() GameTooltip:Hide() end)
