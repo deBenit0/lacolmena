@@ -7,7 +7,6 @@ local W = ns.W
 local Diag = {}
 ns.Diag = Diag
 
-local LOGO = "Interface\\AddOns\\HDFprofesiones\\Media\\norrisplay"
 
 -- Cada comprobación devuelve: true (bien), false (falla) o nil (no se puede saber aún), y un texto.
 local CHECKS = {
@@ -145,12 +144,11 @@ local CHECKS = {
     local ok = W.LinkHooked and GetCurrentKeyBoardFocus ~= nil
     return ok and true or false, ok and "compatible" or "no; usa arrastrar"
   end },
-  { "Logo de NorrisPlay", function()
-    local tex = UIParent:CreateTexture(nil, "BACKGROUND")
-    local ok = tex:SetTexture(LOGO)
-    tex:Hide()
-    if ok == nil then return nil, "este cliente no dice si cargó la imagen: mira el Inicio" end
-    return ok and true or false, ok and "cargado" or "no se carga la imagen"
+  { "Emblema del tabardo", function()
+    local info = C_GuildInfo and C_GuildInfo.GetGuildTabardInfo and C_GuildInfo.GetGuildTabardInfo("player")
+    if info and info.emblemFileID then return true, "cargado" end
+    if ns.db and ns.db.settings.emblem then return true, "guardado (el juego aún no lo ha dado)" end
+    return nil, "el juego aún no ha dado el tabardo de la hermandad"
   end },
   { "Hora del servidor", function()
     local ok = GetServerTime ~= nil and date ~= nil
