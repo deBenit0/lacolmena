@@ -55,7 +55,6 @@ local function peopleWith(pk, byKarma)
   end)
   return rows
 end
-ns.UI.PeopleWith = peopleWith
 
 -- Cuántos personajes tienen alguna profesión de fabricar y cuántos de recolectar (cada personaje
 -- aparte, como los roles). Cocina, primeros auxilios y pesca no cuentan.
@@ -172,10 +171,14 @@ function ns.UI.ChooseRoles(force)
 end
 
 ns.UI.RegisterPage("guild", function(page)
-  -- La primera vez (sin rol elegido) hay que decir qué rol haces.
+  -- La primera vez (sin rol elegido) hay que decir qué rol haces. Solo una vez por personaje:
+  -- sin rol elegido también es «Auto» (lo pone el addon), y no debe salir cada vez.
   page:HookScript("OnShow", function()
     local c = ns.MyChar()
-    if c and not c.roleSet then ns.UI.ChooseRoles(true) end
+    if c and not c.roleSet and not c.roleAsked then
+      c.roleAsked = true
+      ns.UI.ChooseRoles(true)
+    end
   end)
   -- Columnas: karma (izquierda), «Quién fabrica qué» (centro) y oficiales (derecha, solo si lo eres).
   -- Si no eres oficial, «Quién fabrica qué» se queda también con el sitio de los oficiales.
@@ -263,7 +266,6 @@ ns.UI.RegisterPage("guild", function(page)
     ns.Sync.PublishMine()
     page:Refresh()
   end
-  page.SetMyRole = function(_, role) setMyRole(role) end
   local ROLE_SLOTS = {
     { key = 1, icon = "Interface\\Icons\\Ability_Defend", tip = "Tanques" },
     { key = 2, icon = "Interface\\Icons\\Spell_Holy_FlashHeal", tip = "Sanadores" },

@@ -676,15 +676,6 @@ local function buildCatalog(page, mode)
   -- Referencias para depurar y para las pruebas.
   page.state, page.list, page.detail, page.search, page.profButton = state, list, detail, search, profButton
 
-  -- Pliega o despliega todos los grupos (y lo recuerda).
-  function page:SetAllCollapsed(value)
-    page:Refresh() -- recalcular qué profesiones hay con los filtros actuales
-    local saved = savedCollapsed()
-    for _, k in ipairs(page.groupKeys or {}) do saved[k] = value end
-    saved.fav = value
-    page:Refresh()
-  end
-
   function page:RefreshButtons()
     detail.askAll:SetEnabled(state.key ~= nil)
   end
@@ -1628,5 +1619,5 @@ function ns.UI.CrafterRows(key, withGatherers)
   for _, c in ipairs(out) do if c.name ~= me then sorted[#sorted + 1] = c end end
   return sorted
 end
-ns.UI.GearGroup, ns.UI.IsEquipment, ns.UI.MaterialGroup = gearGroup, isEquipment, materialGroup
+ns.UI.GearGroup = gearGroup
 ns.UI.CraftCategory, ns.UI.ReagentsBlock = craftCategory, reagentsBlock

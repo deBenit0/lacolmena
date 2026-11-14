@@ -164,7 +164,6 @@ ns.UI.RegisterPage("chat", function(f)
   ns.Listen("CHAT_HISTORY", function()
     if f:IsVisible() then ns.Coalesce("chatHistory", 0.5, rebuild) end
   end)
-  f.showOfficer = amOfficer
 
   function f:Refresh()
     local officer = amOfficer()

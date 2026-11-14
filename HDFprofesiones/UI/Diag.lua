@@ -301,10 +301,17 @@ local function createWindow()
   local close = W.CloseButton(window)
   close:SetPoint("TOPRIGHT", -10, -10)
 
-  -- Resultado de la autocomprobación, con colores.
-  window.checks = W.Text(window, "GameFontHighlightSmall")
-  window.checks:SetPoint("TOPLEFT", 22, -40)
-  window.checks:SetWidth(516)
+  -- Resultado de la autocomprobación, con colores. Son muchas líneas: van en su propia lista con
+  -- barra, encima del informe (antes se metían debajo del cuadro del informe).
+  local checksScroll = CreateFrame("ScrollFrame", "HDFProfChecksScroll", window, "UIPanelScrollFrameTemplate")
+  checksScroll:SetPoint("TOPLEFT", 22, -40)
+  checksScroll:SetSize(490, 224)
+  window.checksChild = CreateFrame("Frame", nil, checksScroll)
+  window.checksChild:SetSize(490, 224)
+  checksScroll:SetScrollChild(window.checksChild)
+  window.checks = W.Text(window.checksChild, "GameFontHighlightSmall")
+  window.checks:SetPoint("TOPLEFT", 0, 0)
+  window.checks:SetWidth(486)
   window.checks:SetJustifyV("TOP")
   window.checks:SetSpacing(2)
 
@@ -352,6 +359,7 @@ function Diag.Show()
     lines[#lines + 1] = statusTag(r.status, true) .. " " .. r.label .. ": |cffbbbbbb" .. r.detail .. "|r"
   end
   window.checks:SetText(table.concat(lines, "\n"))
+  window.checksChild:SetHeight(math.max(224, (window.checks:GetStringHeight() or 0) + 4))
   local errors = ns.db and #ns.db.errors or 0
   window.title:SetText(string.format("Comprobación: %d bien, %d fallan, %d sin comprobar · %d errores guardados",
     good, bad, unknown, errors))

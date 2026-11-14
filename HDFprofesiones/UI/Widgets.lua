@@ -92,7 +92,6 @@ local function cornerAccents(f, size)
     bar("BOTTOMRIGHT", 1, -1, size, 2), bar("BOTTOMRIGHT", 1, -1, 2, size),
   }
 end
-W.CornerAccents = cornerAccents
 
 function W.Panel(name, parent, width, height)
   local f = CreateFrame("Frame", name, parent or UIParent, BACKDROP_TEMPLATE)
@@ -232,11 +231,13 @@ function W.Button(parent, text, width, height, onClick)
       self:SetHighlightFontObject("GameFontHighlightSmall")
       if self.SetDisabledFontObject then self:SetDisabledFontObject("GameFontDisableSmall") end
     end
+    if self.on and self.SetOn then self:SetOn(true) end -- pestaña o filtro encendido: sigue en blanco
   end
   b:SetText(text)
   -- Letra: "small", "normal" o "large".
   function b:SetFontSize(size)
     self.fixedFont = true
+    self.fontSize = size
     if not self.SetNormalFontObject then return end
     if size == "small" then
       self:SetNormalFontObject("GameFontNormalSmall")
@@ -260,14 +261,22 @@ function W.CloseButton(parent)
   return CreateFrame("Button", nil, parent, "UIPanelCloseButton")
 end
 
+-- Encendido o apagado (pestañas y filtros): letras blancas o amarillas, del mismo tamaño que
+-- tenga el botón (el elegido con SetFontSize o el pequeño que pone solo si el texto no cabe).
+local function setOn(self, on)
+  if on then self:LockHighlight() else self:UnlockHighlight() end
+  if self.SetNormalFontObject then
+    local size = self.fixedFont and self.fontSize or (self.autoSmall and "small") or "normal"
+    local suffix = (size == "small" and "Small") or (size == "large" and "Large") or ""
+    self:SetNormalFontObject((on and "GameFontHighlight" or "GameFontNormal") .. suffix)
+  end
+  self.on = on and true or false
+end
+
 -- Pestaña de arriba: botón del juego; la elegida se queda con el brillo y letras blancas.
 function W.Tab(parent, text, width, height, onClick)
   local b = W.Button(parent, text, width, height or 26, onClick)
-  function b:SetOn(on)
-    if on then self:LockHighlight() else self:UnlockHighlight() end
-    if self.SetNormalFontObject then self:SetNormalFontObject(on and "GameFontHighlight" or "GameFontNormal") end
-    self.on = on and true or false
-  end
+  b.SetOn = setOn
   b:SetOn(false)
   return b
 end
@@ -625,7 +634,6 @@ local function onInsertLink(link)
     focus:SetText(link)
   end
 end
-W.OnInsertLink = onInsertLink
 local hookedInsert = false
 if ChatFrameUtil and ChatFrameUtil.InsertLink then
   hooksecurefunc(ChatFrameUtil, "InsertLink", onInsertLink)
@@ -759,11 +767,7 @@ end
 -- Botón pequeño de texto (filtros rápidos, interruptores). SetOn lo deja encendido.
 function W.Chip(parent, text, width, onClick)
   local b = W.Button(parent, text, width, 22, onClick)
-  function b:SetOn(on)
-    if on then self:LockHighlight() else self:UnlockHighlight() end
-    if self.SetNormalFontObject then self:SetNormalFontObject(on and "GameFontHighlight" or "GameFontNormal") end
-    self.on = on and true or false
-  end
+  b.SetOn = setOn
   return b
 end
 

@@ -14,7 +14,6 @@ local function modernForm()
   local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
   return page and page.SchematicForm, page
 end
-Missing.ModernForm = modernForm
 
 -- Materiales de la receta elegida: lista de { id, need } o nil si no hay ninguna elegida.
 local function selectedReagents()
@@ -573,7 +572,6 @@ local function attachModern()
   end
   ns.SafeCall(Missing.LayoutModern, form)
 end
-Missing.AttachModern = attachModern
 
 -- Engancha los botones en las ventanas de profesión. La interfaz de Blizzard las crea en
 -- el momento de abrirlas por primera vez (se cargan bajo demanda), así que se intenta en

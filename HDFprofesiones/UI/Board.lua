@@ -21,12 +21,6 @@ local function canAccept(r, info, me)
   return r.a ~= me and info.state == "open" and not info.owner and info.remaining > 0
 end
 
-local function urgencyText(r)
-  if not r.pr then return nil end
-  local color = r.pr == 1 and "|cffff4040" or "|cffff9933"
-  return color .. Data.WHEN[r.pr].need .. "|r"
-end
-
 -- Lo que me queda por enviar de un pedido que acepté (0 si nada).
 local function toSend(r, me, now)
   local cm = r.a ~= me and r.c and r.c[me]
@@ -465,5 +459,3 @@ ns.UI.MarketCollect = collect
 ns.UI.MarketRank = rank
 ns.UI.MaterialsStatus = materialsStatus
 ns.UI.PriceText = priceText
-ns.UI.UrgencyText = urgencyText
-ns.UI.CanAccept = canAccept

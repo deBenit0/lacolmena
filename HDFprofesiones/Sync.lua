@@ -242,6 +242,7 @@ end
 Sync.VersionNumber = versionNumber
 
 function Sync.NotePeerVersion(sender, av)
+  av = ns.CleanText(av, 20) -- viene de otro: sin colores ni enlaces y corto (sale en el chat)
   if type(av) ~= "string" then return end
   Sync.peers[sender] = av
   if versionNumber(av) > versionNumber(ns.VERSION) and versionNumber(av) > versionNumber(Sync.newest) then

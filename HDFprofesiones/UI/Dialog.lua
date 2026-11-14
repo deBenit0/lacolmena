@@ -310,10 +310,8 @@ local function create()
     })
     if r then
       self:Hide()
-      -- Que se vea en el Tablón: fuera los filtros de tipo y categoría.
-      local board = ns.db.settings.board
-      if board then board.show, board.cat = 1, 1 end
-      ns.UI.Open("board")
+      -- Se abre el Mercado con la petición nueva elegida (SelectById quita los filtros).
+      ns.UI.Open("market", r.id)
     end
   end
 end

@@ -168,9 +168,11 @@ function Offers.BuildInto(e, now)
     local owner, id = Offers.ParseKey(k)
     if owner and Offers.ClaimLeft(owner, ns.Me(), id, claim, now) > 0 then
       cl[k] = { q = claim.q, t = claim.t, b = claim.b }
-    else
+    elseif not owner or Offers.ClaimGot(owner, ns.Me(), id, claim) < (claim.q or 0) then
       c.claims[k] = nil
     end
+    -- Si ya me ha llegado todo, no se publica pero se deja: lo quita Offers.CheckReceived
+    -- (un segundo después), que es quien apunta el karma, el historial y el aviso.
   end
   if next(cl) then e.cl = cl end
   local od = {}

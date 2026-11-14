@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.34.1"
+ns.VERSION = "0.34.2"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -532,7 +532,7 @@ end
 ---------------------------------------------------------------------------
 -- Base de datos guardada (compartida por todos los personajes de la cuenta)
 ---------------------------------------------------------------------------
-local DEFAULT_SETTINGS = { alerts = true, sound = true, hideLowGear = true, onlyUsable = true, chatPost = true }
+local DEFAULT_SETTINGS = { alerts = true, sound = true, onlyUsable = true, chatPost = true }
 
 ns.On("ADDON_LOADED", function(name)
   if name ~= ADDON then return end

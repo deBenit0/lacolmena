@@ -53,7 +53,6 @@ local function resolve(id)
   if a then return a.page, a.mode end
   return PAGE_BY_ID[id] and id or "home", nil
 end
-UI.Resolve = resolve
 
 -- Cada página se registra con una función que construye su contenido.
 function UI.RegisterPage(id, create)
@@ -485,10 +484,6 @@ function UI.SetMini(on)
   end
 end
 
-function UI.IsMini()
-  return mini and mini:IsShown()
-end
-
 -- Abrir (desde la pestaña o el minimapa) siempre lleva a Inicio.
 function UI.Toggle(host)
   if panel and panel:IsShown() and (panel.host == host or not host) then
@@ -517,12 +512,6 @@ function UI.Counts()
     if r.a ~= me and not signed and D.State(r, now) == "open" then c.agenda = c.agenda + 1 end
   end
   return c
-end
-
--- Cuántas cosas te esperan: lo que puedes hacer y lo que tienes que enviar.
-function UI.PendingCount()
-  local c = UI.Counts()
-  return c.commits + c.market
 end
 
 -- Ventanas en las que se ha puesto la pestaña (para el diagnóstico).

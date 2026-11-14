@@ -22,7 +22,6 @@ local function someoneMakes(key, except)
   end
   return false
 end
-Extras.SomeoneMakes = someoneMakes
 
 -- Lista de lo que se pide y nadie da: { key, askers = { nombres }, t = lo más reciente }.
 function Extras.MissingRecipes(now)

@@ -14,7 +14,6 @@ local function mineChanged()
   end)
   ns.Fire("DATA_CHANGED", "mine")
 end
-Scan.MineChanged = mineChanged
 
 local function itemIdFromLink(link)
   return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
@@ -253,7 +252,6 @@ local function skillLine(i)
     return name, isHeader, isExpanded, rank, maxRank, nil
   end
 end
-Scan.SkillLine = skillLine
 
 function Scan.SkillLines()
   local c = ns.MyChar()

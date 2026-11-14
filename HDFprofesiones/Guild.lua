@@ -48,7 +48,6 @@ local function loose(name)
   if not who then return "" end
   return (who .. "-" .. realm:gsub("[%s%-']", "")):lower()
 end
-Guild.Loose = loose
 
 function Guild.Accepts(name)
   if type(name) ~= "string" then return false end
@@ -112,7 +111,6 @@ local function cleanup()
     if not Guild.Find(r.a) and not r.demo and r.a ~= me then
       g.requests[id] = nil
       g.alerted[id], g.thanked[id] = nil, nil
-      if g.karmaSeen then g.karmaSeen[id] = nil end
       removed = true
     end
   end
@@ -136,22 +134,6 @@ function Guild.DupesText()
   if #parts == 0 then return nil end
   table.sort(parts)
   return table.concat(parts, "; ")
-end
-
--- Avisa una vez por sesión de cada nombre de pila repetido.
-local dupesWarned = {}
-function Guild.WarnDupes()
-  for name, raws in pairs(Guild.dupes or {}) do
-    if not dupesWarned[name] then
-      dupesWarned[name] = true
-      local names = {}
-      for _, r in ipairs(raws) do names[#names + 1] = (r:match("^([^%-]+)") or r) end
-      local text = string.format("Hay %d en la hermandad que se llaman %s (%s): el addon aún no los distingue "
-        .. "y sus pedidos, ofertas y correos pueden liarse. Díselo a quien lleva el addon.", #raws, ns.ShortName(name),
-        table.concat(names, ", "))
-      if ns.Alerts and ns.Alerts.Push then ns.Alerts.Push({ type = "other", page = "guild", text = text }) else ns.Print(text) end
-    end
-  end
 end
 
 function Guild.Refresh()

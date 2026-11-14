@@ -43,6 +43,13 @@ end
 
 local function addToTooltip(tooltip, itemID)
   if not tooltip or not itemID or tooltip.hdfItem == itemID then return end
+  -- La marca para no repetir la línea se borra al limpiarse cada ventanita (también las de
+  -- comparar objetos, que no son GameTooltip): si no, la línea no volvía a salir en ellas.
+  if not tooltip.hdfHooked and tooltip.HookScript then
+    tooltip.hdfHooked = true
+    pcall(tooltip.HookScript, tooltip, "OnTooltipCleared", function(self) self.hdfItem = nil end)
+    pcall(tooltip.HookScript, tooltip, "OnHide", function(self) self.hdfItem = nil end)
+  end
   tooltip.hdfItem = itemID
   local line = QoL.TooltipLines(itemID)
   if line then
@@ -71,6 +78,7 @@ for _, tip in ipairs({ GameTooltip, ItemRefTooltip }) do
     pcall(tip.HookScript, tip, "OnTooltipSetItem", function(self) ns.SafeCall(addToTooltip, self, itemFromTooltip(self)) end)
     pcall(tip.HookScript, tip, "OnTooltipCleared", function(self) self.hdfItem = nil end)
     pcall(tip.HookScript, tip, "OnHide", function(self) self.hdfItem = nil end)
+    tip.hdfHooked = true
   end
 end
 
@@ -96,7 +104,6 @@ local function snapshot()
   end
   trade.items = any and items or nil
 end
-QoL.TradeSnapshot = snapshot
 
 local function tradePartner()
   local name = GetUnitName and GetUnitName("NPC", true) or (UnitName and UnitName("NPC"))
@@ -143,7 +150,6 @@ local function joinPattern()
   local pattern = escaped:gsub("%%s", "(.+)")
   return "^" .. pattern .. "$"
 end
-QoL.JoinPattern = joinPattern
 
 function QoL.WelcomeSettings()
   local s = ns.db.settings
