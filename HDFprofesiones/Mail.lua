@@ -27,7 +27,7 @@ end
 function Mail.OnSendMail(recipient)
   if type(recipient) ~= "string" or recipient == "" then return end
   local items = attachedItems()
-  pending = next(items) and { to = ns.FullName(recipient), items = items } or nil
+  pending = next(items) and { to = ns.FullName(recipient), items = items, t = GetTime() } or nil
 end
 
 -- Apunta una entrega a "to" de los objetos "items" ({ [id] = cantidad }), por correo o en mano:
@@ -74,6 +74,8 @@ end
 function Mail.OnSent()
   local mail = pending
   pending = nil
+  -- Si la confirmación llega muy tarde, ese correo ya no es el de este envío: no se apunta.
+  if mail and GetTime() - (mail.t or 0) > 15 then mail = nil end
   if mail then Mail.RegisterDelivery(mail.to, mail.items, "por correo") end
 end
 
@@ -177,6 +179,7 @@ hookSendButton()
 ns.On("MAIL_SHOW", hookSendButton)
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
+ns.On("MAIL_CLOSED", function() pending = nil end)
 
 -- Lo mismo para una oferta mía: destinatario, asunto y, si tiene precio, contra reembolso.
 function Mail.PrepareOffer(who, id, amount, price)

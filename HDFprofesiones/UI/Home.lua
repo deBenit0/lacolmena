@@ -12,7 +12,7 @@ local HELP = {
     .. "aceptar el encargo, susurrar o preparar el correo. Al enviarlo por correo se completa solo." },
   { "+ Pedir y + Ofrecer", "Elige un objeto del catálogo o arrástralo desde tus bolsas al botón." },
   { "Grupos", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
-    .. "y «Hacer grupo» elige 1 tanque, 1 sanador y 3 de daño." },
+    .. "y quien la propuso pulsa «Elegir grupo»: elige 1 tanque, 1 sanador y 3 de daño." },
   { "Hermandad", "Miembro de la semana, karma, quién fabrica qué y, para oficiales, anuncios y pedidos de la hermandad." },
   { "Karma", "+1 por cada pedido u oferta que das y -1 por cada uno que recibes (tus alts suman contigo)." },
   { "Tus recetas", "Para que salgan a los demás, abre una vez la ventana de cada profesión." },

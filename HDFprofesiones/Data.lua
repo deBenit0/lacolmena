@@ -79,7 +79,6 @@ local function deepCopy(v)
   for k, x in pairs(v) do t[k] = deepCopy(x) end
   return t
 end
-Data.Copy = deepCopy
 
 -- Nueva versión: siempre mayor que la anterior, aunque sea en el mismo segundo.
 local function bump(old, now)
@@ -225,6 +224,7 @@ function Data.ApplyEntry(e)
   if cur and cur.v >= e.v then return false, cur.v > e.v end
   g.entries[e.n] = e
   Data.indexDirty = true
+  Data.InvalidateKarma()
   if e.n == ns.Me() then Data.RestoreMine(e) end
   return true, false
 end
@@ -294,6 +294,7 @@ function Data.UpdateMyEntry(now)
   end
   g.entries[e.n] = e
   Data.indexDirty = true
+  Data.InvalidateKarma()
   return true
 end
 
@@ -410,9 +411,27 @@ end
 -- Karma de un personaje, en puntos (1 punto por pedido): los pedidos que le reconocen los
 -- demás por entregar, menos los que ha recibido él.
 -- Se suma por persona: el principal y todos sus alts.
+-- Con caché (se pide por cada fila al repintar): se vacía al cambiar cualquier ficha o la lista.
+local karmaCache, karmaCacheG = {}, nil
+function Data.InvalidateKarma() karmaCache = {} end
+ns.Listen("DATA_CHANGED", Data.InvalidateKarma)
+ns.Listen("ROSTER_UPDATED", Data.InvalidateKarma)
+
+local karmaUncached
 function Data.KarmaFor(name)
   local g = ns.G()
   if not g then return 0 end
+  if karmaCacheG ~= g then karmaCache, karmaCacheG = {}, g end
+  local key = name or false
+  local k = karmaCache[key]
+  if k == nil then
+    k = karmaUncached(g, name)
+    karmaCache[key] = k
+  end
+  return k
+end
+
+function karmaUncached(g, name)
   local mainOf = ns.Social and ns.Social.MainOf or function(n) return n end
   local person = mainOf(name)
   local copper = 0
@@ -531,11 +550,11 @@ end
 function Data.MergeInfo(ik, d)
   if type(ik) ~= "string" or #ik > 40 or not ik:match("^[^:]+:[ie]%d+$") or type(d) ~= "table" then return false end
   -- Tope de recetas guardadas: nadie puede llenar el archivo de guardado de recetas inventadas.
-  if ns.db and ns.db.info and not ns.db.info[ik] then
+  local isNew = ns.db and ns.db.info and not ns.db.info[ik]
+  if isNew then
     ns.infoCount = ns.infoCount or 0
     if ns.infoCount == 0 then for _ in pairs(ns.db.info) do ns.infoCount = ns.infoCount + 1 end end
     if ns.infoCount >= Data.MAX_INFO then return false end
-    ns.infoCount = ns.infoCount + 1
   end
   local changed = false
   if type(d.v) == "table" then
@@ -546,6 +565,8 @@ function Data.MergeInfo(ik, d)
     end
   end
   if d.cd == true then changed = Data.MarkCooldown(ik) or changed end
+  -- Solo cuenta si de verdad se ha guardado algo (si no, el tope se llenaba con recetas vacías).
+  if isNew and ns.db.info[ik] then ns.infoCount = ns.infoCount + 1 end
   return changed
 end
 
@@ -888,7 +909,6 @@ function Data.MergeCopies(now)
     g.requests[p.id] = nil
     g.alerted[p.id] = nil
     g.thanked[p.id] = nil
-    if g.karmaSeen then g.karmaSeen[p.id] = nil end
     -- si el de verdad ya terminó y se borró, la copia no lo resucita
     if not (g.gone and g.gone[p.req.id]) then Data.ApplyRequest(p.req, now) end
   end
@@ -911,7 +931,6 @@ function Data.Purge(now)
       g.requests[id] = nil
       g.alerted[id] = nil
       g.thanked[id] = nil
-      if g.karmaSeen then g.karmaSeen[id] = nil end
     end
   end
 end

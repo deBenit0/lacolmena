@@ -1,5 +1,5 @@
 -- Quedadas de mazmorra: alguien propone una mazmorra (ahora o a una hora), los demás se
--- apuntan con los roles que pueden hacer y quien la propuso pulsa "Hacer grupo": el addon
+-- apuntan con los roles que pueden hacer y quien la propuso pulsa "Elegir grupo": el addon
 -- elige 1 tanque, 1 sanador y 3 DPS, deja al resto de suplentes y puede invitarlos.
 --
 -- Quedada:
@@ -242,10 +242,7 @@ local function bump(old, now)
   return max(now, (old or 0) + 1)
 end
 
-local function hasRole(mask, bit)
-  return mask and floor(mask / bit) % 2 == 1
-end
-Dungeons.HasRole = hasRole
+local hasRole = Dungeons.HasRole
 
 function Dungeons.Dungeon(d)
   return Dungeons.BY_ID[d] or { id = d, name = "Mazmorra", min = 1, max = 60 }
@@ -357,11 +354,25 @@ function Dungeons.Sanitize(r)
     out.gp = gp
   end
   if type(r.s) == "table" then
-    local s, any, count = {}, false, 0
+    -- Nunca hay más de 40 apuntados. Se eligen siempre los mismos (por orden de nombre, y los que
+    -- se han borrado de la lista al final): antes dependía del orden de pairs y cada uno se
+    -- quedaba con 40 distintos.
+    local valid = {}
     for name, su in pairs(r.s) do
-      count = count + 1
-      if count > 40 then break end -- nunca hay más de 40 apuntados
       if type(name) == "string" and #name <= 80 and not name:find("|", 1, true) and type(su) == "table" then
+        valid[#valid + 1] = name
+      end
+    end
+    table.sort(valid, function(x, y)
+      local ox, oy = r.s[x].o == true, r.s[y].o == true
+      if ox ~= oy then return oy end
+      return x < y
+    end)
+    local s, any = {}, false
+    for i = 1, min(#valid, 40) do
+      local name = valid[i]
+      local su = r.s[name]
+      do
         local o = {}
         local mask = tonumber(su.r)
         if mask and mask >= 0 and mask <= 7 then o.r = floor(mask) end

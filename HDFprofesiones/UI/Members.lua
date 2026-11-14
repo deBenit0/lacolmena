@@ -355,7 +355,7 @@ ns.UI.RegisterPage("members", function(page)
       if filter == "online" then ok = item.online
       elseif filter == "addon" then ok = item.hasAddon
       elseif filter == "crafters" then ok = item.crafter
-      elseif filter == "officers" then ok = (item.rank or 9) <= 1 end
+      elseif filter == "officers" then ok = ns.Social.IsOfficer(name) end
       if ok and query ~= "" then
         ok = item.display:lower():find(query, 1, true) ~= nil
       end

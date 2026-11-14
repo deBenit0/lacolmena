@@ -4,7 +4,7 @@
 -- «Filtros ▾». A la izquierda la lista (el mismo objeto pedido por varios se junta en una
 -- fila); a la derecha el detalle de lo elegido, con quién lo fabrica.
 local _, ns = ...
-local W, Data, Guild = ns.W, ns.Data, ns.Guild
+local W, Data = ns.W, ns.Data
 
 local LIST_W, DETAIL_W, BODY_H = 444, 334, 372
 local ROWS, ROW_H, HEADER_H = 7, 48, 24
@@ -88,13 +88,6 @@ local function settings()
   return m
 end
 
--- Lo que me queda por enviar de un pedido que acepté (0 si nada).
-local function toSend(r, me, now)
-  local cm = r.a ~= me and r.c and r.c[me]
-  if not cm or not Data.CommitActive(cm, now, r) then return 0 end
-  return math.max(0, (cm.n or 0) - Data.DeliveredOf(cm))
-end
-
 local function payText(r)
   local parts = {}
   if r.g then parts[#parts + 1] = ns.FormatMoney(r.g) end
@@ -161,7 +154,6 @@ local function stepsText(r, info)
   end
   return table.concat(parts, " |cff999999›|r ")
 end
-ns.UI.RequestSteps = stepsText
 
 -- Cuándo caduca algo, en corto ("caduca en 2 d"); en rojo si queda menos de un día.
 local function expiresText(at, now)
@@ -1475,18 +1467,6 @@ ns.UI.RegisterPage("market", function(page)
     state.selected = id
     page:Refresh()
     list:Select(state.selected)
-  end
-
-  -- Lo de antes: "Mis pedidos", "Mis encargos" e historial de la 0.29.
-  ns.UI.FilterRequests = function(fid)
-    local f = ns.UI.PageFrame("market")
-    if not f then return end
-    if fid == "ended" then
-      state.ended = true
-      f:SetChip(nil)
-    else
-      f:SetChip(fid == "craft" and "craft" or fid == "involved" and "involved" or fid == "mine" and "mine" or nil)
-    end
   end
 
   -- "Nuevo": lo que ha llegado desde la última vez que miraste. Al entrar se toma la marca

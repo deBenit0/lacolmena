@@ -839,6 +839,9 @@ ns.UI.RegisterPage("dungeons", function(page)
     detail.make:SetText(r.gp and "Volver a elegir" or "Elegir grupo")
     if D.IsLeveling(r) then
       ns.UI.Tip(detail.make, "Grupo de leveo", "Sin roles: entran los 5 primeros en apuntarse (tú delante).")
+    else
+      -- si no, se quedaba la ayuda del leveo de la última quedada de leveo que se miró
+      ns.UI.Tip(detail.make, "Elegir grupo", "Elige entre los apuntados 1 tanque, 1 sanador y 3 DPS.")
     end
     detail.make:SetScript("OnClick", function() ns.Sync.MakeGroup(r.id) end)
     detail.invite:SetEnabled(open and r.gp ~= nil)
@@ -917,12 +920,14 @@ ns.UI.RegisterPage("dungeons", function(page)
     state.week = math.max(0, math.min(MAX_WEEK,
       math.floor((state.day - D.DayNumber(now) + weekdayOffset(now)) / 7)))
     state.id = nil
+    state.kind = "all" -- con otro tipo elegido, la quedada podía no salir en la lista
     page:Refresh()
   end
 
   function page:SelectById(id)
     state.id = id
     state.day = nil
+    state.kind = "all"
     page:Refresh()
     list:Select(id)
   end

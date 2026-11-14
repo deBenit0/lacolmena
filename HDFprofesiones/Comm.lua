@@ -148,7 +148,7 @@ local function pump()
       if ok and (result == false or THROTTLED[result]) then
         -- el servidor nos frena: reintentar más tarde
         item.tries = (item.tries or 0) + 1
-        if item.tries > 5 then table.remove(queue, 1) end
+        if item.tries > 5 then dropFirst(queue) end -- el mensaje entero, no solo este trozo
         tokens = 0
         return
       end
@@ -158,7 +158,6 @@ local function pump()
     end
   end
 end
-Comm.Pump = pump
 C_Timer.NewTicker(0.2, function() ns.SafeCall(pump) end)
 
 local function dispatch(sender, text, channel)
@@ -174,7 +173,8 @@ function Comm.OnAddonMessage(prefix, text, channel, sender)
   if channel ~= "GUILD" and channel ~= "WHISPER" then return end
   sender = ns.FullName(sender)
   if not sender or sender == ns.Me() then return end
-  if channel == "WHISPER" and not (ns.Guild and ns.Guild.IsMember(sender)) then return end
+  -- Susurros: solo de la hermandad, buscando el nombre igual que en el resto (otro reino interno...).
+  if channel == "WHISPER" and not (ns.Guild and ns.Guild.Accepts(sender)) then return end
   if ns.Guild then ns.Guild.MarkSeen(sender) end
 
   local head = string.sub(text, 1, 1)

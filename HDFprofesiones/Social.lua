@@ -421,12 +421,6 @@ function Social.AddHelps(ids)
   end
 end
 
-function Social.AddHelp(n)
-  local ids = {}
-  for i = 1, n or 0 do ids[i] = "anon:" .. ns.Now() .. ":" .. i end
-  Social.AddHelps(ids)
-end
-
 -- Ayudas por persona (sumando sus alts): { {name = principal, n} }, de más a menos.
 -- which = "this" (esta semana) o "last" (la anterior).
 function Social.Ranking(which, now)
