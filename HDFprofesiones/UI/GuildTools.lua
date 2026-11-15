@@ -75,9 +75,123 @@ function Tools.MOTD()
   return ok and text or ""
 end
 
-function Tools.SetMOTD(text)
-  local fn = (C_GuildInfo and C_GuildInfo.SetMOTD) or G("GuildSetMOTD")
-  return call(fn, (text or ""):sub(1, 128))
+-- Lo más largo que deja el juego: 128 letras (bytes); se corta sin partir una letra con tilde.
+Tools.MOTD_MAX = 128
+local function cutUtf8(s, max)
+  local out, len = {}, 0
+  for ch in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    if len + #ch > max then break end
+    out[#out + 1] = ch
+    len = len + #ch
+  end
+  return table.concat(out)
+end
+
+-- La macro para cambiarlo: "/gmotd texto" (en una línea; vacío lo borra).
+function Tools.MOTDMacro(text)
+  text = tostring(text or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  text = cutUtf8(text, Tools.MOTD_MAX)
+  local cmd = W.Slash("GUILD_MOTD", "/gmotd")
+  return text ~= "" and (cmd .. " " .. text) or cmd
+end
+
+-- Las órdenes con nombre: /ginvite, /invite, /gpromote, /gdemote, /gremove.
+function Tools.InviteMacro(name) return W.MacroLine("GUILD_INVITE", "/ginvite", name) end
+function Tools.PartyMacro(name) return W.MacroLine("INVITE", "/invite", name) end
+function Tools.PromoteMacro(name) return W.MacroLine("GUILD_PROMOTE", "/gpromote", name) end
+function Tools.DemoteMacro(name) return W.MacroLine("GUILD_DEMOTE", "/gdemote", name) end
+function Tools.RemoveMacro(name) return W.MacroLine("GUILD_UNINVITE", "/gremove", name) end
+function Tools.LeaveMacro() return W.Slash("GUILD_LEAVE", "/gquit") end
+
+local function refreshSoon() ns.After(1, function() ns.Guild.RequestRoster() end) end
+
+-- Ventana pequeña con una caja de texto y un botón seguro (invitar y mensaje del día).
+-- opts: name, title, label, width, maxBytes, button, macro(text), done(text), none
+local function inputDialog(opts)
+  local f = W.Panel(opts.name, UIParent, 400, 130)
+  f:SetFrameStrata("DIALOG")
+  f:SetToplevel(true)
+  f:SetPoint("CENTER", 0, 120)
+  f:Hide()
+  tinsert(UISpecialFrames, opts.name)
+  local close = W.CloseButton(f)
+  close:SetPoint("TOPRIGHT", -6, -6)
+  f.title = W.Text(f, "GameFontNormal", "CENTER")
+  f.title:SetPoint("TOP", 0, -16)
+  f.title:SetWidth(360)
+  f.title:SetText(opts.title)
+  f.edit = W.Input(f, 340)
+  f.edit:SetPoint("TOP", 0, -46)
+  if opts.maxBytes then f.edit:SetMaxBytes(opts.maxBytes + 1) end
+  f.hint = W.Text(f, "GameFontDisableSmall", "CENTER")
+  f.hint:SetPoint("TOP", f.edit, "BOTTOM", 0, -6)
+  f.hint:SetWidth(360)
+  f.ok = W.Button(f, opts.button, 110, 22)
+  f.ok:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -6, 14)
+  f.cancel = W.Button(f, CANCEL or "Cancelar", 110, 22, function() f:Hide() end)
+  f.cancel:SetPoint("BOTTOMLEFT", f, "BOTTOM", 6, 14)
+  -- Intro no puede hacer la orden (no es un clic): se dice qué botón pulsar.
+  f.edit:SetScript("OnEnterPressed", function(self)
+    self:ClearFocus()
+    f.hint:SetText("Pulsa «" .. opts.button .. "».")
+  end)
+  f.edit:SetScript("OnEscapePressed", function() f:Hide() end)
+  W.SecureMacro(f.ok, function()
+    if not f:IsShown() then return nil end
+    return opts.macro(f.edit:GetText() or "")
+  end, function()
+    local text = f.edit:GetText() or ""
+    f:Hide()
+    if opts.done then opts.done(text) end
+  end, opts.none)
+  return f
+end
+
+-- Cambiar el mensaje del día.
+local motdWindow
+function Tools.EditMOTD()
+  if not Tools.CanEditMOTD() then
+    ns.Print("tu rango no puede cambiar el mensaje del día.")
+    return
+  end
+  if not motdWindow then
+    motdWindow = inputDialog({
+      name = "HDFProfMOTD", title = "Mensaje del día de la hermandad:", button = "Guardar",
+      maxBytes = Tools.MOTD_MAX,
+      macro = function(text) return Tools.MOTDMacro(text) end,
+      done = function() refreshSoon() end,
+    })
+  end
+  motdWindow.edit:SetText(Tools.MOTD())
+  motdWindow.hint:SetText("Hasta " .. Tools.MOTD_MAX .. " letras.")
+  motdWindow:Show()
+  motdWindow.edit:SetFocus()
+  return motdWindow
+end
+
+-- Invitar a la hermandad: se escribe el nombre del personaje (con apellido si lo tiene).
+local inviteWindow
+local function cleanName(text)
+  return (tostring(text or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s%s+", " "))
+end
+function Tools.ShowInvite()
+  if not inviteWindow then
+    inviteWindow = inputDialog({
+      name = "HDFProfInvite", title = "¿A quién invitas a la hermandad?", button = "Invitar",
+      macro = function(text)
+        local name = cleanName(text)
+        if name == "" then return nil end
+        return Tools.InviteMacro(name)
+      end,
+      done = function(text) ns.Print("invitación a la hermandad enviada a %s.", cleanName(text)) refreshSoon() end,
+      none = "escribe el nombre del personaje.",
+    })
+  end
+  inviteWindow.edit:SetText("")
+  inviteWindow.hint:SetText("Nombre del personaje (con apellido si lo tiene).")
+  inviteWindow:Show()
+  inviteWindow.edit:SetFocus()
+  return inviteWindow
 end
 
 ---------------------------------------------------------------------------
@@ -214,9 +328,8 @@ function Tools.OpenRanks()
 end
 
 function Tools.Leave()
-  W.Confirm("¿Seguro que quieres SALIR de la hermandad? Para volver, alguien tendrá que invitarte.", function()
-    call(G("GuildLeave"))
-  end)
+  W.SecureConfirm("¿Seguro que quieres SALIR de la hermandad? Para volver, alguien tendrá que invitarte.",
+    Tools.LeaveMacro(), refreshSoon)
 end
 
 ---------------------------------------------------------------------------
@@ -267,6 +380,13 @@ local function createCard()
   f.tell:SetPoint("TOPLEFT", 20, -200)
   f.party = W.Button(f, "Invitar al grupo", 140, 22)
   f.party:SetPoint("LEFT", f.tell, "RIGHT", 6, 0)
+  -- Invitar al grupo: "/invite Nombre" con el botón seguro (f.partyName lo pone ShowMember).
+  W.SecureMacro(f.party, function()
+    if not f:IsShown() or not f.partyName then return nil end
+    return Tools.PartyMacro(f.partyName)
+  end, function()
+    ns.Print("invitación al grupo enviada a %s.", f.partyName or "?")
+  end)
   f.hint = W.Text(f, "GameFontDisableSmall")
   f.hint:SetPoint("BOTTOMLEFT", 20, 16)
   f.hint:SetWidth(320)
@@ -318,27 +438,25 @@ function Tools.ShowMember(name, info)
   local myRaw = ns.Guild.Info(ns.Me())
   local me = name == ns.Me() and (not myRaw or myRaw.raw == info.raw)
   f.promote:SetEnabled(not me and Tools.CanPromote())
+  -- Ascender, degradar y expulsar: se confirma en una ventana propia cuyo «Sí» es la orden.
   f.promote:SetScript("OnClick", function()
-    W.Confirm("¿Ascender a " .. display .. "?", function() call((C_GuildInfo and C_GuildInfo.Promote) or G("GuildPromote"), game) end)
+    W.SecureConfirm("¿Ascender a " .. display .. "?", Tools.PromoteMacro(game), refreshSoon)
   end)
   f.demote:SetEnabled(not me and Tools.CanDemote())
   f.demote:SetScript("OnClick", function()
-    W.Confirm("¿Degradar a " .. display .. "?", function() call((C_GuildInfo and C_GuildInfo.Demote) or G("GuildDemote"), game) end)
+    W.SecureConfirm("¿Degradar a " .. display .. "?", Tools.DemoteMacro(game), refreshSoon)
   end)
   f.remove:SetEnabled(not me and Tools.CanRemove())
   f.remove:SetScript("OnClick", function()
-    W.Confirm("¿EXPULSAR a " .. display .. " de la hermandad?", function()
-      call((C_GuildInfo and C_GuildInfo.Uninvite) or G("GuildUninvite"), game)
+    W.SecureConfirm("¿EXPULSAR a " .. display .. " de la hermandad?", Tools.RemoveMacro(game), function()
       f:Hide()
+      refreshSoon()
     end)
   end)
   f.tell:SetEnabled(not me)
   f.tell:SetScript("OnClick", function() ns.SendTell(target) end)
   f.party:SetEnabled(not me and info.online)
-  f.party:SetScript("OnClick", function()
-    local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or G("InviteUnit")
-    if invite then pcall(invite, ns.TellName and ns.TellName(target) or game) end
-  end)
+  f.partyName = not me and (ns.TellName and ns.TellName(target) or game) or nil
   f.hint:SetText("Los botones apagados son los que tu rango no puede usar.")
   f:Show()
 end

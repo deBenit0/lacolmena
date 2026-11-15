@@ -263,6 +263,18 @@ function Diag.Report()
   end
   lines[#lines + 1] = string.format("Total: %d bien, %d fallan, %d sin comprobar", good, bad, unknown)
   lines[#lines + 1] = ""
+  local mails = ns.db and ns.db.mailLog or {}
+  lines[#lines + 1] = string.format("CORREOS QUE FALLARON (%d)", #mails)
+  for i, m in ipairs(mails) do
+    local when = (date and m.t and m.t > 0) and date("%d/%m %H:%M", m.t) or "?"
+    lines[#lines + 1] = string.format("%d) [%s, v%s] %s%s · a «%s» · reembolso %s, dinero %s · %s", i, when,
+      tostring(m.v), tostring(m.why), m.extra and (" (" .. m.extra .. ")") or "", tostring(m.to),
+      m.cod and "sí" or "no", tostring(m.money), tostring(m.addon))
+    if m.msg then lines[#lines + 1] = "     juego: " .. tostring(m.msg) end
+    lines[#lines + 1] = "     objetos: " .. (m.items ~= "" and m.items or "ninguno")
+  end
+  if #mails == 0 then lines[#lines + 1] = "(ninguno)" end
+  lines[#lines + 1] = ""
   local errors = ns.db and ns.db.errors or {}
   lines[#lines + 1] = string.format("ERRORES GUARDADOS (%d)", #errors)
   for i, e in ipairs(errors) do
@@ -340,7 +352,7 @@ local function createWindow()
   window.recheck = W.Button(window, "Comprobar otra vez", 156, 22, function() Diag.Show() end)
   window.recheck:SetPoint("BOTTOMLEFT", 20, 14)
   window.clear = W.Button(window, "Borrar errores", 126, 22, function()
-    if ns.db then wipe(ns.db.errors) end
+    if ns.db then wipe(ns.db.errors); if ns.db.mailLog then wipe(ns.db.mailLog) end end
     Diag.Show()
   end)
   window.clear:SetPoint("LEFT", window.recheck, "RIGHT", 6, 0)
@@ -369,3 +381,7 @@ function Diag.Show()
   ns.Print("comprobación: %d bien, %d fallan, %d sin comprobar.", good, bad, unknown)
   return good, bad, unknown
 end
+
+-- Acciones que el juego bloquea por un addon: se apuntan en los errores (con el addon y la función).
+ns.On("ADDON_ACTION_BLOCKED", function(addon, func) ns.LogBlocked("Acción bloqueada", addon, func) end)
+ns.On("ADDON_ACTION_FORBIDDEN", function(addon, func) ns.LogBlocked("Acción prohibida", addon, func) end)

@@ -85,60 +85,6 @@ local function addonText(e)
   return "|cffff9933\194\183 Versión antigua|r", 1
 end
 
--- Ventana para escribir a quién invitar.
-StaticPopupDialogs["HDFPROF_INVITE"] = {
-  text = "¿A quién invitas a la hermandad?\n(nombre del personaje)",
-  button1 = ACCEPT or "Aceptar",
-  button2 = CANCEL or "Cancelar",
-  hasEditBox = true,
-  timeout = 0,
-  whileDead = true,
-  hideOnEscape = true,
-  preferredIndex = 3,
-  OnAccept = function(self)
-    local edit = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
-    local name = edit and edit:GetText() or ""
-    name = name:gsub("^%s+", ""):gsub("%s+$", "")
-    if name == "" then return end
-    local invite = (C_GuildInfo and C_GuildInfo.Invite) or GuildInvite
-    if invite then pcall(invite, name) end
-  end,
-  EditBoxOnEnterPressed = function(self)
-    local popup = self:GetParent()
-    StaticPopupDialogs["HDFPROF_INVITE"].OnAccept(popup)
-    popup:Hide()
-  end,
-  EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-}
-
--- Cambiar el mensaje del día.
-StaticPopupDialogs["HDFPROF_MOTD"] = {
-  text = "Mensaje del día de la hermandad:",
-  button1 = ACCEPT or "Aceptar",
-  button2 = CANCEL or "Cancelar",
-  hasEditBox = true,
-  maxLetters = 128,
-  editBoxWidth = 350,
-  timeout = 0,
-  whileDead = true,
-  hideOnEscape = true,
-  preferredIndex = 3,
-  OnShow = function(self)
-    local edit = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
-    if edit and ns.GuildTools then edit:SetText(ns.GuildTools.MOTD()) end
-  end,
-  OnAccept = function(self)
-    local edit = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
-    if edit and ns.GuildTools then ns.GuildTools.SetMOTD(edit:GetText() or "") end
-  end,
-  EditBoxOnEnterPressed = function(self)
-    local popup = self:GetParent()
-    StaticPopupDialogs["HDFPROF_MOTD"].OnAccept(popup)
-    popup:Hide()
-  end,
-  EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-}
-
 ns.UI.RegisterPage("members", function(page)
   local filter, query, showInactive = "all", "", false
   -- Orden: pulsar el título de una columna ordena por ella; otra vez, al revés.
@@ -288,16 +234,12 @@ ns.UI.RegisterPage("members", function(page)
   page.motd:SetWidth(684)
   page.motd:SetJustifyH("LEFT")
   page.motd:SetWordWrap(false)
-  page.motdEdit = W.Button(page, "Cambiar", 82, 20, function()
-    StaticPopup_Show("HDFPROF_MOTD")
-  end)
+  page.motdEdit = W.Button(page, "Cambiar", 82, 20, function() ns.GuildTools.EditMOTD() end)
   page.motdEdit:SetPoint("BOTTOMRIGHT", -4, 30)
 
   -- Abajo: invitar, información, registro, rangos, salir y la ventana del juego.
   local T = function() return ns.GuildTools end
-  page.invite = W.Button(page, "Invitar a miembro", 146, 22, function()
-    StaticPopup_Show("HDFPROF_INVITE")
-  end)
+  page.invite = W.Button(page, "Invitar a miembro", 146, 22, function() T().ShowInvite() end)
   page.invite:SetPoint("BOTTOMLEFT", 0, 2)
   page.info = W.Button(page, "Información", 106, 22, function() T().ShowInfo() end)
   page.info:SetPoint("LEFT", page.invite, "RIGHT", 6, 0)

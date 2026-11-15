@@ -99,7 +99,12 @@ local function currentMoney()
   return (MoneyInputFrame_GetCopper and SendMailMoney and MoneyInputFrame_GetCopper(SendMailMoney)) or 0
 end
 
+-- Casilla de Opciones «Ayuda con el correo»: apagada, el addon no hace nada en el buzón (para
+-- descartar que sea él cuando falla un envío).
+function Mail.Off() return ns.db and ns.db.settings and ns.db.settings.mailOff and true or false end
+
 local function applyCOD()
+  if Mail.Off() then return end
   if not cod or not SendMailCODButton or not SendMailMoney or not MoneyInputFrame_SetCopper then return end
   -- Si ha cambiado el destinatario, ya no es nuestro correo.
   local to = (SendMailNameEditBox and SendMailNameEditBox:GetText() or ""):lower()
@@ -169,14 +174,66 @@ end
 
 -- Qué se envía: se mira al pulsar «Enviar» del buzón, sin tocar la función de enviar del juego.
 local function hookSendButton()
+  if Mail.Off() then return end -- con la ayuda apagada ni siquiera se engancha al botón
   if Mail.hooked or not SendMailMailButton or not SendMailMailButton.HookScript then return end
   Mail.hooked = true
   SendMailMailButton:HookScript("OnClick", function()
+    if Mail.Off() then return end
     ns.SafeCall(Mail.OnSendMail, SendMailNameEditBox and SendMailNameEditBox:GetText())
   end)
 end
-hookSendButton()
+Mail.HookSendButton = hookSendButton
 ns.On("MAIL_SHOW", hookSendButton)
+
+---------------------------------------------------------------------------
+-- Registro de envíos que fallan (sale en «Comprobar el addon»). Solo escucha avisos del juego:
+-- no toca el buzón. Cuando falla, el correo sigue escrito en el buzón y se lee tal cual.
+---------------------------------------------------------------------------
+local lastError -- { t, msg }: último mensaje rojo del juego con el buzón abierto
+
+local function mailSnapshot(reason, extra)
+  if not ns.db then return end
+  ns.db.mailLog = ns.db.mailLog or {}
+  local log = ns.db.mailLog
+  local items = {}
+  for i = 1, ATTACHMENTS_MAX_SEND or 12 do
+    if HasSendMailItem and HasSendMailItem(i) then
+      local name, b, _, d = GetSendMailItem(i)
+      local link = GetSendMailItemLink and GetSendMailItemLink(i)
+      local id = type(link) == "string" and tonumber(link:match("item:(%d+)")) or (type(b) == "number" and b) or nil
+      local _, _, _, equipLoc, _, classID, subclassID = nil, nil, nil, nil, nil, nil, nil
+      if id and ns.ItemInstant then equipLoc, classID, subclassID = ns.ItemInstant(id) end
+      items[#items + 1] = string.format("%s x%s (id %s, tipo %s/%s %s)", tostring(name), tostring(d or "?"),
+        tostring(id), tostring(classID), tostring(subclassID), tostring(equipLoc or ""))
+    end
+  end
+  local codOn = SendMailCODButton and SendMailCODButton.GetChecked and SendMailCODButton:GetChecked()
+  local money = (MoneyInputFrame_GetCopper and SendMailMoney and MoneyInputFrame_GetCopper(SendMailMoney)) or 0
+  local entry = {
+    t = time and time() or 0, v = ns.VERSION, why = reason,
+    msg = (lastError and GetTime and GetTime() - lastError.t < 10) and lastError.msg or nil,
+    extra = extra,
+    to = SendMailNameEditBox and SendMailNameEditBox:GetText() or "?",
+    cod = codOn and true or false, money = money,
+    items = table.concat(items, "; "),
+    addon = Mail.Off() and "ayuda apagada" or (cod and ("reembolso del addon " .. tostring(cod.amount)
+      .. (cod.applied and " (puesto)" or " (sin poner)")) or "sin nada del addon"),
+  }
+  if #log >= 8 then table.remove(log, 1) end
+  log[#log + 1] = entry
+end
+Mail.Snapshot = mailSnapshot
+
+ns.On("UI_ERROR_MESSAGE", function(_, msg)
+  if MailFrame and MailFrame:IsShown() and type(msg) == "string" then
+    lastError = { t = GetTime(), msg = msg }
+    -- algunos fallos del correo solo dan el mensaje rojo (sin MAIL_FAILED)
+    if SendMailFrame and SendMailFrame:IsShown() then ns.SafeCall(mailSnapshot, "mensaje del juego") end
+  end
+end)
+ns.On("MAIL_FAILED", function(itemID)
+  ns.SafeCall(mailSnapshot, "MAIL_FAILED", itemID and ("objeto " .. tostring(itemID)) or nil)
+end)
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
 ns.On("MAIL_CLOSED", function() pending = nil end)

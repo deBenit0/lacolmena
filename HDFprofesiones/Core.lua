@@ -2,7 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.34.2"
+ns.VERSION = "0.34.4"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
@@ -32,6 +32,12 @@ function ns.LogError(text, stack)
   end
   if #log >= 20 then table.remove(log, 1) end
   log[#log + 1] = { m = text, s = stack, t = time and time() or 0, v = ns.VERSION, n = 1 }
+end
+
+-- El juego avisa cuando bloquea una acción por culpa de un addon (cualquiera, no solo este).
+-- Se apunta para verlo en «Comprobar el addon».
+function ns.LogBlocked(kind, addon, func)
+  ns.LogError(string.format("%s: addon «%s», función %s", kind, tostring(addon), tostring(func)))
 end
 
 local function stackText()
