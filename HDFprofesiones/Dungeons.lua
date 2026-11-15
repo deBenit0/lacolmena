@@ -746,28 +746,71 @@ local function inviteCandidates(full)
   return list
 end
 
-local pending = {} -- ["nombre corto en minúsculas"] = { list, i, t }
+-- Invitar al grupo es cosa de la interfaz del juego: desde el addon se bloquea. Se hace con
+-- una macro ("/invite Nombre", una línea por cada uno) que lanza el botón seguro al pulsar
+-- «Invitar» (UI/Dungeons.lua). Aquí solo se prepara el texto y se apunta a quién se invitó.
+local pending = {} -- ["nombre corto en minúsculas"] = { list, i, t, sent, retry }
+local RESEND = 30 -- segundos: a los ya invitados no se les vuelve a invitar hasta entonces
 
-local function sendInvite(name)
-  local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-  if invite then pcall(invite, name) end
-end
-
-function Dungeons.Invite(r)
-  if not r or not r.gp then return 0 end
-  if not ((C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit) then return 0 end
-  local me, n = ns.Me(), 0
+-- Los que faltan por invitar (sin mí, sin los que ya están en el grupo ni los de prueba).
+local function toInvite(r)
+  local me, out = ns.Me(), {}
   local party = partyNames()
   for _, name in ipairs(Dungeons.Members(r.gp)) do
     local short = ns.ShortName(name)
     if name ~= me and not party[short:lower()] and not (ns.Demo and ns.Demo.IsDemo(name)) then
-      local list = inviteCandidates(name)
-      pending[short:lower()] = { list = list, i = 1, t = GetTime and GetTime() or 0 }
-      sendInvite(list[1])
-      n = n + 1
+      out[#out + 1] = name
     end
   end
-  return n
+  return out
+end
+
+-- La macro para invitar: texto, cuántos van, cuántos no caben (pulsar otra vez) y sus claves.
+-- Con un nombre que el juego no encontró se prueba el siguiente de su lista (inviteCandidates).
+function Dungeons.InviteMacro(r, limit)
+  limit = limit or 255
+  if not r or not r.gp then return nil, 0, 0, {} end
+  local W = ns.W
+  local cmd = (W and W.Slash and W.Slash("INVITE", "/invite")) or "/invite"
+  local now = GetTime and GetTime() or 0
+  local lines, keys, len, left = {}, {}, 0, 0
+  for _, name in ipairs(toInvite(r)) do
+    local key = ns.ShortName(name):lower()
+    local p = pending[key]
+    if not p or (now - (p.t or 0) > 120 and not p.retry) then
+      p = { list = inviteCandidates(name), i = 1, t = now }
+      pending[key] = p
+    end
+    local recent = p.sent and now - p.sent < RESEND and not p.retry
+    local target = p.list[p.i]
+    if target and not recent then
+      local line = cmd .. " " .. (target:gsub("[\r\n]+", " "))
+      local add = #line + (#lines > 0 and 1 or 0)
+      if len + add <= limit then
+        lines[#lines + 1] = line
+        keys[#keys + 1] = key
+        len = len + add
+      else
+        left = left + 1
+      end
+    end
+  end
+  if #lines == 0 then return nil, 0, left, keys end
+  return table.concat(lines, "\n"), #lines, left, keys
+end
+
+-- Tras pulsar: apuntar a quién se ha invitado (para leer si el juego no lo encuentra).
+function Dungeons.MarkInvited(keys)
+  local now = GetTime and GetTime() or 0
+  for _, key in ipairs(keys or {}) do
+    local p = pending[key]
+    if p then p.sent, p.t, p.retry = now, now, nil end
+  end
+end
+
+-- Lo que hay apuntado de alguien (para las pruebas).
+function Dungeons.PendingInvite(name)
+  return pending[ns.ShortName(name):lower()]
 end
 
 -- "No se encuentra al jugador '%s'." del juego, convertido en patrón para leer el nombre.
@@ -779,6 +822,8 @@ do
   end
 end
 
+-- Si el juego no lo encuentra, ya no se puede invitar solo con otro nombre (sería una acción
+-- bloqueada): se deja preparado el siguiente para la próxima vez que se pulse «Invitar».
 ns.On("CHAT_MSG_SYSTEM", function(msg)
   if not next(pending) or type(msg) ~= "string" then return end
   if issecretvalue and issecretvalue(msg) then return end -- el juego a veces no deja leerlo
@@ -789,17 +834,17 @@ ns.On("CHAT_MSG_SYSTEM", function(msg)
   if not who then return end
   local short = (who:match("^([^%s%-]+)") or who):lower()
   local p = pending[short]
-  if not p then return end
+  if not p or not p.sent then return end
   local now = GetTime and GetTime() or 0
-  if now - p.t > 20 or p.i >= #p.list then
+  if now - p.sent > 20 then return end
+  if p.i >= #p.list then
     pending[short] = nil
-    if p.i >= #p.list then
-      ns.Print("no he podido invitar a %s. Invítalo a mano (clic derecho en su nombre).", p.list[1])
-    end
+    ns.Print("no he podido invitar a %s. Invítalo a mano (clic derecho en su nombre).", p.list[1])
     return
   end
-  p.i, p.t = p.i + 1, now
-  sendInvite(p.list[p.i])
+  local tried = p.list[p.i]
+  p.i, p.t, p.sent, p.retry = p.i + 1, now, nil, true
+  ns.Print("No encuentro a %s: pulsa Invitar otra vez para probar con su otro nombre.", tried)
 end)
 
 -- Borra las quedadas viejas.

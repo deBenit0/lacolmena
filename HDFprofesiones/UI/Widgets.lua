@@ -546,6 +546,255 @@ function W.Confirm(text, callback)
   if popup then popup.data = data end
 end
 
+---------------------------------------------------------------------------
+-- Botones que hacen cosas que el juego solo deja a su propia interfaz (invitar a la hermandad
+-- o al grupo, ascender, degradar, expulsar, mensaje del día, salir de la hermandad). Llamadas
+-- desde el addon, el juego las bloquea («...se ha bloqueado de una acción disponible solo para
+-- la interfaz de Blizzard»). Se hacen como una macro del jugador: un botón seguro del juego
+-- ("SecureActionButtonTemplate", type = "macro") con las órdenes de siempre (/ginvite Nombre...).
+-- Ese botón seguro NO va dentro de nuestras ventanas (las volvería protegidas y no se podrían
+-- abrir ni cerrar en combate): es uno solo, colgado de UIParent e invisible, que se pone encima
+-- de nuestro botón cuando el ratón pasa por él (solo fuera de combate). En combate no sale y
+-- nuestro botón solo dice que no se puede.
+---------------------------------------------------------------------------
+-- Orden del juego para cada cosa (la de este cliente; la inglesa si no la encuentra).
+function W.Slash(key, fallback)
+  local s = _G["SLASH_" .. key .. "1"]
+  if type(s) == "string" and s:sub(1, 1) == "/" and not s:find("%s") then return s end
+  return fallback
+end
+
+-- Una línea de macro: "/orden texto" (sin saltos de línea dentro, que serían otra orden).
+function W.MacroLine(key, fallback, arg)
+  local cmd = W.Slash(key, fallback)
+  if arg == nil then return cmd end
+  arg = tostring(arg):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  if arg == "" then return nil end
+  return cmd .. " " .. arg
+end
+
+W.MACRO_MAX = 255 -- lo más largo que puede ser una macro
+
+local function inCombat() return InCombatLockdown and InCombatLockdown() and true or false end
+W.InCombat = inCombat
+
+local secureOwners = {}  -- nuestros botones con su macro: [botón] = { get, post, none }
+local overlay            -- el botón seguro (uno para todos)
+local watcher            -- mira por dónde va el ratón
+
+local function mouseFocus()
+  if GetMouseFoci then
+    local ok, list = pcall(GetMouseFoci)
+    if ok and type(list) == "table" then return list[1], true end
+  end
+  if GetMouseFocus then
+    local ok, f = pcall(GetMouseFocus)
+    if ok then return f, true end
+  end
+  return nil, false
+end
+
+-- ¿Está el ratón sobre ese botón (y no tapado por otra ventana)?
+local function hovered(owner)
+  if not (owner.IsVisible and owner:IsVisible()) then return false end
+  if owner.IsEnabled and not owner:IsEnabled() then return false end
+  if not (owner.IsMouseOver and owner:IsMouseOver()) then return false end
+  local focus, known = mouseFocus()
+  if known then return focus == owner or (overlay ~= nil and focus == overlay and overlay.owner == owner) end
+  return true
+end
+
+local function macroFor(owner)
+  local s = secureOwners[owner]
+  if not s then return nil end
+  local ok, text = pcall(s.get)
+  if not ok or type(text) ~= "string" or text == "" then return nil end
+  if #text > W.MACRO_MAX then return nil end
+  return text
+end
+
+local function hideOverlay()
+  if not overlay or not overlay:IsShown() then return end
+  if inCombat() then overlay.pendingHide = true; return end
+  local owner = overlay.owner
+  overlay:Hide()
+  overlay:ClearAllPoints()
+  overlay:SetAttribute("macrotext", nil)
+  overlay.owner, overlay.text, overlay.pendingHide = nil, nil, nil
+  if owner and owner.UnlockHighlight then owner:UnlockHighlight() end
+end
+W.HideSecureOverlay = hideOverlay
+
+local function createOverlay()
+  if overlay or inCombat() then return overlay end
+  local o = CreateFrame("Button", "HDFProfSecureButton", UIParent, "SecureActionButtonTemplate")
+  o:SetFrameStrata("TOOLTIP")
+  o:SetFrameLevel(50)
+  o:EnableMouse(true)
+  -- Un clic del ratón = una vez: el juego (SecureActionButton_OnClick) hace los clics del
+  -- ratón al SOLTAR, sea cual sea la opción ActionButtonUseKeyDown; con "useOnKeyDown" en false
+  -- también lo hace al soltar aunque el cliente fuese de los antiguos. Solo el botón izquierdo.
+  o:RegisterForClicks("LeftButtonUp")
+  o:SetAttribute("useOnKeyDown", false)
+  o:SetAttribute("type", "macro")
+  o:Hide()
+  -- Después de la macro: lo del addon (cerrar la ventana, avisar...).
+  o:HookScript("PostClick", function(self)
+    local owner, text = self.owner, self.text
+    local s = owner and secureOwners[owner]
+    if s and s.post then
+      local ok, err = pcall(s.post, owner, text)
+      if not ok and ns.LogError then ns.LogError(tostring(err)) end
+    end
+    -- lo siguiente que haría el botón (p. ej. invitar a los que faltan)
+    if self.owner and not inCombat() then
+      local nextText = hovered(self.owner) and macroFor(self.owner)
+      if nextText then
+        if nextText ~= self.text then self:SetAttribute("macrotext", nextText); self.text = nextText end
+      else
+        hideOverlay()
+      end
+    end
+  end)
+  -- La ayuda de nuestro botón sigue saliendo con el botón seguro encima.
+  o:SetScript("OnEnter", function(self)
+    local fn = self.owner and self.owner.GetScript and self.owner:GetScript("OnEnter")
+    if type(fn) == "function" then pcall(fn, self.owner) end
+  end)
+  o:SetScript("OnLeave", function(self)
+    local fn = self.owner and self.owner.GetScript and self.owner:GetScript("OnLeave")
+    if type(fn) == "function" then pcall(fn, self.owner) end
+  end)
+  overlay = o
+  return o
+end
+
+-- Pone el botón seguro justo encima de nuestro botón (en medidas de UIParent).
+local function placeOverlay(owner, text)
+  if inCombat() then return false end
+  local o = createOverlay()
+  if not o then return false end
+  local l, b = owner:GetLeft(), owner:GetBottom()
+  local w, h = owner:GetWidth(), owner:GetHeight()
+  if type(l) ~= "number" or type(b) ~= "number" or type(w) ~= "number" or type(h) ~= "number" then return false end
+  local us = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+  local bs = owner.GetEffectiveScale and owner:GetEffectiveScale() or 1
+  local s = (type(us) == "number" and us > 0 and type(bs) == "number" and bs > 0) and bs / us or 1
+  if o.owner and o.owner ~= owner and o.owner.UnlockHighlight then o.owner:UnlockHighlight() end
+  o:ClearAllPoints()
+  o:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
+  o:SetSize(math.max(1, w * s), math.max(1, h * s))
+  o:SetAttribute("macrotext", text)
+  o.owner, o.text, o.pendingHide = owner, text, nil
+  o:Show()
+  if owner.LockHighlight then owner:LockHighlight() end
+  return true
+end
+
+-- Cada poco: si el ratón está sobre uno de nuestros botones, el seguro va encima; si se va, fuera.
+local function tick()
+  if inCombat() then return end
+  if overlay and overlay.pendingHide then hideOverlay() end
+  local cur = overlay and overlay:IsShown() and overlay.owner
+  if cur then
+    local text = hovered(cur) and macroFor(cur)
+    if not text then
+      hideOverlay()
+    else
+      if text ~= overlay.text then overlay:SetAttribute("macrotext", text); overlay.text = text end
+      return
+    end
+  end
+  for owner in pairs(secureOwners) do
+    if hovered(owner) then
+      local text = macroFor(owner)
+      if text then placeOverlay(owner, text) end
+      return
+    end
+  end
+end
+W.SecureTick = tick
+
+local function startWatcher()
+  if watcher then return end
+  watcher = CreateFrame("Frame")
+  local wait = 0
+  watcher:SetScript("OnUpdate", function(_, elapsed)
+    wait = wait - (elapsed or 0)
+    if wait > 0 then return end
+    wait = 0.05
+    tick()
+  end)
+  if ns.On then
+    -- Al empezar el combate (aún se puede): fuera el botón seguro. Al acabar, lo pendiente.
+    ns.On("PLAYER_REGEN_DISABLED", function() hideOverlay() end)
+    ns.On("PLAYER_REGEN_ENABLED", function() if overlay and overlay.pendingHide then hideOverlay() end end)
+  end
+end
+
+-- button: nuestro botón normal. getMacroText(): la macro ("/ginvite Nombre"...) o nil si ahora no
+-- se puede (nil: no sale el botón seguro y al pulsar se dice noneText). postClick(button, macro):
+-- lo que hace el addon después. El OnClick del botón lo pone esto: no cambiarlo luego.
+function W.SecureMacro(button, getMacroText, postClick, noneText)
+  secureOwners[button] = { get = getMacroText, post = postClick, none = noneText }
+  startWatcher()
+  button:SetScript("OnClick", function(self)
+    if inCombat() then
+      ns.Print("No se puede en combate.")
+      return
+    end
+    local text = macroFor(self)
+    if not text then
+      local s = secureOwners[self]
+      local msg = s and s.none
+      if type(msg) == "function" then msg = msg() end
+      if msg then ns.Print(msg) end
+      return
+    end
+    -- El botón seguro aún no estaba encima (el ratón acaba de llegar): ya está, otra vez.
+    if placeOverlay(self, text) then ns.Print("pulsa otra vez.") end
+  end)
+  return button
+end
+
+-- Confirmar algo que hace una de esas órdenes («¿Expulsar a X?»): ventana propia (las del
+-- juego, StaticPopup, quedan marcadas por el addon y bloquean la orden), con «Sí» seguro.
+local secureConfirm
+function W.SecureConfirm(text, macroText, after)
+  if inCombat() then
+    ns.Print("No se puede en combate.")
+    return
+  end
+  if not secureConfirm then
+    local f = W.Panel("HDFProfSecureConfirm", UIParent, 380, 112)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetPoint("CENTER", 0, 120)
+    f:Hide()
+    tinsert(UISpecialFrames, "HDFProfSecureConfirm")
+    f.text = W.Text(f, "GameFontHighlight", "CENTER")
+    f.text:SetPoint("TOP", 0, -20)
+    f.text:SetWidth(350)
+    f.yes = W.Button(f, YES or "Sí", 110, 22)
+    f.yes:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -6, 16)
+    f.no = W.Button(f, NO or "No", 110, 22, function() f:Hide() end)
+    f.no:SetPoint("BOTTOMLEFT", f, "BOTTOM", 6, 16)
+    W.SecureMacro(f.yes, function() return f:IsShown() and f.macro or nil end, function()
+      local cb = f.after
+      f:Hide()
+      f.macro, f.after = nil, nil
+      if cb then cb() end
+    end)
+    f:SetScript("OnHide", function() f.macro = nil end)
+    secureConfirm = f
+  end
+  local f = secureConfirm
+  f.text:SetText(text)
+  f.macro, f.after = macroText, after
+  f:Show()
+  return f
+end
+
 -- Ventana pequeña con varios botones para elegir una opción (cuándo lo harás, por ejemplo).
 local choice
 function W.Choose(title, sub, labels, callback)

@@ -381,3 +381,7 @@ function Diag.Show()
   ns.Print("comprobación: %d bien, %d fallan, %d sin comprobar.", good, bad, unknown)
   return good, bad, unknown
 end
+
+-- Acciones que el juego bloquea por un addon: se apuntan en los errores (con el addon y la función).
+ns.On("ADDON_ACTION_BLOCKED", function(addon, func) ns.LogBlocked("Acción bloqueada", addon, func) end)
+ns.On("ADDON_ACTION_FORBIDDEN", function(addon, func) ns.LogBlocked("Acción prohibida", addon, func) end)

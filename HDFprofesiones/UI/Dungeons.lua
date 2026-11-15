@@ -717,6 +717,23 @@ ns.UI.RegisterPage("dungeons", function(page)
   detail.invite = W.Button(detail, "Invitar", 96, 22)
   detail.invite:SetPoint("LEFT", detail.make, "RIGHT", 4, 0)
   ns.UI.Tip(detail.invite, "Invitar al grupo", "Invita a los elegidos al grupo del juego.")
+  -- Invitar es cosa de la interfaz del juego: va como macro ("/invite Nombre" por cada uno) con
+  -- el botón seguro. Si no caben todos, a la siguiente pulsación van los que faltan.
+  W.SecureMacro(detail.invite, function()
+    local r = detail.inviteRun
+    if not r or not detail:IsShown() then return nil end
+    return (D.InviteMacro(r))
+  end, function()
+    local r = detail.inviteRun
+    if not r then return end
+    local _, n, left, keys = D.InviteMacro(r)
+    D.MarkInvited(keys)
+    if left > 0 then
+      ns.Print("invitaciones enviadas: %d. Faltan %d: pulsa Invitar otra vez.", n, left)
+    else
+      ns.Print("invitaciones enviadas: %d.", n)
+    end
+  end, "no queda nadie por invitar (a los invitados hace poco no se les vuelve a invitar hasta pasados 30 s).")
   detail.cancel = W.Button(detail, "Cancelar", 96, 22)
   detail.cancel:SetPoint("LEFT", detail.invite, "RIGHT", 4, 0)
 
@@ -734,6 +751,7 @@ ns.UI.RegisterPage("dungeons", function(page)
 
   function page:RefreshDetail()
     local r = current()
+    detail.inviteRun = nil
     local regions = { detail.title, detail.sub, detail.people, detail.group, detail.rolesLabel, detail.join,
       detail.leave, detail.make, detail.invite, detail.cancel }
     for _, region in ipairs(regions) do region:SetShown(r ~= nil) end
@@ -845,10 +863,7 @@ ns.UI.RegisterPage("dungeons", function(page)
     end
     detail.make:SetScript("OnClick", function() ns.Sync.MakeGroup(r.id) end)
     detail.invite:SetEnabled(open and r.gp ~= nil)
-    detail.invite:SetScript("OnClick", function()
-      local n = D.Invite(r)
-      ns.Print("invitaciones enviadas: %d.", n)
-    end)
+    detail.inviteRun = (author and open and r.gp) and r or nil
     detail.cancel:SetEnabled(open)
     detail.cancel:SetScript("OnClick", function()
       W.Confirm("¿Cancelar esta quedada?", function() ns.Sync.CancelRun(r.id) end)
