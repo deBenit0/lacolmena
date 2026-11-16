@@ -24,7 +24,6 @@ local infoAsked = {}
 Sync.peers = {}               -- [personaje] = versión del addon
 Sync.RESYNC_EVERY = 300       -- segundos entre resúmenes periódicos
 Sync.lastHello = nil          -- cuándo llegó el último resumen de otro jugador (para la comprobación)
-Sync.oldWarned = {}           -- [personaje] = true si ya avisé de que tiene una versión antigua
 
 ---------------------------------------------------------------------------
 -- Nombres compactos: "Nombre-Reino" se envía como "Nombre" si es del reino del remitente
@@ -254,11 +253,8 @@ function Sync.NotePeerVersion(sender, av)
       ns.Alerts.Push({ page = "home", text = string.format(
         "Hay una versión nueva del addon (%s). Cierra el juego y actualízalo: con versiones distintas no se ven los pedidos.", av) })
     end
-  elseif versionNumber(av) < versionNumber(ns.VERSION) and not Sync.oldWarned[sender] then
-    Sync.oldWarned[sender] = true
-    ns.Print("%s tiene una versión antigua del addon (%s; la tuya es la %s): puede que no vea tus pedidos. Dile que lo actualice.",
-      ns.DisplayName(sender), av, ns.VERSION)
   end
+  -- Quien tiene una versión antigua ya no se avisa en el chat (molestaba al entrar): se ve en Miembros.
 end
 
 -- Compañeros vistos con otra versión: { "Nombre (0.25.0)", ... }.
