@@ -16,28 +16,31 @@ local function category(key)
 end
 ns.UI.ItemCategory = category
 
--- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y nadie lo ha cogido)
+-- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y queda algo sin coger)
 local function canAccept(r, info, me)
-  return r.a ~= me and info.state == "open" and not info.owner and info.remaining > 0
+  return r.a ~= me and info.state == "open" and info.remaining > 0
 end
 
 -- Lo que me queda por enviar de un pedido que acepté (0 si nada).
 local function toSend(r, me, now)
   local cm = r.a ~= me and r.c and r.c[me]
   if not cm or not Data.CommitActive(cm, now, r) then return 0 end
+  -- cerrado por el autor (o un oficial) o ya completo: no queda nada que enviar
+  if r.x or not Data.IsActiveState(Data.RequestInfo(r, now).state) then return 0 end
   return math.max(0, (cm.n or 0) - Data.DeliveredOf(cm))
 end
 
--- ¿Tengo lo necesario para hacer "amount"? Texto para la fila, o nil si no lo hago yo.
-local function materialsStatus(r, amount)
+-- Lo que me falta para fabricar "amount" de un pedido: lista { {id, n} } (vacía si lo tengo
+-- todo). nil si no lo fabrico yo; false si aún no sé la receta (hay que abrir la profesión);
+-- "m" si los materiales los pone quien pide.
+local function missingMaterials(r, amount)
   local c = ns.MyChar()
-  local kind, id = ns.ParseKey(r.k)
   for pk, prof in pairs(c and c.profs or {}) do
     if prof.recipes and prof.recipes[r.k] then
-      if r.m then return "|cff40ff40Los materiales los pone quien pide.|r" end
+      if r.m then return "m" end
       local info = Data.GetInfo(Data.InfoKey(pk, r.k))
       local var = info and info.v and info.v[1]
-      if not var then return "|cff999999Abre tu ventana de profesión para saber si tienes los materiales.|r" end
+      if not var then return false end
       local times = math.ceil(amount / math.max(1, var.m or 1))
       local ids = {}
       for mid in pairs(var.r) do ids[#ids + 1] = mid end
@@ -45,11 +48,25 @@ local function materialsStatus(r, amount)
       local missing = {}
       for _, mid in ipairs(ids) do
         local need = var.r[mid] * times - ns.Scan.Have(mid)
-        if need > 0 then missing[#missing + 1] = need .. "x " .. ns.KeyName("i" .. mid) end
+        if need > 0 then missing[#missing + 1] = { id = mid, n = need } end
       end
-      if #missing == 0 then return "|cff40ff40Tienes los materiales para hacerlo ya.|r" end
-      return "|cffff9933Te faltan: " .. table.concat(missing, ", ") .. "|r"
+      return missing
     end
+  end
+end
+ns.UI.MissingMaterials = missingMaterials
+
+-- ¿Tengo lo necesario para hacer "amount"? Texto para la fila, o nil si no lo hago yo.
+local function materialsStatus(r, amount)
+  local kind, id = ns.ParseKey(r.k)
+  local missing = missingMaterials(r, amount)
+  if missing == "m" then return "|cff40ff40Los materiales los pone quien pide.|r" end
+  if missing == false then return "|cff999999Abre tu ventana de profesión para saber si tienes los materiales.|r" end
+  if missing then
+    if #missing == 0 then return "|cff40ff40Tienes los materiales para hacerlo ya.|r" end
+    local parts = {}
+    for i, m in ipairs(missing) do parts[i] = m.n .. "x " .. ns.KeyName("i" .. m.id) end
+    return "|cffff4040Te faltan: " .. table.concat(parts, ", ") .. "|r"
   end
   if kind == "i" and Data.ICanGather(r.k) then
     local have = ns.Scan.Have(id)
@@ -73,7 +90,8 @@ local function collect(seenAt)
     local info = Data.RequestInfo(r, now)
     local pending = toSend(r, me, now)
     local mine = r.a == me
-    local visible = info.state == "open" or (mine and Data.IsActiveState(info.state))
+    -- abiertos y ya cogidos (en el Tablón salen en gris con quién lo hace)
+    local visible = Data.IsActiveState(info.state)
     if pending > 0 or visible then
       local item = {
         kind = "req", id = r.id, k = r.k, author = r.a, t = r.t or 0,
@@ -83,9 +101,9 @@ local function collect(seenAt)
         new = not mine and pending == 0 and (r.t or 0) > (seenAt or 0),
       }
       if pending > 0 then stats.toSend = stats.toSend + 1 end
-      if visible and not mine then stats.open = stats.open + 1 end
+      if info.state == "open" and not mine then stats.open = stats.open + 1 end
       if item.canServe then stats.servable = stats.servable + 1 end
-      if item.new and visible then stats.new = stats.new + 1 end
+      if item.new and info.state == "open" then stats.new = stats.new + 1 end
       items[#items + 1] = item
     end
   end
@@ -413,10 +431,6 @@ end
 -- mode = "need": la misma ventana para que un oficial añada lo que necesita la hermandad.
 -- opts = { edit = cambiar una oferta mía, price, craft = ofrecer fabricarlo, mats }
 function ns.UI.OpenOfferDialog(id, qty, mode, opts)
-  if ns.OFFERS_OFF and mode ~= "need" then
-    ns.Print("«Ofrecer» ya no está: quien necesite algo lo pide con «+ Pedir» y tú te encargas desde el Mercado.")
-    return
-  end
   opts = opts or {}
   if opts.craft and id and not opts.edit and not ns.Offers.Knows("i" .. id) then
     ns.Print("aún no tengo leída esa receta tuya: cierra y abre la ventana de la profesión y vuelve a intentarlo.")

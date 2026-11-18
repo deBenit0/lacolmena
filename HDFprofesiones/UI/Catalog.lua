@@ -1485,10 +1485,10 @@ local ASK_TYPES = {
   { id = "equipment", label = "Equipo", tip = "Armas, armaduras, bolsas y abalorios, por ranura y por clase." },
   { id = "consumables", label = "Consumibles", tip = "Pociones, elixires, frascos, comida y vendas." },
 }
+-- Al pedir solo salen los tres tipos; al ofrecer, solo «De tus bolsas» y «Te lo fabrico».
 local MODES = {
-  { id = "ask", label = "Pedir", width = 80 },
-  { id = "offer", label = "Ofrecer de tus bolsas", width = 150, off = true },
-  { id = "craft", label = "Ofrecer fabricar", width = 124, off = true },
+  { id = "offer", label = "Algo de tus bolsas", width = 150, off = true },
+  { id = "craft", label = "Te lo fabrico", width = 124, off = true },
 }
 local function isAskType(mode)
   for _, t in ipairs(ASK_TYPES) do if t.id == mode then return true end end
@@ -1500,15 +1500,16 @@ ns.UI.RegisterPage("ask", function(page)
   page.modes, page.types, page.frames = {}, {}, {}
   local x = 100
   for _, m in ipairs(MODES) do
-    if not (m.off and ns.OFFERS_OFF) then
+    do
       local b = W.Chip(page, m.label, m.width, function() page:SetMode(m.id) end)
       b:SetPoint("TOPLEFT", x, -2)
       x = x + m.width + 4
       page.modes[m.id] = b
     end
   end
-  ns.UI.Tip(page.modes.ask, "Pedir", "Pide materiales, equipo o consumibles a la hermandad.")
-  x = x + 14
+  if page.modes.offer then ns.UI.Tip(page.modes.offer, "Algo de tus bolsas", "Ofrece algo que ya tienes.") end
+  if page.modes.craft then ns.UI.Tip(page.modes.craft, "Te lo fabrico", "Ofrece fabricar una de tus recetas por encargo.") end
+  x = 100
   for _, t in ipairs(ASK_TYPES) do
     local b = W.Chip(page, t.label, 100, function() page:SetMode(t.id) end)
     b:SetPoint("TOPLEFT", x, -2)
@@ -1567,7 +1568,6 @@ ns.UI.RegisterPage("ask", function(page)
   end
 
   function page:SetMode(mode)
-    if ns.OFFERS_OFF and (mode == "offer" or mode == "craft") then mode = "ask" end
     if mode == "ask" then mode = page.lastAsk or "materials" end
     if not page.frames[mode] then mode = "materials" end
     page.mode = mode
@@ -1578,7 +1578,10 @@ ns.UI.RegisterPage("ask", function(page)
   function page:Refresh()
     local asking = isAskType(page.mode)
     for id, f in pairs(page.frames) do f:SetShown(id == page.mode) end
-    for id, b in pairs(page.modes) do b:SetOn(id == page.mode or (id == "ask" and asking)) end
+    for id, b in pairs(page.modes) do
+      b:SetShown(not asking)
+      b:SetOn(id == page.mode)
+    end
     for id, b in pairs(page.types) do
       b:SetShown(asking)
       b:SetOn(id == page.mode)
@@ -1593,6 +1596,14 @@ end)
 function ns.UI.OpenAsk(mode)
   local f = ns.UI.Open("ask")
   if f and f.SetMode then f:SetMode(mode or "ask") end
+end
+
+-- «+ OFRECER»: dos tarjetas, ALGO DE MIS BOLSAS o TE LO FABRICO.
+function ns.UI.OpenOffer()
+  W.Choose("¿Qué ofreces?", "Algo que ya tienes, o fabricar algo de tus recetas por encargo.",
+    { "ALGO DE MIS BOLSAS", "TE LO FABRICO" }, function(i)
+      ns.UI.OpenAsk(i == 2 and "craft" or "offer")
+    end)
 end
 
 -- Pedir un objeto concreto (arrastrado al botón «+ Pedir»).

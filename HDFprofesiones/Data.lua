@@ -771,38 +771,65 @@ local function rejected(r, name, cm)
 end
 Data.Rejected = function(r, name) return r and r.c and r.c[name] and rejected(r, name, r.c[name]) or false end
 
--- El pedido es de uno solo: el primero que lo aceptó (si dos lo aceptan a la vez sin verse,
--- gana el que lo hizo antes; todos llegan a la misma conclusión).
-function Data.OwnerOf(r, now)
-  local owner, ocm
+-- Desde la 0.35 varios pueden encargarse de partes del mismo pedido. Encargados: por orden de
+-- aceptación (ampliar el plazo no cambia el orden), cada uno se queda lo que prometió si aún cabe
+-- en lo que falta por entregar; al que ya no le cabe (lo aceptó a la vez que otro sin verse) se
+-- queda fuera. Todos llegan a la misma conclusión.
+function Data.OwnersOf(r, now)
+  local alive = {}
+  local capacity = r and r.q or 0
   for name, cm in pairs(r and r.c or {}) do
+    capacity = capacity - deliveredOf(cm)
     if commitAlive(cm, now) and not rejected(r, name, cm) then
-      -- la hora en que lo aceptó (ampliar el plazo no cambia quién lo tiene)
-      local cv, ocv = cm.at or cm.cv or 0, ocm and (ocm.at or ocm.cv or 0)
-      if not owner or cv < ocv or (cv == ocv and name < owner) then owner, ocm = name, cm end
+      alive[#alive + 1] = { name = name, cm = cm, at = cm.at or cm.cv or 0 }
     end
   end
-  return owner, ocm
+  table.sort(alive, function(x, y)
+    if x.at ~= y.at then return x.at < y.at end
+    return x.name < y.name
+  end)
+  local owners = {}
+  for _, o in ipairs(alive) do
+    local need = o.cm.n - deliveredOf(o.cm)
+    if need <= capacity then
+      owners[#owners + 1] = o
+      capacity = capacity - need
+    end
+  end
+  return owners
 end
 
--- ¿Está activo este encargo? Con la petición, además tiene que ser el que se queda el pedido.
+-- El primer encargado (para lo que solo necesita uno).
+function Data.OwnerOf(r, now)
+  local first = Data.OwnersOf(r, now)[1]
+  if first then return first.name, first.cm end
+end
+
+-- ¿Está activo este encargo? Con la petición, además tiene que ser de los que se quedan el pedido.
 function Data.CommitActive(cm, now, r)
   if not commitAlive(cm, now) then return false end
   if r then
-    local _, ocm = Data.OwnerOf(r, now)
-    return ocm == cm
+    for _, o in ipairs(Data.OwnersOf(r, now)) do
+      if o.cm == cm then return true end
+    end
+    return false
   end
   return true
 end
 
 -- Estado calculado de una petición (no se guarda: todos llegan al mismo resultado).
 function Data.RequestInfo(r, now)
-  local info = { delivered = 0, pending = 0, commits = {} }
-  info.owner = Data.OwnerOf(r, now)
+  local info = { delivered = 0, pending = 0, commits = {}, owners = {} }
+  local activeSet = {}
+  for _, o in ipairs(Data.OwnersOf(r, now)) do
+    info.owners[#info.owners + 1] = o.name
+    activeSet[o.name] = true
+  end
+  info.owner = info.owners[1]
   for name, cm in pairs(r.c or {}) do
     local d = deliveredOf(cm)
     info.delivered = info.delivered + d
-    local active = name == info.owner
+    local active = activeSet[name] == true
     local pending = active and (cm.n - d) or 0
     info.pending = info.pending + pending
     if active or d > 0 then
@@ -844,9 +871,9 @@ function Data.RequestInfo(r, now)
     info.state, info.ended = "done", last
   elseif now > info.expires and not info.owner then
     info.state, info.ended = "expired", info.expires
-  elseif info.remaining <= 0 or info.owner then
-    -- con encargado, aunque se haya ampliado la cantidad: nadie más puede cogerlo hasta que
-    -- él entregue (o caduque su plazo) y entonces vuelve a estar abierto lo que falte
+  elseif info.remaining <= 0 or now > info.expires then
+    -- todo cogido (lo que falte vuelve a estar abierto si alguien suelta o se le pasa el plazo);
+    -- caducado con encargados: nadie más puede cogerlo, pero los que lo tienen siguen
     info.state = "accepted"
   else
     info.state = "open"
@@ -997,21 +1024,28 @@ end
 
 -- "Lo hago yo": me quedo el pedido entero y digo cuándo lo tendré (when = 1, 2 o 3).
 -- Solo puede tenerlo uno: si ya lo ha aceptado otro, no se puede.
-function Data.Commit(id, when, now)
+-- Me encargo de "n" (sin "n", de todo lo que queda). Si ya era encargado, cambia lo que me quedo.
+function Data.Commit(id, when, now, n)
   local r, me = getRequest(id), ns.Me()
   if not r then return nil, "La petición ya no existe." end
   if r.a == me then return nil, "No puedes aceptar tu propia petición." end
   local info = Data.RequestInfo(r, now)
-  if info.owner and info.owner ~= me then
-    return nil, "Ya lo ha aceptado " .. ns.DisplayName(info.owner) .. "."
+  local old = r.c and r.c[me]
+  local wasOwner = old and Data.CommitActive(old, now, r)
+  -- lo que puedo coger: lo libre más lo que ya tenía sin entregar
+  local free = info.remaining + (wasOwner and (old.n - deliveredOf(old)) or 0)
+  if free <= 0 then
+    if info.owner then return nil, "Ya lo ha aceptado " .. ns.DisplayName(info.owner) .. "." end
+    return nil, "La petición ya no está abierta."
   end
-  if info.state ~= "open" then return nil, "La petición ya no está abierta." end
+  if not wasOwner and info.state ~= "open" then return nil, "La petición ya no está abierta." end
   if r.rj and r.rj[me] then return nil, ns.DisplayName(r.a) .. " te quitó este encargo: no puedes volver a cogerlo." end
+  n = min(free, max(1, floor(tonumber(n) or free)))
   when = Data.WHEN[tonumber(when) or 0] and tonumber(when) or 3
   r.c = r.c or {}
   local cm = r.c[me] or {}
-  if info.owner ~= me then cm.at, cm.ex = now, nil end -- lo acepto ahora (o de nuevo)
-  cm.n = r.q - (info.delivered - deliveredOf(cm))
+  if not wasOwner then cm.at, cm.ex = now, nil end -- lo acepto ahora (o de nuevo)
+  cm.n = deliveredOf(cm) + n
   cm.w = when
   cm.by = Data.Deadline(when, now)
   cm.cv = bump(cm.cv, now)
@@ -1076,6 +1110,25 @@ function Data.ConfirmDelivery(id, crafter, amount, now)
   cm.d = deliveredOf(cm) + amount
   cm.dv = bump(cm.dv, now)
   r.c[crafter] = cm
+  return r, Data.CheckThanks(r, now)
+end
+
+-- «¡Me ha llegado!»: lo que el encargado me mandó por correo ya está en mis manos. No suma nada
+-- (el correo ya contaba): solo apunta que lo he recibido. Sin "crafter", de todos.
+-- Con "amount" (lo que se vio salir del buzón), solo esa cantidad.
+function Data.MarkArrived(id, crafter, now, amount)
+  local r, me = getRequest(id), ns.Me()
+  if not r then return nil, "La petición ya no existe." end
+  if r.a ~= me then return nil, "Solo el autor puede decir que le ha llegado." end
+  local changed = false
+  for name, cm in pairs(r.c or {}) do
+    if (not crafter or name == crafter) and (cm.s or 0) > (cm.d or 0) then
+      cm.d = amount and min(cm.s, (cm.d or 0) + max(1, floor(amount))) or cm.s
+      cm.dv = bump(cm.dv, now)
+      changed = true
+    end
+  end
+  if not changed then return nil, "No hay nada enviado por correo sin recibir." end
   return r, Data.CheckThanks(r, now)
 end
 

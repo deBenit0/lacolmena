@@ -256,6 +256,40 @@ function W.Button(parent, text, width, height, onClick)
   return b
 end
 
+-- Color de un botón del juego (el rojo se pasa a gris y se tiñe): verde = ayudar o pedir,
+-- azul = coger u ofrecer. El juego cambia las texturas al pulsar: se vuelve a teñir.
+W.GREEN = { 0.35, 0.9, 0.35 }
+W.BLUE = { 0.45, 0.7, 1 }
+local function applyTint(b)
+  local c = b.tint
+  -- sin color: el rojo del juego de siempre (una fila reutilizada pudo quedarse verde)
+  local function paint(t)
+    if type(t) == "table" and t.SetVertexColor then
+      if t.SetDesaturated then t:SetDesaturated(c and true or false) end
+      if c then t:SetVertexColor(c[1], c[2], c[3]) else t:SetVertexColor(1, 1, 1) end
+    end
+  end
+  for _, key in ipairs({ "Left", "Middle", "Right" }) do paint(b[key]) end
+  for _, get in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetDisabledTexture" }) do
+    if b[get] then paint(b[get](b)) end
+  end
+end
+function W.Tint(b, color)
+  local first = not b.tintHooked
+  b.tintHooked = true
+  b.tint = color
+  applyTint(b)
+  if first and b.HookScript then
+    for _, ev in ipairs({ "OnMouseDown", "OnMouseUp", "OnShow", "OnEnable", "OnDisable" }) do
+      b:HookScript(ev, function(self)
+        applyTint(self)
+        ns.After(0, function() applyTint(self) end)
+      end)
+    end
+  end
+  return b
+end
+
 -- Botón de cerrar del juego (la X roja).
 function W.CloseButton(parent)
   return CreateFrame("Button", nil, parent, "UIPanelCloseButton")
@@ -862,15 +896,27 @@ function W.Choose(title, sub, labels, callback)
 end
 
 -- "Aceptar encargo": elegir cuándo lo tendrás (y ver qué prisa tiene quien lo pide).
+-- «ME ENCARGO»: si queda más de uno, primero cuántos (el resto sigue en el Tablón para otros) y
+-- luego para cuándo.
 function W.AcceptRequest(r)
   local Data = ns.Data
   local info = Data.RequestInfo(r, ns.Now())
-  local labels = {}
-  for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
-  local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
-  sub = sub .. string.format("Te quedas el pedido entero (%d). Si no lo entregas a tiempo, vuelve al Mercado.", info.remaining)
-  W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", info.remaining, ns.KeyLabel(r.k), ns.DisplayName(r.a)),
-    sub, labels, function(when) ns.Sync.Commit(r.id, when) end)
+  local function when(n)
+    local labels = {}
+    for i, w in ipairs(Data.WHEN) do labels[i] = w.label end
+    local sub = r.pr and ("|cffff9933" .. Data.WHEN[r.pr].need .. ".|r ") or "Sin prisa. "
+    sub = sub .. (n >= info.remaining and string.format("Te quedas todo lo que queda (%d).", n)
+      or string.format("Te quedas %d; los otros %d siguen en el Tablón.", n, info.remaining - n))
+      .. " Si no lo entregas a tiempo, vuelve al Mercado."
+    W.Choose(string.format("¿Cuándo tendrás %dx %s para %s?", n, ns.KeyLabel(r.k), ns.DisplayName(r.a)),
+      sub, labels, function(w) ns.Sync.Commit(r.id, w, n) end)
+  end
+  if info.remaining > 1 then
+    W.AskAmount(string.format("¿De cuántos te encargas? (quedan %d de %s)", info.remaining, ns.KeyLabel(r.k)),
+      info.remaining, function(n) when(math.min(n, info.remaining)) end)
+  else
+    when(math.max(1, info.remaining))
+  end
 end
 
 -- "Más tiempo": elegir un plazo más largo (solo una vez).

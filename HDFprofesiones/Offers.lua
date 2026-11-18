@@ -386,6 +386,21 @@ function Offers.Remove(id)
   return true
 end
 
+-- Vuelve a contar los 14 días de una oferta mía (la que quitó un oficial no vuelve).
+function Offers.Renew(id, now)
+  local c = mine()
+  local o = c and c.offers[id]
+  if not o then return nil, "No tienes esa oferta." end
+  if ns.Social and ns.Social.IsOfferRemoved(key(ns.Me(), id), o.t) then
+    c.offers[id] = nil
+    publish()
+    return nil, "Esa oferta la quitó un oficial."
+  end
+  o.t = now
+  publish()
+  return true
+end
+
 -- "Lo quiero": pido "q" unidades de la oferta.
 function Offers.Claim(k, q, now)
   local c, me = mine(), ns.Me()

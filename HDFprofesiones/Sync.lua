@@ -564,8 +564,8 @@ function Sync.CreateRequest(opts)
   return r, err
 end
 
-function Sync.Commit(id, when)
-  local r, err = afterRequestAction(Data.Commit(id, when, ns.Now()))
+function Sync.Commit(id, when, n)
+  local r, err = afterRequestAction(Data.Commit(id, when, ns.Now(), n))
   if r and r.demo and ns.Demo then ns.Demo.OnCommit(r) end
   return r, err
 end
@@ -588,6 +588,12 @@ function Sync.ConfirmDelivery(id, crafter, amount)
     Sync.PublishMine()
     ns.Extras.AddStat("received", 1)
   end
+  return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
+end
+
+function Sync.MarkArrived(id, crafter, amount)
+  local r, thanksChanged = Data.MarkArrived(id, crafter, ns.Now(), amount)
+  if r and thanksChanged == true then Sync.PublishMine() end
   return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
 end
 

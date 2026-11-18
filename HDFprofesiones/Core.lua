@@ -2,10 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.34.7"
--- «Ofrecer» (de tus bolsas y por encargo) QUITADO (18/11): quien necesita algo lo pide y quien
--- puede, se encarga. Lo de «la hermandad necesita» (oficiales) sigue.
-ns.OFFERS_OFF = true
+ns.VERSION = "0.35.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"
