@@ -399,8 +399,16 @@ local function createDialog()
 
   dialog.chat = W.Check(dialog, "Avisar en el chat de hermandad")
   dialog.chat:SetPoint("BOTTOMLEFT", 20, 16)
-  local publish = W.Button(dialog, "Crear", 96, 22, function() dialog:Publish() end)
+  local publish = W.Button(dialog, "Crear", 96, 22)
   dialog.publish = publish
+  -- Con «Avisar en el chat» marcado (y algún rol), «Crear» es un botón seguro: el aviso sale
+  -- como macro tuya («/g ...») y luego se crea el grupo. Si no, el botón crea sin más.
+  local function announceMacro()
+    if not dialog:IsShown() or not dialog.chat:GetChecked() or checkedMask(dialog.checks) == 0 then return nil end
+    return ns.Extras.AnnounceMacro("run", { d = dialog.d, at = dialog:SlotTime() })
+  end
+  W.SecureMacro(publish, announceMacro, function() dialog:Publish(true) end,
+    function() dialog:Publish() end)
   function dialog:UpdatePublish() end -- se puede proponer sin ir (se pregunta)
   watchChecks(dialog.checks, function() dialog:UpdatePublish() end)
   publish:SetPoint("BOTTOMRIGHT", -22, 18)
@@ -408,19 +416,26 @@ local function createDialog()
   cancel:SetPoint("RIGHT", publish, "LEFT", -6, 0)
   cancel:Hide() -- con la casilla del chat no cabe: se cierra con la X o con Esc
 
-  function dialog:Publish()
+  -- announced: el aviso ya salió como macro al pulsar «Crear».
+  function dialog:Publish(announced)
     local mask = checkedMask(self.checks)
+    local d, at = self.d, self:SlotTime()
     local function go()
       rememberRoles(mask)
-      local r = ns.Sync.CreateRun({ d = self.d, at = self:SlotTime(), roles = mask })
+      local r = ns.Sync.CreateRun({ d = d, at = at, roles = mask })
       if r then
         self:Hide()
-        if self.chat:GetChecked() then ns.Extras.Announce("run", r, r.id) end
         ns.UI.Open("dungeons", r.id)
       end
     end
     if mask == 0 then
-      W.Confirm("No has marcado ningún rol: ¿la organizas sin ir tú?", go)
+      local ask = "No has marcado ningún rol: ¿la organizas sin ir tú?"
+      local macro = self.chat:GetChecked() and ns.Extras.AnnounceMacro("run", { d = d, at = at })
+      if macro then
+        W.SecureConfirm(ask, macro, go) -- el «Sí» avisa en el chat y crea
+      else
+        W.Confirm(ask, go)
+      end
     else
       go()
     end

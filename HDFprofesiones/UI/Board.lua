@@ -413,6 +413,10 @@ end
 -- mode = "need": la misma ventana para que un oficial añada lo que necesita la hermandad.
 -- opts = { edit = cambiar una oferta mía, price, craft = ofrecer fabricarlo, mats }
 function ns.UI.OpenOfferDialog(id, qty, mode, opts)
+  if ns.OFFERS_OFF and mode ~= "need" then
+    ns.Print("«Ofrecer» ya no está: quien necesite algo lo pide con «+ Pedir» y tú te encargas desde el Mercado.")
+    return
+  end
   opts = opts or {}
   if opts.craft and id and not opts.edit and not ns.Offers.Knows("i" .. id) then
     ns.Print("aún no tengo leída esa receta tuya: cierra y abre la ventana de la profesión y vuelve a intentarlo.")

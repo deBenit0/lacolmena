@@ -413,7 +413,33 @@ end
 -- Se suma por persona: el principal y todos sus alts.
 -- Con caché (se pide por cada fila al repintar): se vacía al cambiar cualquier ficha o la lista.
 local karmaCache, karmaCacheG = {}, nil
-function Data.InvalidateKarma() karmaCache = {} end
+
+-- La ficha de alguien de la lista de la hermandad. En WoW Forever el mismo jugador llega con
+-- reinos internos distintos («Ares-CAMWOWEU5Realm6PvP» en su ficha, otro en la lista), así que
+-- si no está con el nombre exacto se busca por el nombre de pila (solo si hay una ficha así).
+local shortIndex, shortIndexDirty = nil, true
+local function rebuildShortIndex(g)
+  shortIndex = {}
+  for name in pairs(g.entries) do
+    local short = ns.ShortName(name):lower()
+    short = short:match("^(%S+)") or short
+    if shortIndex[short] == nil then shortIndex[short] = name else shortIndex[short] = false end
+  end
+  shortIndexDirty = false
+end
+function Data.EntryFor(name)
+  local g = ns.G()
+  if not g or type(name) ~= "string" then return nil end
+  local e = g.entries[name]
+  if e then return e, name end
+  if shortIndexDirty or not shortIndex then rebuildShortIndex(g) end
+  local short = ns.ShortName(name):lower()
+  short = short:match("^(%S+)") or short
+  local key = shortIndex[short]
+  if key and g.entries[key] then return g.entries[key], key end
+  return nil
+end
+function Data.InvalidateKarma() karmaCache = {}; shortIndexDirty = true end
 ns.Listen("DATA_CHANGED", Data.InvalidateKarma)
 ns.Listen("ROSTER_UPDATED", Data.InvalidateKarma)
 

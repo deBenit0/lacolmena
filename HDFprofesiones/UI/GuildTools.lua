@@ -103,10 +103,12 @@ function Tools.DemoteMacro(name) return W.MacroLine("GUILD_DEMOTE", "/gdemote", 
 function Tools.RemoveMacro(name) return W.MacroLine("GUILD_UNINVITE", "/gremove", name) end
 function Tools.LeaveMacro() return W.Slash("GUILD_LEAVE", "/gquit") end
 
-local function refreshSoon() ns.After(1, function() ns.Guild.RequestRoster() end) end
+-- La lista se vuelve a pedir cuando ya ha dado tiempo a pulsar Intro.
+local function refreshSoon() ns.After(8, function() ns.Guild.RequestRoster() end) end
 
--- Ventana pequeña con una caja de texto y un botón seguro (invitar y mensaje del día).
--- opts: name, title, label, width, maxBytes, button, macro(text), done(text), none
+-- Ventana pequeña con una caja de texto (invitar y mensaje del día). Al aceptar, la orden queda
+-- escrita en el chat para que pulses Intro (el juego no deja que la haga el addon).
+-- opts: name, title, label, width, maxBytes, button, macro(text), done(text), none, what
 local function inputDialog(opts)
   local f = W.Panel(opts.name, UIParent, 400, 130)
   f:SetFrameStrata("DIALOG")
@@ -126,24 +128,24 @@ local function inputDialog(opts)
   f.hint = W.Text(f, "GameFontDisableSmall", "CENTER")
   f.hint:SetPoint("TOP", f.edit, "BOTTOM", 0, -6)
   f.hint:SetWidth(360)
-  f.ok = W.Button(f, opts.button, 110, 22)
+  local function accept()
+    if not f:IsShown() then return end
+    local text = f.edit:GetText() or ""
+    local cmd = opts.macro(text)
+    if not cmd then
+      if opts.none then ns.Print(opts.none) end
+      return
+    end
+    f:Hide()
+    W.ChatCommand(cmd, opts.what)
+    if opts.done then opts.done(text) end
+  end
+  f.ok = W.Button(f, opts.button, 110, 22, accept)
   f.ok:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -6, 14)
   f.cancel = W.Button(f, CANCEL or "Cancelar", 110, 22, function() f:Hide() end)
   f.cancel:SetPoint("BOTTOMLEFT", f, "BOTTOM", 6, 14)
-  -- Intro no puede hacer la orden (no es un clic): se dice qué botón pulsar.
-  f.edit:SetScript("OnEnterPressed", function(self)
-    self:ClearFocus()
-    f.hint:SetText("Pulsa «" .. opts.button .. "».")
-  end)
+  f.edit:SetScript("OnEnterPressed", function() accept() end)
   f.edit:SetScript("OnEscapePressed", function() f:Hide() end)
-  W.SecureMacro(f.ok, function()
-    if not f:IsShown() then return nil end
-    return opts.macro(f.edit:GetText() or "")
-  end, function()
-    local text = f.edit:GetText() or ""
-    f:Hide()
-    if opts.done then opts.done(text) end
-  end, opts.none)
   return f
 end
 
@@ -159,6 +161,7 @@ function Tools.EditMOTD()
       name = "HDFProfMOTD", title = "Mensaje del día de la hermandad:", button = "Guardar",
       maxBytes = Tools.MOTD_MAX,
       macro = function(text) return Tools.MOTDMacro(text) end,
+      what = "guardar el mensaje del día",
       done = function() refreshSoon() end,
     })
   end
@@ -183,7 +186,8 @@ function Tools.ShowInvite()
         if name == "" then return nil end
         return Tools.InviteMacro(name)
       end,
-      done = function(text) ns.Print("invitación a la hermandad enviada a %s.", cleanName(text)) refreshSoon() end,
+      what = "invitar",
+      done = function() refreshSoon() end,
       none = "escribe el nombre del personaje.",
     })
   end
@@ -327,9 +331,10 @@ function Tools.OpenRanks()
   end)
 end
 
+-- Salir: no hace falta confirmar aparte (hay que pulsar Intro en el chat).
 function Tools.Leave()
-  W.SecureConfirm("¿Seguro que quieres SALIR de la hermandad? Para volver, alguien tendrá que invitarte.",
-    Tools.LeaveMacro(), refreshSoon)
+  W.ChatCommand(Tools.LeaveMacro(), "SALIR de la hermandad (para volver, alguien tendrá que invitarte)")
+  refreshSoon()
 end
 
 ---------------------------------------------------------------------------
@@ -438,20 +443,22 @@ function Tools.ShowMember(name, info)
   local myRaw = ns.Guild.Info(ns.Me())
   local me = name == ns.Me() and (not myRaw or myRaw.raw == info.raw)
   f.promote:SetEnabled(not me and Tools.CanPromote())
-  -- Ascender, degradar y expulsar: se confirma en una ventana propia cuyo «Sí» es la orden.
+  -- Ascender, degradar y expulsar: la orden queda escrita en el chat y pulsas Intro (eso ya
+  -- es la confirmación).
   f.promote:SetScript("OnClick", function()
-    W.SecureConfirm("¿Ascender a " .. display .. "?", Tools.PromoteMacro(game), refreshSoon)
+    W.ChatCommand(Tools.PromoteMacro(game), "ascender a " .. display)
+    refreshSoon()
   end)
   f.demote:SetEnabled(not me and Tools.CanDemote())
   f.demote:SetScript("OnClick", function()
-    W.SecureConfirm("¿Degradar a " .. display .. "?", Tools.DemoteMacro(game), refreshSoon)
+    W.ChatCommand(Tools.DemoteMacro(game), "degradar a " .. display)
+    refreshSoon()
   end)
   f.remove:SetEnabled(not me and Tools.CanRemove())
   f.remove:SetScript("OnClick", function()
-    W.SecureConfirm("¿EXPULSAR a " .. display .. " de la hermandad?", Tools.RemoveMacro(game), function()
-      f:Hide()
-      refreshSoon()
-    end)
+    f:Hide()
+    W.ChatCommand(Tools.RemoveMacro(game), "EXPULSAR a " .. display .. " de la hermandad")
+    refreshSoon()
   end)
   f.tell:SetEnabled(not me)
   f.tell:SetScript("OnClick", function() ns.SendTell(target) end)
