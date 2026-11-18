@@ -1,6 +1,6 @@
 -- Página "Opciones" (rueda dentada): tres grupos con icono.
 --   Yo: personaje, profesiones leídas, principal, no disponible y no molestar.
---   Avisos: cada tipo de aviso con encendido, grande en el centro, sonido y también en el chat.
+--   Avisos: cada tipo de aviso, si se escribe en el chat (ya no hay ventanas de aviso).
 --   Otros: mis pedidos en el chat, minimapa, demostración, comprobar el addon, letra de las listas
 --   y el estado.
 local _, ns = ...
@@ -150,9 +150,9 @@ ns.UI.RegisterPage("mine", function(page)
   -------------------------------------------------------------------------
   local al = group(page, 260, 330, "Interface\\Icons\\INV_Misc_Bell_01", "Avisos")
   page.alertsBox = al
-  local COLS = { { key = "on", label = "Sí" }, { key = "big", label = "Grande" }, { key = "sound", label = "Sonido" },
-    { key = "chat", label = "Chat" } }
-  local X0 = 168
+  -- Sin ventanas de aviso (18/11): solo «en el chat», por tipo.
+  local COLS = { { key = "chat", label = "En el chat" } }
+  local X0 = 250
   for i, c in ipairs(COLS) do
     local h = W.Text(al, "GameFontNormalSmall", "CENTER")
     h:SetPoint("TOP", al, "TOPLEFT", X0 + (i - 1) * 40 + 12, -46)
@@ -174,7 +174,9 @@ ns.UI.RegisterPage("mine", function(page)
     row.checks = {}
     for k, c in ipairs(COLS) do
       local cb = W.Check(al, "", function(checked)
-        ns.Alerts.TypeSettings(t.id)[c.key] = checked
+        local ts = ns.Alerts.TypeSettings(t.id)
+        ts[c.key] = checked
+        if checked then ts.on = true end
         page:Refresh()
       end)
       cb:SetPoint("TOPLEFT", X0 + (k - 1) * 40, y)
@@ -187,11 +189,9 @@ ns.UI.RegisterPage("mine", function(page)
   legend:SetPoint("BOTTOMLEFT", 12, 44)
   legend:SetWidth(306)
   legend:SetJustifyV("BOTTOM")
-  legend:SetText("Grande: en el centro de la pantalla (si no, un cartel arriba). Chat: también se escribe en tu "
-    .. "chat. Cada aviso trae una rueda que lleva aquí.")
-  page.test = W.Button(al, "Probar un aviso", 130, 22, function()
-    ns.Alerts.Push({ type = "other", icon = "Interface\\Icons\\INV_Misc_Note_01",
-      text = "Así se ve un aviso (" .. date("%H:%M:%S") .. ")" })
+  legend:SetText("Ya no salen ventanas de aviso. Marca los que quieras ver escritos en tu chat.")
+  page.test = W.Button(al, "Probar en el chat", 130, 22, function()
+    ns.Print("así se ve un aviso en el chat (" .. date("%H:%M:%S") .. ")")
   end)
   page.test:SetPoint("BOTTOMLEFT", 10, 12)
 
@@ -305,10 +305,10 @@ ns.UI.RegisterPage("mine", function(page)
     for id, row in pairs(page.alertRows) do
       local ts = ns.Alerts.TypeSettings(id)
       for _, cb in ipairs(row.checks) do
-        cb:SetChecked(ts[cb.key] and true or false)
-        if cb.key ~= "on" then cb:SetEnabled(ts.on and true or false) end
+        cb:SetChecked((ts.on and ts[cb.key]) and true or false)
       end
-      row.label:SetTextColor(ts.on and 1 or 0.5, ts.on and 1 or 0.5, ts.on and 1 or 0.5)
+      local lit = ts.on and ts.chat
+      row.label:SetTextColor(lit and 1 or 0.6, lit and 1 or 0.6, lit and 1 or 0.6)
       row.mark:SetShown(page.focus == id)
     end
 

@@ -8,6 +8,10 @@ ns.Alerts = Alerts
 local queue = {}
 local frame, showing, hideToken
 
+-- Ventanas de aviso QUITADAS (18/11): ningún aviso abre ventana ni suena. Solo queda la línea en
+-- el chat para los tipos que la tengan marcada en Opciones. Con true vuelven.
+Alerts.WINDOWS = false
+
 -- Tipos de aviso: cada uno se configura en Opciones (encendido, grande en el centro, sonido y
 -- también en el chat).
 Alerts.TYPES = {
@@ -229,6 +233,7 @@ function Alerts.Push(alert)
     if now - t > Alerts.DEDUP_SECONDS then recent[k] = nil end
   end
   if ts.chat then ns.Print(alert.text or "") end
+  if not Alerts.WINDOWS then return end -- sin ventanas de aviso (18/11, él las quiere fuera)
   queue[#queue + 1] = alert
   Alerts.Flush()
 end
