@@ -237,6 +237,14 @@ ns.UI.RegisterPage("market", function(page)
   ns.UI.Tip(page.addAsk, "+ Pedir", "Elige qué pedir en el catálogo, o arrastra aquí un objeto de tus bolsas.")
   ns.UI.Tip(page.addOffer, "+ Ofrecer", "Elige qué ofrecer de tus bolsas (o arrastra aquí el objeto), o qué recetas "
     .. "tuyas ofreces fabricar.")
+  if ns.OFFERS_OFF then -- sin «Ofrecer»: fuera «Se ofrece» y «+ Ofrecer»; «+ Pedir» a la derecha
+    page.offer:Hide()
+    page.addOffer:Hide()
+    page.search:ClearAllPoints()
+    page.search:SetPoint("LEFT", page.want, "RIGHT", 16, 0)
+    page.addAsk:ClearAllPoints()
+    page.addAsk:SetPoint("TOPRIGHT", 0, 0)
+  end
 
   -----------------------------------------------------------------------
   -- Fila 2: filtros rápidos, «Filtros ▾» y ordenar.
@@ -801,7 +809,9 @@ ns.UI.RegisterPage("market", function(page)
         W.Confirm("¿Borrar este pedido? Desaparecerá del Mercado de todos.", function() ns.Sync.Close(r.id) end)
       end)
       setButton(detail.x1, active and "Anunciar" or nil, true, function()
-        if ns.Extras.Announce("request", r, r.id) then ns.Print("anunciado en el chat de hermandad.") end
+        -- Lo escribe el jugador (Intro): el juego bloquea a veces el que manda el addon.
+        local m = ns.Extras.AnnounceMacro("request", r)
+        if m then W.ChatCommand(m, "anunciarlo en el chat de hermandad") else ns.Print("no estás en ninguna hermandad.") end
       end, "Anunciarlo en el chat de hermandad (para los que no tienen el addon).")
     else
       local myActive = mineCommit and Data.CommitActive(mineCommit, now, r)
@@ -1338,7 +1348,7 @@ ns.UI.RegisterPage("market", function(page)
       if #all == 0 then
         text, button, fn = "No hay nada en el Mercado ahora mismo.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
       elseif state.chip == "craft" then
-        text, button, fn = "Nadie pide nada que puedas hacer.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
+        text, button, fn = "Nadie pide nada que puedas hacer.", "+ Pedir", function() ns.UI.OpenAsk("ask") end
       elseif state.chip == "mine" then
         if state.side == "offer" then
           text, button, fn = "No estás ofreciendo nada ni has cogido ofertas.", "+ Ofrecer", function() ns.UI.OpenAsk("offer") end
@@ -1433,6 +1443,7 @@ ns.UI.RegisterPage("market", function(page)
   end
 
   function page:SetSide(side)
+    if ns.OFFERS_OFF then side = "want" end
     state.side = side
     state.selected = nil
     page:Refresh()
@@ -1443,7 +1454,9 @@ ns.UI.RegisterPage("market", function(page)
     if chip == "involved" then chip = "mine" end -- «Mis encargos» ahora va dentro de «Lo mío»
     state.chip = chip
     state.selected = nil
-    if side then
+    if ns.OFFERS_OFF then
+      state.side = "want"
+    elseif side then
       state.side = side
     elseif chip == "mine" or chip == "involved" then
       state.side = "want"
@@ -1462,7 +1475,7 @@ ns.UI.RegisterPage("market", function(page)
       if not Data.IsActiveState(Data.RequestInfo(r, ns.Now()).state) then state.ended = true end
       state.expanded[r.k] = true
     elseif type(id) == "string" and id:sub(1, 2) == "o:" then
-      state.side = "offer"
+      state.side = ns.OFFERS_OFF and "want" or "offer"
     end
     state.selected = id
     page:Refresh()

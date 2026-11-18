@@ -463,6 +463,7 @@ local function showOffer(icon, isCraft)
 end
 
 local function hookProduct(icon, isCraft)
+  if ns.OFFERS_OFF then return end
   if not icon or icon.hdfOffer then return end
   icon.hdfOffer = true
   icon:HookScript("OnEnter", function(self) ns.SafeCall(showOffer, self, isCraft) end)
@@ -538,7 +539,7 @@ function Missing.LayoutModern(form)
     if type(info) == "table" and info.recipeID and C_TradeSkillUI then
       itemID = ns.Scan.ModernOutput(info.recipeID, C_TradeSkillUI.GetRecipeSchematic(info.recipeID, false))
     end
-    form.hdfOffer:SetShown(itemID ~= nil and form.OutputIcon:IsShown())
+    form.hdfOffer:SetShown(not ns.OFFERS_OFF and itemID ~= nil and form.OutputIcon:IsShown())
     form.hdfOffer:SetScript("OnClick", function()
       if not ns.G() then return ns.Print("no estás en ninguna hermandad.") end
       ns.UI.OpenOfferDialog(itemID, nil, nil, { craft = true })

@@ -1487,8 +1487,8 @@ local ASK_TYPES = {
 }
 local MODES = {
   { id = "ask", label = "Pedir", width = 80 },
-  { id = "offer", label = "Ofrecer de tus bolsas", width = 150 },
-  { id = "craft", label = "Ofrecer fabricar", width = 124 },
+  { id = "offer", label = "Ofrecer de tus bolsas", width = 150, off = true },
+  { id = "craft", label = "Ofrecer fabricar", width = 124, off = true },
 }
 local function isAskType(mode)
   for _, t in ipairs(ASK_TYPES) do if t.id == mode then return true end end
@@ -1500,10 +1500,12 @@ ns.UI.RegisterPage("ask", function(page)
   page.modes, page.types, page.frames = {}, {}, {}
   local x = 100
   for _, m in ipairs(MODES) do
-    local b = W.Chip(page, m.label, m.width, function() page:SetMode(m.id) end)
-    b:SetPoint("TOPLEFT", x, -2)
-    x = x + m.width + 4
-    page.modes[m.id] = b
+    if not (m.off and ns.OFFERS_OFF) then
+      local b = W.Chip(page, m.label, m.width, function() page:SetMode(m.id) end)
+      b:SetPoint("TOPLEFT", x, -2)
+      x = x + m.width + 4
+      page.modes[m.id] = b
+    end
   end
   ns.UI.Tip(page.modes.ask, "Pedir", "Pide materiales, equipo o consumibles a la hermandad.")
   x = x + 14
@@ -1565,6 +1567,7 @@ ns.UI.RegisterPage("ask", function(page)
   end
 
   function page:SetMode(mode)
+    if ns.OFFERS_OFF and (mode == "offer" or mode == "craft") then mode = "ask" end
     if mode == "ask" then mode = page.lastAsk or "materials" end
     if not page.frames[mode] then mode = "materials" end
     page.mode = mode

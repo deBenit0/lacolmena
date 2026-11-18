@@ -133,8 +133,8 @@ local CHECKS = {
     return ok, ok and "el buzón lo tiene" or "no lo encuentro: la propina habrá que pagarla a mano"
   end },
   { "Invitar al grupo", function()
-    local ok = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
-    return ok ~= nil, ok and "compatible" or "no se puede invitar desde el addon"
+    local ok = true
+    return ok, "con un clic tuyo (macro /invite)"
   end },
   { "Arrastrar objetos", function()
     local ok = GetCursorInfo ~= nil and ClearCursor ~= nil
