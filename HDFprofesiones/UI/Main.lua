@@ -405,7 +405,8 @@ local MINI_ITEMS = {
   { id = "commits", icon = "Interface\\Icons\\Trade_BlackSmithing", title = "Encargos",
     text = "Lo que tienes que enviar.", open = function() UI.OpenMarket("involved") end },
   { id = "market", icon = "Interface\\Icons\\INV_Misc_Bag_10", title = "Mercado",
-    text = "Lo que piden y puedes fabricar.", open = function() UI.OpenMarket("craft") end },
+    text = "Lo que te espera en el Mercado: lo que puedes hacer o dar, lo que te han enviado y lo que quieren de tus ofertas.",
+    open = function() UI.Open("market") end },
   { id = "agenda", icon = "Interface\\Icons\\INV_Misc_Key_03", title = "Grupos",
     text = "Quedadas a las que no te has apuntado.", open = function() UI.Open("dungeons") end },
 }
@@ -502,9 +503,10 @@ function UI.Counts()
   local c = { commits = 0, market = 0, agenda = 0, guild = 0 }
   if not ns.G() then return c end
   local stats = UI.BoardStats and UI.BoardStats()
-  if stats then
-    c.commits, c.market, c.guild = stats.toSend or 0, stats.servable or 0, stats.guild or 0
-  end
+  if stats then c.guild = stats.guild or 0 end
+  -- Mercado: lo que te espera en sus pestañas (encargos aparte, para la tira pequeña).
+  local mc = UI.MarketCounts and UI.MarketCounts()
+  if mc then c.commits, c.market = mc.jobs, mc.board + mc.mine + mc.offers end
   local D, me, now = ns.Dungeons, ns.Me(), ns.Now()
   for _, r in pairs(D and D.Runs() or {}) do
     local su = r.s and r.s[me]

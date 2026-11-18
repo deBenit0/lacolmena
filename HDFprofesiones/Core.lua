@@ -3,9 +3,8 @@
 local ADDON, ns = ...
 
 ns.VERSION = "0.34.7"
--- «Ofrecer» (de tus bolsas y por encargo) QUITADO (18/11): quien necesita algo lo pide y quien
--- puede, se encarga. Lo de «la hermandad necesita» (oficiales) sigue.
-ns.OFFERS_OFF = true
+-- «Ofrecer» vuelve entero con el Mercado nuevo (0.35). El interruptor se quita al terminarlo.
+ns.OFFERS_OFF = false
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"

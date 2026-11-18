@@ -16,9 +16,9 @@ local function category(key)
 end
 ns.UI.ItemCategory = category
 
--- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y nadie lo ha cogido)
+-- ¿Puedo aceptar este pedido ahora? (no es mío, está abierto y queda algo sin coger)
 local function canAccept(r, info, me)
-  return r.a ~= me and info.state == "open" and not info.owner and info.remaining > 0
+  return r.a ~= me and info.state == "open" and info.remaining > 0
 end
 
 -- Lo que me queda por enviar de un pedido que acepté (0 si nada).
@@ -73,7 +73,8 @@ local function collect(seenAt)
     local info = Data.RequestInfo(r, now)
     local pending = toSend(r, me, now)
     local mine = r.a == me
-    local visible = info.state == "open" or (mine and Data.IsActiveState(info.state))
+    -- abiertos y ya cogidos (en el Tablón salen en gris con quién lo hace)
+    local visible = Data.IsActiveState(info.state)
     if pending > 0 or visible then
       local item = {
         kind = "req", id = r.id, k = r.k, author = r.a, t = r.t or 0,
@@ -83,9 +84,9 @@ local function collect(seenAt)
         new = not mine and pending == 0 and (r.t or 0) > (seenAt or 0),
       }
       if pending > 0 then stats.toSend = stats.toSend + 1 end
-      if visible and not mine then stats.open = stats.open + 1 end
+      if info.state == "open" and not mine then stats.open = stats.open + 1 end
       if item.canServe then stats.servable = stats.servable + 1 end
-      if item.new and visible then stats.new = stats.new + 1 end
+      if item.new and info.state == "open" then stats.new = stats.new + 1 end
       items[#items + 1] = item
     end
   end

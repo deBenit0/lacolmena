@@ -31,6 +31,11 @@ UI\Main.lua
 UI\Home.lua
 UI\Board.lua
 UI\Market.lua
+UI\MarketDetail.lua
+UI\MarketBoard.lua
+UI\MarketMine.lua
+UI\MarketJobs.lua
+UI\MarketOffers.lua
 UI\Catalog.lua
 UI\Mine.lua
 UI\Dialog.lua
