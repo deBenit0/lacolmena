@@ -22,7 +22,7 @@ local SECTIONS = {
   { id = "guild", label = "Hermandad", page = "guild" },
   { id = "options", label = "Opciones", page = "mine" },
 }
-ns.MOTTO = "Mi vida por el fundillo"
+ns.MOTTO = "Lo que está brotado no puede brotar"
 
 -- Todas las páginas y la pestaña que se enciende con cada una.
 local PAGES = {
@@ -30,7 +30,7 @@ local PAGES = {
   { id = "members", section = "members" },
   { id = "chat", section = "chat" },
   { id = "market", section = "market" },
-  { id = "ask", section = "market" },      -- «+ Pedir» y «+ Ofrecer»: el catálogo
+  { id = "ask", section = "market" },      -- «+ Pedir»: el catálogo
   { id = "dungeons", section = "agenda" },
   { id = "guild", section = "guild" },
   { id = "mine", section = "options" },    -- Opciones
@@ -405,7 +405,7 @@ local MINI_ITEMS = {
   { id = "commits", icon = "Interface\\Icons\\Trade_BlackSmithing", title = "Encargos",
     text = "Lo que tienes que enviar.", open = function() UI.OpenMarket("involved") end },
   { id = "market", icon = "Interface\\Icons\\INV_Misc_Bag_10", title = "Mercado",
-    text = "Lo que te espera en el Mercado: lo que puedes hacer o dar, lo que te han enviado y lo que quieren de tus ofertas.",
+    text = "Lo que te espera en el Mercado: lo que puedes hacer o dar y lo que te han enviado.",
     open = function() UI.Open("market") end },
   { id = "agenda", icon = "Interface\\Icons\\INV_Misc_Key_03", title = "Grupos",
     text = "Quedadas a las que no te has apuntado.", open = function() UI.Open("dungeons") end },
@@ -506,7 +506,7 @@ function UI.Counts()
   if stats then c.guild = stats.guild or 0 end
   -- Mercado: lo que te espera en sus pestañas (encargos aparte, para la tira pequeña).
   local mc = UI.MarketCounts and UI.MarketCounts()
-  if mc then c.commits, c.market = mc.jobs, mc.board + mc.mine + mc.offers end
+  if mc then c.commits, c.market = mc.jobs, mc.board + mc.mine end
   local D, me, now = ns.Dungeons, ns.Me(), ns.Now()
   for _, r in pairs(D and D.Runs() or {}) do
     local su = r.s and r.s[me]
@@ -665,7 +665,7 @@ end
 
 ---------------------------------------------------------------------------
 -- La ventana de hermandad del juego (la J) abre también el addon, pegado a su lado en la
--- página Hermandad; al cerrarla se cierran las dos. Se puede apagar en la página Hermandad.
+-- página Hermandad; al cerrarla se cierran las dos. Desde el 18/11 siempre encendido.
 ---------------------------------------------------------------------------
 -- La ventana de hermandad del juego, la de siempre (el botón «Ventana del juego»).
 function UI.OpenGameGuild()
@@ -702,7 +702,7 @@ keyButton:SetScript("OnClick", function()
   elseif panel and panel:IsShown() then
     panel:Hide()
   else
-    UI.Open("members")
+    UI.Open("home")
   end
 end)
 
@@ -748,17 +748,17 @@ function UI.OpenWithHost(host)
   if not replaceable(host) or (InCombatLockdown and InCombatLockdown()) then
     -- en combate no se tocan las ventanas del juego: las dos juntas, como antes
     if panel and panel:IsShown() and not panel.withHost then return end
-    UI.Open("members", nil, host, true)
+    UI.Open("home", nil, host, true)
     if panel then panel.withHost = host end
     return
   end
   -- Se cierra la del juego; si la nuestra ya estaba abierta, la J la cierra; si no, se abre en
-  -- Miembros (donde la dejaste, o en el centro).
+  -- Inicio (donde la dejaste, o en el centro).
   if HideUIPanel then pcall(HideUIPanel, host) else host:Hide() end
   if panel and panel:IsShown() then
     panel:Hide()
   else
-    UI.Open("members")
+    UI.Open("home")
   end
 end
 

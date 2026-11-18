@@ -77,7 +77,7 @@ local function displayName(name, info)
 end
 
 local function addonText(e)
-  if not e then return "|cffe04040" .. "\194\183 Sin addon|r", 0 end
+  if not e then return "|cff777777\194\183|r", 0 end -- sin addon: solo un puntito gris
   local Sync = ns.Sync
   local mine = Sync and Sync.VersionNumber and Sync.VersionNumber(ns.VERSION) or 0
   local theirs = Sync and Sync.VersionNumber and Sync.VersionNumber(e.av) or 0
@@ -215,6 +215,10 @@ ns.UI.RegisterPage("members", function(page)
       row.cols.addon:SetText(item.addon)
       row.cols.rank:SetText(item.rankName or "")
       row.cols.zone:SetText(item.zone or "")
+      -- Con «En línea» todos están conectados: sin la columna, la zona cabe entera.
+      local wide = filter == "online"
+      row.cols.zone:SetWidth(wide and (COLS[8].w + COLS[9].w) or COLS[8].w)
+      row.cols.seen:SetShown(not wide)
       if item.online then
         row.cols.seen:SetText("|cff40c040Conectado|r")
       else
@@ -250,11 +254,21 @@ ns.UI.RegisterPage("members", function(page)
   page.ranks = W.Button(page, "Rangos", 80, 22, function() T().OpenRanks() end)
   page.ranks:SetPoint("LEFT", page.log, "RIGHT", 6, 0)
   ns.UI.Tip(page.ranks, "Rangos y permisos", "Solo el líder: nombres de los rangos y qué puede hacer cada uno.")
-  page.leave = W.Button(page, "Salir de la hermandad", 172, 22, function() T().Leave() end)
-  page.leave:SetPoint("LEFT", page.ranks, "RIGHT", 6, 0)
-  page.gameGuild = W.Button(page, "Ventana del juego", 146, 22, function() ns.UI.OpenGameGuild() end)
-  page.gameGuild:SetPoint("BOTTOMRIGHT", -4, 2)
-  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre, por si necesitas algo de allí.")
+  -- Salir: pequeño, en gris y apartado en la esquina, y pide confirmar.
+  page.leave = CreateFrame("Button", nil, page)
+  page.leave:SetSize(130, 14)
+  page.leave:SetScale(0.85)
+  page.leave:SetPoint("BOTTOMRIGHT", -4, 4)
+  page.leave.text = W.Text(page.leave, "GameFontNormalSmall")
+  page.leave.text:SetPoint("RIGHT", 0, 0)
+  page.leave.text:SetTextColor(0.6, 0.6, 0.6)
+  page.leave.text:SetText("Salir de la hermandad")
+  page.leave:SetScript("OnEnter", function(self) self.text:SetTextColor(1, 0.25, 0.25) end)
+  page.leave:SetScript("OnLeave", function(self) self.text:SetTextColor(0.6, 0.6, 0.6) end)
+  page.leave:SetScript("OnClick", function()
+    W.Confirm("¿Seguro que quieres SALIR de la hermandad? Para volver, alguien tendrá que invitarte.",
+      function() T().Leave() end)
+  end)
 
   function page:Refresh()
     for _, chip in ipairs(self.chips) do chip:SetOn(chip.id == filter) end
@@ -262,9 +276,15 @@ ns.UI.RegisterPage("members", function(page)
     if tools then
       local motd = tools.MOTD()
       self.motd:SetText("|cffffd100Mensaje del día:|r " .. (motd ~= "" and motd or "|cff888888(ninguno)|r"))
-      self.motdEdit:SetShown(tools.CanEditMOTD())
+      -- Herramientas de administración: solo oficiales y líder.
+      local boss = ns.Social and ns.Social.AmOfficer()
+      self.motdEdit:SetShown(boss and tools.CanEditMOTD() and true or false)
+      self.info:SetShown(boss and true or false)
+      self.log:SetShown(boss and true or false)
+      self.ranks:SetShown(boss and true or false)
     end
     for _, h in ipairs(self.heads) do
+      h:SetShown(not (h.col.id == "seen" and filter == "online"))
       local on = h.col.id == sortCol
       h.text:SetText(h.col.label .. (on and (sortDesc and " v" or " ^") or ""))
       if on then h.text:SetTextColor(1, 0.82, 0) else h.text:SetTextColor(0.75, 0.7, 0.6) end

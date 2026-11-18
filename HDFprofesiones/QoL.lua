@@ -139,8 +139,8 @@ end)
 ---------------------------------------------------------------------------
 -- 3. Bienvenida a nuevos miembros
 ---------------------------------------------------------------------------
-QoL.DEFAULT_WELCOME = "¡Bienvenido a %s, %s! Instala el addon \"%s\" (carpeta HDFprofesiones) para pedir y "
-  .. "ofrecer cosas a la hermandad y apuntarte a mazmorras. ¡Mi vida por el fundillo!"
+QoL.DEFAULT_WELCOME = "¡Bienvenido a %s, %s! Instala el addon \"%s\" (carpeta HDFprofesiones) para pedir "
+  .. "cosas a la hermandad y apuntarte a mazmorras. ¡Mi vida por el fundillo!"
 
 -- Convierte "%s se ha unido a la hermandad." en un patrón que captura el nombre.
 local function joinPattern()
@@ -219,15 +219,6 @@ function QoL.Summary(since, now)
     if (r.t or 0) > since then servable = servable + 1 end
   end
   if servable > 0 then lines[#lines + 1] = string.format("%d pedidos nuevos que puedes hacer", servable) end
-  for _, o in ipairs(ns.Offers.List(now)) do
-    if o.owner == me then
-      for _, c in ipairs(o.claims) do
-        if (c.t or 0) > since then
-          lines[#lines + 1] = string.format("%s quiere %dx %s de tu oferta", ns.DisplayName(c.name), c.left, ns.KeyLabel("i" .. o.id))
-        end
-      end
-    end
-  end
   local needs = 0
   for _, n in ipairs(ns.Social.Needs(now)) do
     if (n.t or 0) > since and n.left > 0 then needs = needs + 1 end

@@ -98,16 +98,6 @@ local CHECKS = {
     local ok = TradeSkillReagent1 and TradeSkillReagent1.hdfHooked
     return ok and true or false, ok and "enganchado" or "no se ha podido enganchar"
   end },
-  { "Botón \"Ofrecer\" en lo que fabricas", function()
-    if ProfessionsFrame then
-      local form = ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
-      local ok = form and form.hdfOffer ~= nil
-      return ok and true or false, ok and "listo (ventana moderna)" or "elige una receta y vuelve a comprobar"
-    end
-    if not TradeSkillFrame then return nil, "abre una profesión y vuelve a comprobar" end
-    local ok = TradeSkillSkillIcon and TradeSkillSkillIcon.hdfOffer
-    return ok and true or false, ok and "enganchado" or "no encuentro el icono del objeto"
-  end },
   { "Recetas leídas (Forever)", function()
     if not ns.Scan.ModernAPI() then return nil, "este cliente usa la ventana clásica" end
     local c, n = ns.MyChar(), 0

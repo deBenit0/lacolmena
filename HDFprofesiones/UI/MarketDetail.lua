@@ -145,12 +145,9 @@ local function build()
   detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
   detail.crafters = W.Crafters(detail, DETAIL_W - 16, 3, 26, true)
   detail.crafters:SetPoint("TOPLEFT", 8, -194)
-  -- Lo que se ofrece: materiales de su receta (cuántos tienes) y, en «ofrecen fabricarlo», quién lo
-  -- ofrece en dos filas (para que quepa todo).
+  -- Materiales de la receta (cuántos tienes).
   detail.matsLabel = W.Header(detail)
   detail.matsLabel:Hide()
-  detail.offerers = W.Crafters(detail, DETAIL_W - 16, 2, 26, true)
-  detail.offerers:Hide()
   local function reagents()
     detail.reagents = detail.reagents or ns.UI.ReagentsBlock(detail, DETAIL_W - 24)
     return detail.reagents
@@ -243,7 +240,8 @@ local function build()
     local info = Data.RequestInfo(r, now)
     local _, _, link = ns.KeyInfo(r.k)
     detail.title:SetText(string.format("%dx %s", r.q, noBrackets(link or ns.KeyName(r.k))))
-    detail.sub:SetText("pide " .. ns.AuthorText(r.a) .. " |cffbbbbbb(karma " .. Data.KarmaText(r.a) .. ") · hace "
+    local karma = ns.Social.AmOfficer() and (" |cffbbbbbb(karma " .. Data.KarmaText(r.a) .. ")|r") or ""
+    detail.sub:SetText("pide " .. ns.AuthorText(r.a) .. karma .. " |cffbbbbbb· hace "
       .. ns.FormatDuration(now - (r.t or now)) .. "|r")
     detail.steps:SetText(stepsText(r, info))
     local lines = {}
@@ -365,199 +363,6 @@ local function build()
     end
   end
 
-  -- Oferta.
-  local function showOffer(item)
-    local o, now = item.o, ns.Now()
-    local _, _, link = ns.KeyInfo(item.k)
-    detail.title:SetText(string.format("%dx %s", o.q, noBrackets(link or ns.KeyName(item.k))))
-    detail.sub:SetText("ofrece " .. ns.AuthorText(o.owner) .. " |cffbbbbbb(karma " .. Data.KarmaText(o.owner) .. ") · hace "
-      .. ns.FormatDuration(now - (o.t or now)) .. "|r")
-    detail.steps:SetText("Precio: " .. ns.UI.PriceText(o.g) .. "   " .. (expiresText((o.t or 0) + ns.Offers.OFFER_TTL, now) or ""))
-    local lines = {}
-    if o.nt then lines[#lines + 1] = "Nota: |cffffffff" .. o.nt .. "|r" end
-    lines[#lines + 1] = o.free > 0 and string.format("Quedan |cffffffff%d|r libres de %d.", o.free, o.q)
-      or "|cffff9933Ya está todo pedido.|r"
-    if item.mine then
-      if #o.claims > 0 then
-        lines[#lines + 1] = "|cff66ccffLo quieren:|r"
-        for i, c in ipairs(o.claims) do
-          if i <= 3 then lines[#lines + 1] = "  " .. ns.WhoColored(c.name) .. " " .. c.left end
-        end
-        if #o.claims > 3 then lines[#lines + 1] = string.format("  |cffbbbbbby %d más|r", #o.claims - 3) end
-        lines[#lines + 1] = "|cffbbbbbbMándaselo por correo: se apunta solo.|r"
-      else
-        lines[#lines + 1] = "|cff999999Nadie lo ha pedido todavía.|r"
-      end
-    elseif item.claimed then
-      lines[#lines + 1] = string.format("|cff66ccffHas pedido %d. %s te lo mandará por correo.|r", o.myClaim, ns.DisplayName(o.owner))
-    else
-      local have = ns.Scan.Have(o.id)
-      if have > 0 then lines[#lines + 1] = string.format("|cffbbbbbbTienes %d.|r", have) end
-    end
-    detail.info:SetText(table.concat(lines, "\n"))
-    local infoH = math.max(#lines * LINE_H, math.ceil(detail.info:GetStringHeight() or 0))
-    detail.info:SetHeight(infoH)
-    detail.whoLabel:Hide()
-    detail.crafters:Hide()
-    showReagents(item.k, nil, -76 - infoH - 6)
-    if item.mine then
-      local first = o.claims[1]
-      if first then
-        local can = ns.Mail.CanPrepare()
-        setButton(detail.b1, "Preparar correo", can, function() ns.Mail.PrepareOffer(first.name, o.id, first.left, o.g) end,
-          not can and "Abre el buzón para preparar el correo." or nil)
-      else
-        setButton(detail.b1, "Anunciar", true, function() ns.UI.Market.Announce("offer", o) end,
-          "Anunciarla en el chat de hermandad (para los que no tienen el addon).")
-      end
-      setButton(detail.b2, "Quitar oferta", true, function()
-        W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
-      end)
-      if first then
-        setButton(detail.b3, "Ya lo he enviado", true, function()
-          local function mark(cl)
-            local n = ns.Offers.MarkSent(cl.name, o.id, ns.Now())
-            if n > 0 then ns.Print("apuntado: %dx %s entregadas a %s.", n, ns.KeyLabel("i" .. o.id), ns.DisplayName(cl.name)) end
-          end
-          -- lo que se apunta: lo que le falta, sin pasar de lo que queda en la oferta
-          local function amount(cl) return math.min(cl.left or 0, o.q or 0) end
-          if #o.claims == 1 then
-            W.Confirm(string.format("¿Ya le has dado %dx %s a %s? Se apuntará como entregado.", amount(first),
-              ns.KeyName("i" .. o.id), ns.DisplayName(first.name)), function() mark(first) end)
-          else
-            -- La quieren varios: se elige a quién se le ha dado (hasta 4).
-            local labels, shown = {}, {}
-            for i = 1, math.min(4, #o.claims) do
-              local cl = o.claims[i]
-              shown[i] = cl
-              labels[i] = string.format("%s (%d)", ns.DisplayName(cl.name), amount(cl))
-            end
-            W.Choose("¿A quién se lo has dado?", string.format("%s · se apuntará como entregado",
-              ns.KeyName("i" .. o.id)), labels, function(i) if shown[i] then mark(shown[i]) end end)
-          end
-        end, "Si se lo diste sin que el addon lo viera (desde un alt, en mano...). Si lo mandas por correo "
-          .. "desde aquí, se apunta solo.")
-      else
-        setButton(detail.b3, "Editar", true, function()
-          ns.UI.OpenOfferDialog(o.id, o.q, nil, { edit = true, price = o.g, note = o.nt })
-        end, "Cambiar la cantidad o el precio.")
-      end
-    elseif item.claimed then
-      setButton(detail.b1, "Ya no lo quiero", true, function() ns.Offers.Unclaim(o.key) end)
-      setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
-      setButton(detail.b3, nil)
-    else
-      setButton(detail.b1, "Lo quiero", o.free > 0, function()
-        if o.free <= 1 then
-          ns.Offers.Claim(o.key, 1, ns.Now())
-        else
-          W.AskAmount(string.format("¿Cuántos quieres? (quedan %d)", o.free), 1, function(n)
-            local ok, err = ns.Offers.Claim(o.key, n, ns.Now())
-            if not ok and err then ns.Print(err) end
-          end)
-        end
-      end)
-      setButton(detail.b2, "Susurrar", true, function() ns.SendTell(o.owner) end)
-      setButton(detail.b3, nil)
-    end
-    setButton(detail.x1, nil)
-    setButton(detail.x2, nil)
-    if not item.mine and ns.Social.AmOfficer() then
-      setButton(detail.x3, "Quitar (oficial)", true, function()
-        W.Confirm("¿Quitar esta oferta de " .. ns.DisplayName(o.owner) .. " como oficial? Desaparecerá del Mercado de todos.",
-          function() ns.Social.ModRemoveOffer(o.key, ns.Now()) end)
-      end, "Solo oficiales.")
-    else
-      setButton(detail.x3, nil)
-    end
-  end
-
-  -- Ofrecen fabricarlo (una fila con todos los que lo ofrecen).
-  local function showCraft(item)
-    local grp, me, now = item.craft, ns.Me(), ns.Now()
-    local _, _, link = ns.KeyInfo(item.k)
-    detail.title:SetText(noBrackets(link or ns.KeyName(item.k)))
-    local n = #grp.crafters
-    detail.sub:SetText(n == 1 and ("ofrece fabricarlo " .. ns.WhoColored(grp.crafters[1].name))
-      or string.format("ofrecen fabricarlo |cffffffff%d|r personas", n))
-    detail.steps:SetText(grp.mine and (expiresText((grp.myT or 0) + ns.Offers.CRAFT_TTL, now) or "")
-      or "Pídeselo y te lo fabrican.")
-    local lines = {}
-    for i = 1, math.min(2, n) do
-      local c = grp.crafters[i]
-      local who = c.name == me and "|cffffd100Tú|r" or ns.WhoColored(c.name)
-      if c.nt then lines[#lines + 1] = string.format("%s dice: |cffffffff%s|r", who, c.nt) end
-      lines[#lines + 1] = string.format("%s: %s · %s", who, ns.UI.PriceText(c.g),
-        c.m and "pone los materiales" or "|cffbbbbbbmateriales de quien lo pide|r")
-    end
-    if n > 2 then lines[#lines + 1] = string.format("|cffbbbbbby %d más (abajo)|r", n - 2) end
-    detail.info:SetText(table.concat(lines, "\n"))
-    local infoH = math.max(#lines * LINE_H, math.ceil(detail.info:GetStringHeight() or 0))
-    detail.info:SetHeight(infoH)
-    local offering, rows = {}, {}
-    for _, c in ipairs(grp.crafters) do offering[c.name] = true end
-    for _, r in ipairs(ns.UI.CrafterRows and ns.UI.CrafterRows(item.k) or {}) do
-      if offering[r.name] then rows[#rows + 1] = r end
-    end
-    -- Materiales (de la profesión del primero que lo ofrece) y, debajo, quién lo ofrece.
-    local y = showReagents(item.k, rows[1] and rows[1].pk, -76 - infoH - 6)
-    detail.whoLabel:ClearAllPoints()
-    detail.whoLabel:SetPoint("TOPLEFT", 8, y)
-    detail.whoLabel:SetPoint("RIGHT", detail, "RIGHT", -8, 0)
-    detail.whoLabel:SetText("Quién lo ofrece", "(" .. n .. ")")
-    detail.whoLabel:Show()
-    detail.crafters:Hide()
-    detail.offerers:ClearAllPoints()
-    detail.offerers:SetPoint("TOPLEFT", 8, y - 24)
-    detail.offerers:SetItems(rows)
-    detail.offerers:Show()
-    if grp.mine then
-      setButton(detail.b1, "Renovar 30 días", true, function()
-        ns.Offers.RenewCrafts(ns.Now())
-        ns.Print("tus recetas ofrecidas duran otros 30 días.")
-      end)
-      setButton(detail.b2, "Dejar de ofrecer", true, function() ns.Offers.RemoveCraft(item.k) end)
-      setButton(detail.b3, "Editar", true, function()
-        local kind, id = ns.ParseKey(item.k)
-        local o = ns.Offers.MyCrafts()[item.k]
-        if kind == "i" and o then
-          ns.UI.OpenOfferDialog(id, nil, nil, { edit = true, craft = true, price = o.g, mats = o.m == 1, note = o.nt })
-        else
-          ns.UI.OpenAsk("craft")
-        end
-      end, "Cambiar el precio o quién pone los materiales.")
-    else
-      setButton(detail.b1, "Pedírselo", true, function()
-        ns.UI.OpenRequestDialog({ k = item.k, pk = Data.SingleProfession(item.k), q = 1 })
-      end)
-      local first = grp.crafters[1]
-      setButton(detail.b2, "Susurrar", true, function() ns.SendTell(first.name) end,
-        "Susurrar a " .. ns.DisplayName(first.name) .. ".")
-      setButton(detail.b3, nil)
-    end
-    setButton(detail.x1, nil)
-    setButton(detail.x2, nil)
-    -- Oficial: quitar lo que ofrece otro (si lo ofrecen varios, se elige quién).
-    local others = {}
-    for _, c in ipairs(grp.crafters) do if c.name ~= me then others[#others + 1] = c end end
-    if #others > 0 and ns.Social.AmOfficer() then
-      setButton(detail.x3, "Quitar (oficial)", true, function()
-        local function remove(c) ns.Social.ModRemoveOffer(c.name .. ":" .. item.k, ns.Now()) end
-        if #others == 1 then
-          W.Confirm("¿Quitar la oferta de " .. ns.DisplayName(others[1].name) .. " como oficial? Desaparecerá del Mercado de todos.",
-            function() remove(others[1]) end)
-        else
-          local labels = {}
-          for i = 1, math.min(4, #others) do labels[i] = ns.DisplayName(others[i].name) end
-          W.Choose("¿De quién quitas la oferta?", "Como oficial: desaparecerá del Mercado de todos.", labels,
-            function(i) if others[i] then remove(others[i]) end end)
-        end
-      end, "Solo oficiales.")
-    else
-      setButton(detail.x3, nil)
-    end
-  end
-
   -- Pedido de la hermandad (aportan varios).
   local function showNeed(item)
     local n = item.need
@@ -629,7 +434,6 @@ local function build()
     detail.progress:Hide()
     detail.infoHeader:Hide()
     detail.matsLabel:Hide()
-    detail.offerers:Hide()
     if detail.reagents then detail.reagents:Hide() end
     detail.whoLabel:ClearAllPoints()
     detail.whoLabel:SetPoint("TOPLEFT", 8, -170)
@@ -644,9 +448,7 @@ local function build()
     end
     local _, icon = ns.KeyInfo(item.k)
     detail.iconTex:SetTexture(icon)
-    if item.kind == "offer" then showOffer(item)
-    elseif item.kind == "craft" then showCraft(item)
-    elseif item.kind == "need" then showNeed(item)
+    if item.kind == "need" then showNeed(item)
     elseif item.kind == "co" then showOrder(item)
     else showRequest(item) end
     detail:LayoutButtons()

@@ -3,7 +3,6 @@
 -- Ficha de fabricante (una por personaje, la publica su dueño):
 --   { n = "Nombre-Reino", v = versión, c = clase, l = nivel, u = no disponible,
 --     av = versión del addon, th = { [fabricante] = encargos confirmados por este autor },
---     of / cl / od = ofertas, "lo quiero" y envíos de ofertas (ver Offers.lua),
 --     p = { [profesión] = { r = nivel, m = máximo, i = objetos, e = encantamientos,
 --                           cd = { [receta] = fin del cooldown } } } }
 --
@@ -131,7 +130,6 @@ function Data.SanitizeEntry(e)
     end
     out.p = any and profs or nil
   end
-  if ns.Offers then ns.Offers.SanitizeInto(out, e) end -- ofertas, "lo quiero" y envíos
   if ns.Social then ns.Social.SanitizeInto(out, e) end -- alts, oficiales, necesidades, ayudas
   if ns.Orders then ns.Orders.SanitizeInto(out, e) end -- pedidos de fabricación de hermandad
   if ns.History then ns.History.SanitizeInto(out, e) end -- historial público
@@ -184,9 +182,6 @@ local function restoreRest(e, c)
       c[field] = deepCopy(value)
     end
   end
-  fill("offers", e.of)
-  fill("crafts", e.fb)
-  fill("claims", e.cl)
   fill("donated", e.dn)
   fill("needs", e.nd)
   fill("mc", e.mc)
@@ -196,7 +191,6 @@ local function restoreRest(e, c)
   fill("hist", e.hi)
   if e.an and not c.announce then c.announce = deepCopy(e.an) end
   if e.wk and not c.week then c.week = deepCopy(e.wk) end
-  if e.od and not next(c.sent or {}) then c.sent = deepCopy(e.od) end
 end
 
 function Data.RestoreMine(e)
@@ -269,7 +263,6 @@ function Data.BuildMyEntry(now)
     anyProf = true
   end
   e.p = anyProf and profs or nil
-  if ns.Offers then ns.Offers.BuildInto(e, now) end
   if ns.Social then ns.Social.BuildInto(e, now) end
   if ns.Orders then ns.Orders.BuildInto(e, now) end
   if ns.History then ns.History.BuildInto(e) end

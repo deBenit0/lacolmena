@@ -1,11 +1,11 @@
--- Página "Inicio": lo primero que se ve al abrir el addon. Tres tarjetas (tus encargos, tus
--- pedidos y las quedadas), cada una con su número, lo primero de la lista y un botón que lleva
--- a su sitio ya filtrado. Encima, el anuncio de los oficiales; abajo, lo nuevo del Mercado.
+-- Página "Inicio": lo primero que se ve al abrir el addon. Arriba el mensaje del día; luego
+-- tres cajas (mis encargos, mis pedidos y grupos), cada una con su «Ver...»; lo que te espera en
+-- el Mercado; la información de la hermandad; y abajo, el anuncio y el miembro de la semana.
 -- La ayuda va en el «?» (al pasar el ratón).
 local _, ns = ...
 local W, Data = ns.W, ns.Data
 
-local MAX_LINES = 4 -- líneas de cada tarjeta
+local MAX_LINES = 2 -- líneas de cada tarjeta
 
 local HELP = {
   { "Mercado", "Lo que pide la hermandad. Pulsa una fila para ver el detalle: quién lo fabrica, "
@@ -13,7 +13,7 @@ local HELP = {
   { "+ Pedir", "Elige un objeto del catálogo o arrástralo desde tus bolsas al botón." },
   { "Grupos", "Propón una mazmorra hasta 7 días antes. Cada uno se apunta con los papeles que puede hacer "
     .. "y quien la propuso pulsa «Elegir grupo»: elige 1 tanque, 1 sanador y 3 de daño." },
-  { "Hermandad", "Miembro de la semana, karma, quién fabrica qué y, para oficiales, anuncios y pedidos de la hermandad." },
+  { "Hermandad", "Miembro de la semana, roles y quién fabrica qué. Los oficiales ven además el karma, anuncios y pedidos de la hermandad." },
   { "Karma", "+1 por cada pedido que das y -1 por cada uno que recibes (tus alts suman contigo)." },
   { "Tus recetas", "Para que salgan a los demás, abre una vez la ventana de cada profesión." },
 }
@@ -32,10 +32,11 @@ local function openMarket(chip, side)
 end
 ns.UI.OpenMarket = openMarket
 
--- Una tarjeta: icono, título, número grande, unas líneas y un botón abajo.
-local function card(page, x, icon, title)
-  local c = W.Box(page, 250, 300)
-  c:SetPoint("TOPLEFT", x, -34)
+-- Una tarjeta: icono, título, número grande, dos líneas y el botón «Ver...» debajo.
+local CARD_W, CARD_H = 254, 170
+local function card(page, x, icon, title, buttonText)
+  local c = W.Box(page, CARD_W, CARD_H)
+  c:SetPoint("TOPLEFT", x, -36)
   c.icon = c:CreateTexture(nil, "ARTWORK")
   c.icon:SetSize(40, 40)
   c.icon:SetPoint("TOPLEFT", 12, -12)
@@ -48,8 +49,8 @@ local function card(page, x, icon, title)
   c.lines = {}
   for i = 1, MAX_LINES do
     local row = CreateFrame("Frame", nil, c)
-    row:SetSize(226, 30)
-    row:SetPoint("TOPLEFT", 12, -64 - (i - 1) * 34)
+    row:SetSize(CARD_W - 24, 30)
+    row:SetPoint("TOPLEFT", 12, -60 - (i - 1) * 34)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(26, 26)
     row.icon:SetPoint("LEFT")
@@ -61,13 +62,13 @@ local function card(page, x, icon, title)
     c.lines[i] = row
   end
   c.empty = W.Text(c, "GameFontHighlightSmall", "CENTER")
-  c.empty:SetPoint("TOP", 0, -100)
-  c.empty:SetWidth(220)
+  c.empty:SetPoint("TOP", 0, -76)
+  c.empty:SetWidth(CARD_W - 30)
   c.empty:SetTextColor(0.6, 0.6, 0.6)
-  c.button = W.Button(c, "", 200, 24)
-  c.button:SetPoint("BOTTOM", 0, 12)
+  c.button = W.Button(c, buttonText, 200, 24)
+  c.button:SetPoint("BOTTOM", 0, 10)
   -- lines = { { icono, texto }, ... }
-  function c:Fill(count, lines, emptyText, buttonText, onClick)
+  function c:Fill(count, lines, emptyText, onClick)
     self.number:SetText(count > 0 and tostring(count) or "|cff8888880|r")
     for i, row in ipairs(self.lines) do
       local l = lines[i]
@@ -83,23 +84,48 @@ local function card(page, x, icon, title)
     end
     self.empty:SetShown(#lines == 0)
     self.empty:SetText(emptyText or "")
-    self.button:SetText(buttonText)
     self.button:SetScript("OnClick", onClick)
   end
   return c
 end
 
+-- Un texto con el ratón encima enseña el texto entero (cuando no cabe).
+local function fullTextTip(frame, title, getText)
+  frame:EnableMouse(true)
+  frame:SetScript("OnEnter", function(self)
+    local text = getText()
+    if not text or text == "" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText(title)
+    GameTooltip:AddLine(text, 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+local function guildInfoText()
+  local get = _G.GetGuildInfoText
+  if not get then return "" end
+  local ok, text = pcall(get)
+  return ok and type(text) == "string" and text or ""
+end
+
 ns.UI.RegisterPage("home", function(page)
-  -- Anuncio de los oficiales (el más reciente).
-  page.announce = W.Text(page, "GameFontHighlight")
-  page.announce:SetPoint("TOPLEFT", 6, -6)
-  page.announce:SetPoint("RIGHT", page, "RIGHT", -40, 0)
-  page.announce:SetWordWrap(false)
+  local PAGE_W = ns.UI.CONTENT_W or 788
+
+  -- 1. Arriba: el mensaje del día de la hermandad.
+  page.motdBox = W.Box(page, PAGE_W - 32, 28)
+  page.motdBox:SetPoint("TOPLEFT", 0, 0)
+  page.motd = W.Text(page.motdBox, "GameFontHighlight")
+  page.motd:SetPoint("LEFT", 10, 0)
+  page.motd:SetPoint("RIGHT", -10, 0)
+  page.motd:SetWordWrap(false)
+  fullTextTip(page.motdBox, "Mensaje del día", function() return ns.GuildTools and ns.GuildTools.MOTD() end)
 
   -- Ayuda: un «?» que la enseña al pasar el ratón.
   page.help = CreateFrame("Button", nil, page)
   page.help:SetSize(24, 24)
-  page.help:SetPoint("TOPRIGHT", -4, -2)
+  page.help:SetPoint("TOPRIGHT", -2, -2)
   local q = page.help:CreateTexture(nil, "ARTWORK")
   q:SetAllPoints()
   q:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
@@ -116,19 +142,48 @@ ns.UI.RegisterPage("home", function(page)
   end)
   page.help:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+  -- 2. Las tres cajas, cada una con su «Ver...».
+  local gap = math.floor((PAGE_W - 3 * CARD_W) / 2)
   page.cards = {
-    commits = card(page, 0, "Interface\\Icons\\Trade_BlackSmithing", "Tus encargos"),
-    orders = card(page, 262, "Interface\\Icons\\INV_Misc_Note_01", "Tus pedidos"),
-    runs = card(page, 524, "Interface\\Icons\\INV_Misc_Key_03", "Quedadas"),
+    commits = card(page, 0, "Interface\\Icons\\Trade_BlackSmithing", "Mis encargos", "Ver encargos"),
+    orders = card(page, CARD_W + gap, "Interface\\Icons\\INV_Misc_Note_01", "Mis pedidos", "Ver pedidos"),
+    runs = card(page, 2 * (CARD_W + gap), "Interface\\Icons\\INV_Misc_Key_03", "Grupos", "Ver grupos"),
   }
 
-  -- Abajo: lo nuevo del Mercado. (El emblema de la hermandad va en la barra de arriba.)
+  -- 3. Lo que te espera en el Mercado: pedidos que puedes hacer tú.
+  page.wait = W.Box(page, PAGE_W, 56)
+  page.wait:SetPoint("TOPLEFT", 0, -36 - CARD_H - 8)
+  page.waitTitle = W.Text(page.wait, "GameFontNormal")
+  page.waitTitle:SetPoint("TOPLEFT", 10, -8)
+  page.waitTitle:SetText("Te espera en el Mercado")
+  page.waitText = W.Text(page.wait, "GameFontHighlightSmall")
+  page.waitText:SetPoint("TOPLEFT", 18, -30)
+  page.waitText:SetPoint("RIGHT", page.wait, "RIGHT", -190, 0)
+  page.waitText:SetWordWrap(false)
+  page.waitButton = W.Button(page.wait, "ME ENCARGO", 160, 26)
+  page.waitButton:SetPoint("RIGHT", -12, 0)
+  if W.Tint then W.Tint(page.waitButton, W.GREEN) end
+
+  -- 4. Debajo: la información de la hermandad (el texto largo).
+  local infoTop = -36 - CARD_H - 8 - 56 - 8
+  page.info = W.Box(page, PAGE_W, 448 + infoTop - 30)
+  page.info:SetPoint("TOPLEFT", 0, infoTop)
+  page.infoTitle = W.Text(page.info, "GameFontNormal")
+  page.infoTitle:SetPoint("TOPLEFT", 10, -8)
+  page.infoTitle:SetText("Información de la hermandad")
+  page.infoText = W.Text(page.info, "GameFontHighlightSmall")
+  page.infoText:SetPoint("TOPLEFT", 18, -28)
+  page.infoText:SetPoint("BOTTOMRIGHT", -14, 8)
+  page.infoText:SetJustifyH("LEFT")
+  page.infoText:SetJustifyV("TOP")
+  page.infoText:SetWordWrap(true)
+  fullTextTip(page.info, "Información de la hermandad", guildInfoText)
+
+  -- 5. Abajo: el anuncio de los oficiales y el miembro de la semana.
   page.status = W.Text(page, "GameFontNormal")
-  page.status:SetPoint("BOTTOMLEFT", 6, 14)
-  page.status:SetPoint("RIGHT", page, "RIGHT", -170, 0)
+  page.status:SetPoint("BOTTOMLEFT", 6, 6)
+  page.status:SetPoint("RIGHT", page, "RIGHT", -6, 0)
   page.status:SetWordWrap(false)
-  page.goMarket = W.Button(page, "Ver el Mercado", 130, 24, function() openMarket("craft") end)
-  page.goMarket:SetPoint("BOTTOMRIGHT", -24, 8)
 
   page.noGuild = W.Text(page, "GameFontNormalLarge", "CENTER")
   page.noGuild:SetPoint("CENTER", 0, 20)
@@ -150,9 +205,7 @@ ns.UI.RegisterPage("home", function(page)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999para %s · %s|r", it.n, ns.KeyLabel(it.r.k),
         ns.DisplayName(it.r.a), plazo) }
     end
-    page.cards.commits:Fill(#items, lines, "Nadie te ha encargado nada.\nMira lo que puedes hacer.",
-      #items > 0 and "Mis encargos" or "Lo que puedo hacer",
-      function() openMarket(#items > 0 and "involved" or "craft") end)
+    page.cards.commits:Fill(#items, lines, "Nadie te ha encargado nada.", function() openMarket("involved") end)
   end
 
   local function fillOrders(g, me, now)
@@ -168,11 +221,7 @@ ns.UI.RegisterPage("home", function(page)
       local _, icon = ns.KeyInfo(it.r.k)
       lines[#lines + 1] = { icon, string.format("%dx %s\n|cff999999%s|r", it.r.q, ns.KeyLabel(it.r.k), who) }
     end
-    page.cards.orders:Fill(#mine, lines, "No tienes pedidos abiertos.",
-      #mine > 0 and "Mis pedidos" or "+ Pedir",
-      function()
-        if #mine > 0 then openMarket("mine") else ns.UI.Open("ask") end
-      end)
+    page.cards.orders:Fill(#mine, lines, "No tienes pedidos abiertos.", function() openMarket("mine") end)
   end
 
   local function fillRuns(now)
@@ -190,40 +239,68 @@ ns.UI.RegisterPage("home", function(page)
       lines[#lines + 1] = { D.Icon(r.d),
         string.format("%s\n|cff999999%s · %s|r", D.Dungeon(r.d).name, when, extra) }
     end
-    page.cards.runs:Fill(#runs, lines, "No hay quedadas.\nPropón una.",
-      #runs > 0 and "Ver grupos" or "+ Hacer grupo",
-      function()
-        local f = ns.UI.Open("dungeons")
-        if #runs > 0 then
-          if f and f.SelectDay then f:SelectDay(runs[1].at) end
-        else
-          ns.UI.OpenDungeonDialog()
-        end
-      end)
+    page.cards.runs:Fill(#runs, lines, "No hay grupos.", function()
+      local f = ns.UI.Open("dungeons")
+      if #runs > 0 and f and f.SelectDay then f:SelectDay(runs[1].at) end
+    end)
   end
 
+  -- Lo que puedo hacer yo de lo que piden (abierto y que puedo aceptar).
+  local function fillWait()
+    local items = {}
+    local collect = ns.UI.MarketCollect
+    local g = ns.G()
+    if collect and g then
+      for _, it in ipairs((collect(g.boardSeen))) do
+        if it.kind == "req" and not it.mine and it.canServe and it.acceptable then items[#items + 1] = it end
+      end
+    end
+    table.sort(items, function(a, b) return a.t > b.t end)
+    local names = {}
+    for i = 1, math.min(3, #items) do names[i] = ns.KeyLabel(items[i].k) end
+    if #items == 0 then
+      page.waitText:SetText("|cff999999Ahora no hay nada de tu profesión.|r")
+      page.waitButton:Hide()
+      return
+    end
+    local what = #items == 1 and "1 pedido de tu profesión" or (#items .. " pedidos de tu profesión")
+    page.waitText:SetText(what .. "  |cff999999(" .. table.concat(names, ", ") .. (#items > 3 and "..." or "") .. ")|r")
+    page.waitButton:Show()
+    if #items == 1 then
+      local r = items[1].r
+      page.waitButton:SetText("ME ENCARGO")
+      page.waitButton:SetScript("OnClick", function() W.AcceptRequest(r) end)
+    else
+      page.waitButton:SetText("VER LOS " .. #items)
+      page.waitButton:SetScript("OnClick", function() openMarket("craft") end)
+    end
+  end
+
+  local shown = { "motdBox", "help", "wait", "info", "status" }
   function page:Refresh()
     local inGuild = ns.G() ~= nil
     page.noGuild:SetShown(not inGuild)
     for _, c in pairs(page.cards) do c:SetShown(inGuild) end
-    page.status:SetShown(inGuild)
-    page.goMarket:SetShown(inGuild)
-    local an = inGuild and ns.Social.Announcement()
-    page.announce:SetText(an and string.format("|cffff8040Anuncio de %s:|r %s", ns.DisplayName(an.name), an.x) or "")
+    for _, k in ipairs(shown) do page[k]:SetShown(inGuild) end
     if not inGuild then return end
+
+    local motd = ns.GuildTools and ns.GuildTools.MOTD() or ""
+    page.motd:SetText("|cffffd100Mensaje del día:|r " .. (motd ~= "" and motd or "|cff888888(ninguno)|r"))
+    local info = guildInfoText()
+    page.infoText:SetText(info ~= "" and info or "|cff888888(sin información)|r")
 
     local g, me, now = ns.G(), ns.Me(), ns.Now()
     fillCommits(g, me, now)
     fillOrders(g, me, now)
     fillRuns(now)
+    fillWait()
 
-    local s = ns.UI.BoardStats()
     local parts = {}
-    if s.new > 0 then parts[#parts + 1] = string.format("|cffffd100%d nuevos en el Mercado|r", s.new) end
-    if s.servable > 0 then parts[#parts + 1] = string.format("|cff40ff40%d puedes hacerlos|r", s.servable) end
+    local an = ns.Social.Announcement()
+    if an then parts[#parts + 1] = string.format("|cffff8040Anuncio de %s:|r %s", ns.DisplayName(an.name), an.x) end
     local best = ns.Social.MemberOfTheWeek(now)
     if best then
-      parts[#parts + 1] = string.format("|cffffd100miembro de la semana: %s|r", ns.Social.Who(best.name))
+      parts[#parts + 1] = string.format("|cffffd100Miembro de la semana: %s|r", ns.Social.Who(best.name))
     end
     page.status:SetText(table.concat(parts, "  ·  "))
   end
