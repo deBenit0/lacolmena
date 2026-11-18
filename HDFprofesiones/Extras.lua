@@ -128,6 +128,19 @@ function Extras.AnnounceText(kind, obj)
   end
 end
 
+-- El mismo anuncio como macro del jugador («/g texto»): el juego bloquea a veces el aviso
+-- mandado por el addon (sobre todo tras una ventana de confirmar), la macro no.
+function Extras.AnnounceMacro(kind, obj)
+  if not (IsInGuild and IsInGuild()) then return nil end
+  local text = Extras.AnnounceText(kind, obj)
+  local cmd = ns.W and ns.W.Slash("GUILD", "/g") or "/g"
+  if not text then return nil end
+  text = text:gsub("[\r\n]+", " ")
+  local max = 255 - #cmd - 1
+  if #text > max then text = text:sub(1, max) end
+  return cmd .. " " .. text
+end
+
 -- Devuelve true si se ha anunciado.
 function Extras.Announce(kind, obj, id)
   local now = GetTime()
