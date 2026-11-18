@@ -591,6 +591,12 @@ function Sync.ConfirmDelivery(id, crafter, amount)
   return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
 end
 
+function Sync.MarkArrived(id, crafter, amount)
+  local r, thanksChanged = Data.MarkArrived(id, crafter, ns.Now(), amount)
+  if r and thanksChanged == true then Sync.PublishMine() end
+  return afterRequestAction(r, type(thanksChanged) == "string" and thanksChanged or nil)
+end
+
 function Sync.SetQuantity(id, q)
   return afterRequestAction(Data.SetQuantity(id, q, ns.Now()))
 end

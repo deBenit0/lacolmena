@@ -1113,6 +1113,25 @@ function Data.ConfirmDelivery(id, crafter, amount, now)
   return r, Data.CheckThanks(r, now)
 end
 
+-- «¡Me ha llegado!»: lo que el encargado me mandó por correo ya está en mis manos. No suma nada
+-- (el correo ya contaba): solo apunta que lo he recibido. Sin "crafter", de todos.
+-- Con "amount" (lo que se vio salir del buzón), solo esa cantidad.
+function Data.MarkArrived(id, crafter, now, amount)
+  local r, me = getRequest(id), ns.Me()
+  if not r then return nil, "La petición ya no existe." end
+  if r.a ~= me then return nil, "Solo el autor puede decir que le ha llegado." end
+  local changed = false
+  for name, cm in pairs(r.c or {}) do
+    if (not crafter or name == crafter) and (cm.s or 0) > (cm.d or 0) then
+      cm.d = amount and min(cm.s, (cm.d or 0) + max(1, floor(amount))) or cm.s
+      cm.dv = bump(cm.dv, now)
+      changed = true
+    end
+  end
+  if not changed then return nil, "No hay nada enviado por correo sin recibir." end
+  return r, Data.CheckThanks(r, now)
+end
+
 -- Contador de encargos: lo lleva el autor. Suma uno a cada fabricante que entrega todo
 -- lo que prometió (o que completa la petición), confirmado a mano o enviado por correo.
 Data.KARMA_POINT = 10000 -- el karma se guarda en "cobre" por compatibilidad: 1 punto = 10000

@@ -262,11 +262,11 @@ W.GREEN = { 0.35, 0.9, 0.35 }
 W.BLUE = { 0.45, 0.7, 1 }
 local function applyTint(b)
   local c = b.tint
-  if not c then return end
+  -- sin color: el rojo del juego de siempre (una fila reutilizada pudo quedarse verde)
   local function paint(t)
     if type(t) == "table" and t.SetVertexColor then
-      if t.SetDesaturated then t:SetDesaturated(true) end
-      t:SetVertexColor(c[1], c[2], c[3])
+      if t.SetDesaturated then t:SetDesaturated(c and true or false) end
+      if c then t:SetVertexColor(c[1], c[2], c[3]) else t:SetVertexColor(1, 1, 1) end
     end
   end
   for _, key in ipairs({ "Left", "Middle", "Right" }) do paint(b[key]) end
@@ -275,7 +275,8 @@ local function applyTint(b)
   end
 end
 function W.Tint(b, color)
-  local first = b.tint == nil
+  local first = not b.tintHooked
+  b.tintHooked = true
   b.tint = color
   applyTint(b)
   if first and b.HookScript then

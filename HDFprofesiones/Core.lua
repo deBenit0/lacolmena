@@ -2,9 +2,7 @@
 -- Núcleo: espacio de nombres, eventos, utilidades y base de datos guardada.
 local ADDON, ns = ...
 
-ns.VERSION = "0.34.7"
--- «Ofrecer» vuelve entero con el Mercado nuevo (0.35). El interruptor se quita al terminarlo.
-ns.OFFERS_OFF = false
+ns.VERSION = "0.35.0"
 ns.PROTOCOL = 1
 ns.PREFIX = "HDFprofesiones"
 ns.TITLE = "Los hijos del Fundillo"

@@ -407,9 +407,8 @@ local function build()
         setButton(detail.b1, "Preparar correo", can, function() ns.Mail.PrepareOffer(first.name, o.id, first.left, o.g) end,
           not can and "Abre el buzón para preparar el correo." or nil)
       else
-        setButton(detail.b1, "Anunciar", true, function()
-          if ns.Extras.Announce("offer", o, o.key) then ns.Print("oferta anunciada en el chat de hermandad.") end
-        end, "Anunciarla en el chat de hermandad (para los que no tienen el addon).")
+        setButton(detail.b1, "Anunciar", true, function() ns.UI.Market.Announce("offer", o) end,
+          "Anunciarla en el chat de hermandad (para los que no tienen el addon).")
       end
       setButton(detail.b2, "Quitar oferta", true, function()
         W.Confirm("¿Quitar esta oferta?", function() ns.Offers.Remove(o.id) end)
@@ -684,6 +683,13 @@ function D.Refresh(items)
   if not D.IsShown() then return end
   for _, it in ipairs(items or {}) do
     if it.id == D.id then return D.Fill(it) end
+  end
+  -- Un pedido abierto desde otra pestaña: sigue abierto con sus datos al día.
+  local cur, g = detail.item, ns.G()
+  local r = cur and cur.kind == "req" and g and g.requests[cur.id]
+  if r then
+    cur.r, cur.info, cur.now = r, Data.RequestInfo(r, ns.Now()), ns.Now()
+    return D.Fill(cur)
   end
   D.Hide()
 end

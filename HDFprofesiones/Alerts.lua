@@ -318,7 +318,8 @@ function Alerts.OnRequestUpdated(old, new, retry)
     local cm = new.c[me]
     local stillOpen = not cm.rl and cm.n and Data.DeliveredOf(cm) < cm.n -- ni lo solté ni lo entregué
     local owner = Data.OwnerOf(new, now)
-    if mineBefore and stillOpen and not Data.CommitActive(cm, now, new) and owner and owner ~= me then
+    -- (si el autor bajó la cantidad, no es que otro se adelantara)
+    if mineBefore and stillOpen and new.q == old.q and not Data.CommitActive(cm, now, new) and owner and owner ~= me then
       Alerts.Push({ id = new.id, icon = icon,
         text = string.format("%s aceptó antes que tú: %s", ns.DisplayName(owner), ns.KeyLabel(new.k)) })
     end

@@ -89,6 +89,151 @@ function M.Counts(items, stats, now)
   return c
 end
 
+-- Lista de tarjetas para Mis pedidos, Mis encargos y Mis ofertas. fill(it) devuelve lo que
+-- se enseña: { title, sub, hint, money, qty, gold, grey,
+--   button = { label, color, fn, can, tip }, small = { {label, fn, tip}, ... } (hasta 4) }.
+-- Pulsar la tarjeta (no un botón) abre el detalle con todas las acciones.
+M.ROWS, M.ROW_H = 7, 48
+function M.CardList(view, top, fill, emptyText, emptyButton)
+  local list = W.List(view, M.BODY_W, M.BODY_H - top, {
+    rows = M.ROWS,
+    rowHeight = M.ROW_H,
+    card = true,
+    keyOf = function(it) return it.id end,
+    buildRow = function(row)
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetSize(36, 36)
+      row.icon:SetPoint("LEFT", 8, 0)
+      row.qty = row:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+      row.qty:SetPoint("BOTTOMRIGHT", row.icon, "BOTTOMRIGHT", -1, 1)
+      row.title = W.ListText(row, "GameFontHighlight")
+      row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 0)
+      row.title:SetWidth(300)
+      row.title:SetWordWrap(false)
+      row.sub = W.ListText(row, "GameFontHighlightSmall")
+      row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -6)
+      row.sub:SetWidth(330)
+      row.sub:SetWordWrap(false)
+      row.hint = W.ListText(row, "GameFontHighlightSmall")
+      row.hint:SetPoint("TOPLEFT", row, "TOPLEFT", 400, -8)
+      row.hint:SetWidth(220)
+      row.hint:SetWordWrap(false)
+      row.money = W.ListText(row, "GameFontNormalSmall")
+      row.money:SetPoint("TOPLEFT", row.hint, "BOTTOMLEFT", 0, -5)
+      row.money:SetWidth(220)
+      row.money:SetWordWrap(false)
+      row.button = W.Button(row, "", 140, 28)
+      row.button:SetPoint("RIGHT", -8, 0)
+      row.button:SetFontSize("normal")
+      -- enlaces pequeños (editar · quitar · ...), debajo del texto de la derecha
+      row.smalls = {}
+      for i = 1, 4 do
+        local b = CreateFrame("Button", nil, row)
+        b:SetSize(60, 14)
+        b.text = W.Text(b, "GameFontNormalSmall")
+        b.text:SetPoint("LEFT")
+        b:SetScript("OnEnter", function(self)
+          self.text:SetTextColor(1, 1, 1)
+          if self.tipText then
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:SetText(self.label)
+            GameTooltip:AddLine(self.tipText, 1, 1, 1, true)
+            GameTooltip:Show()
+          end
+        end)
+        b:SetScript("OnLeave", function(self)
+          self.text:SetTextColor(1, 0.82, 0)
+          GameTooltip:Hide()
+        end)
+        b:Hide()
+        row.smalls[i] = b
+      end
+      W.KeyTooltip(row, function(self) return self.item and self.item.k end)
+    end,
+    updateRow = function(row, it)
+      local s = fill(it) or {}
+      local _, icon = ns.KeyInfo(it.k)
+      row.icon:SetTexture(icon)
+      row.icon:SetDesaturated(s.grey and true or false)
+      row.qty:SetText(s.qty and s.qty > 1 and tostring(s.qty) or "")
+      row.title:SetText(s.title or ns.KeyLabel(it.k))
+      row.sub:SetText(s.sub or "")
+      row.hint:SetText(s.hint or "")
+      row.money:SetText(s.money or "")
+      local b = s.button
+      if b and b.label then
+        row.button:SetText(b.label)
+        row.button:SetEnabled(b.can ~= false)
+        row.button:SetScript("OnClick", b.fn)
+        W.Tint(row.button, b.color)
+        if b.tip then
+          ns.UI.Tip(row.button, b.label, b.tip)
+        else
+          row.button:SetScript("OnEnter", nil)
+        end
+        row.button:Show()
+      else
+        row.button:Hide()
+      end
+      -- los enlaces pequeños, en fila; si hay, sustituyen a la línea del dinero
+      local x = 0
+      for i, sb in ipairs(row.smalls) do
+        local d = s.small and s.small[i]
+        if d then
+          sb.text:SetText((i > 1 and "|cff777777·|r " or "") .. d.label)
+          sb.text:SetTextColor(1, 0.82, 0)
+          sb:SetWidth((sb.text:GetStringWidth() or 40) + 6)
+          sb:ClearAllPoints()
+          sb:SetPoint("TOPLEFT", row.hint, "BOTTOMLEFT", x, -4)
+          x = x + sb:GetWidth() + 2
+          sb.label, sb.tipText = d.label, d.tip
+          sb:SetScript("OnClick", d.fn)
+          sb:Show()
+        else
+          sb:Hide()
+        end
+      end
+      if s.small and #s.small > 0 then row.money:SetText("") end
+      row:SetSelected(s.gold and true or false)
+      row:SetAlpha(s.grey and 0.55 or 1)
+    end,
+    onSelect = function(it) ns.UI.MarketDetail.Show(it) end,
+  })
+  list:SetPoint("TOPLEFT", 0, -top)
+  view.list = list
+  view.empty = W.Text(view, "GameFontNormal", "CENTER")
+  view.empty:SetPoint("CENTER", list, "CENTER", 0, 14)
+  view.empty:SetWidth(600)
+  view.empty:SetTextColor(0.7, 0.7, 0.7)
+  view.empty:SetText(emptyText)
+  if emptyButton then
+    view.emptyButton = W.Button(view, emptyButton.label, 170, 24, emptyButton.fn)
+    view.emptyButton:SetPoint("TOP", view.empty, "BOTTOM", 0, -10)
+  end
+  function view:SetCards(items)
+    view.shown = items
+    list:SetItems(items)
+    view.empty:SetShown(#items == 0)
+    if view.emptyButton then view.emptyButton:SetShown(#items == 0) end
+  end
+  return list
+end
+
+-- «Anunciar» en el chat de hermandad: queda escrito y lo envía el jugador con Intro (el juego
+-- bloquea a veces lo que manda el addon). kind: "request", "offer" o "need".
+function M.Announce(kind, obj)
+  local m = ns.Extras.AnnounceMacro(kind, obj)
+  if m then W.ChatCommand(m, "anunciarlo en el chat de hermandad") else ns.Print("no estás en ninguna hermandad.") end
+end
+
+-- Con una sola persona, directamente; con varias, se elige (hasta 4).
+function M.PickName(names, title, fn)
+  local people = {}
+  for i, n in ipairs(names) do people[i] = { name = n } end
+  if #people == 0 then return end
+  ns.UI.MarketDetail.PickPerson(people, title, function(p) fn(p.name) end)
+end
+
 -- Para las pestañas de la ventana y la tira pequeña.
 function ns.UI.MarketCounts()
   if not ns.G() or not ns.UI.MarketCollect then return { board = 0, mine = 0, jobs = 0, offers = 0 } end
@@ -123,7 +268,7 @@ ns.UI.RegisterPage("market", function(page)
   end
   page.addOffer = W.Tint(W.Button(page, "+ OFRECER", 124, 28, function()
     local id = cursorItem()
-    if id then ns.UI.OpenOfferDialog(id) else ns.UI.OpenAsk("offer") end
+    if id then ns.UI.OpenOfferDialog(id) else ns.UI.OpenOffer() end
   end), W.BLUE)
   page.addOffer:SetPoint("TOPRIGHT", 0, -2)
   page.addOffer:SetScript("OnReceiveDrag", function()
@@ -157,6 +302,14 @@ ns.UI.RegisterPage("market", function(page)
     page.current = id
     page:Refresh()
   end
+  ns.UI.MarketGo = function(id) page:SetView(id) end
+
+  -- Al abrir o cerrar el buzón cambian los botones de correo (PREPARAR CORREO, MANDÁRSELO).
+  local function mailChanged()
+    ns.After(0.2, function() if page:IsVisible() then page:Refresh() end end)
+  end
+  ns.On("MAIL_SHOW", mailChanged)
+  ns.On("MAIL_CLOSED", mailChanged)
 
   function page:Refresh()
     local g = ns.G()
