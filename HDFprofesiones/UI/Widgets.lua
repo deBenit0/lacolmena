@@ -575,6 +575,22 @@ end
 
 W.MACRO_MAX = 255 -- lo más largo que puede ser una macro
 
+-- Las órdenes de la hermandad (/ginvite, /gpromote, /gdemote, /gremove, /gmotd, /gquit) el
+-- juego no las deja ni al addon ni a una macro («Se ha bloqueado un script de una macro...»):
+-- solo escritas por el jugador. Se dejan escritas en el chat y él pulsa Intro.
+function W.ChatCommand(text, what)
+  if not text or text == "" then return false end
+  local open = (ChatFrameUtil and ChatFrameUtil.OpenChat) or ChatFrame_OpenChat
+  local ok = open and pcall(open, text)
+  if ok then
+    ns.Print("pulsa Intro para %s (ya está escrito en el chat). Si el juego lo bloquea, escríbelo tú: %s",
+      what or "hacerlo", text)
+  else
+    ns.Print("escribe esto en el chat y pulsa Intro: %s", text)
+  end
+  return ok and true or false
+end
+
 local function inCombat() return InCombatLockdown and InCombatLockdown() and true or false end
 W.InCombat = inCombat
 
