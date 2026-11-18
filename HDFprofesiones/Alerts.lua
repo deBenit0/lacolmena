@@ -22,7 +22,7 @@ Alerts.TYPES = {
   { id = "group", label = "Te eligen para el grupo" },
   { id = "remind", label = "Recordatorio de la hora" },
   { id = "expire", label = "Algo tuyo caduca pronto" },
-  { id = "other", label = "Plazos, ofertas y lo demás" },
+  { id = "other", label = "Plazos y lo demás" },
 }
 local TYPE_BY_ID = {}
 for _, t in ipairs(Alerts.TYPES) do TYPE_BY_ID[t.id] = t end
@@ -378,14 +378,6 @@ function Alerts.CheckDeadlines()
           text = string.format("Tu pedido de %s caduca en %s: renuévalo si aún lo quieres", ns.KeyLabel(r.k),
             ns.FormatDuration(left)) })
       end
-    end
-  end
-  for _, o in ipairs(ns.Offers.List(now)) do
-    local left = (o.t or 0) + ns.Offers.OFFER_TTL - now
-    if o.owner == me and left > 0 and left <= 86400 then
-      local _, icon = ns.KeyInfo("i" .. o.id)
-      once("expo:" .. o.key .. ":" .. (o.t or 0), { icon = icon, type = "expire", page = "market",
-        text = string.format("Tu oferta de %s caduca en %s", ns.KeyLabel("i" .. o.id), ns.FormatDuration(left)) })
     end
   end
   -- Olvidar avisos viejos.

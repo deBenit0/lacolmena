@@ -389,87 +389,6 @@ local function hookReagents(prefix, isCraft)
 end
 
 ---------------------------------------------------------------------------
--- Botón "Ofrecer" en el objeto que fabrica la receta elegida (al pasar el ratón o pulsarlo)
----------------------------------------------------------------------------
-local offer = {}
-
--- Objeto que fabrica la receta elegida (nil si es un encantamiento u otra cosa).
-local function productOf(isCraft)
-  if isCraft then
-    local i = GetCraftSelectionIndex and GetCraftSelectionIndex()
-    if not i or i == 0 or not GetCraftItemLink then return nil end
-    return itemIdFromLink(GetCraftItemLink(i))
-  end
-  local i = GetTradeSkillSelectionIndex and GetTradeSkillSelectionIndex()
-  if not i or i == 0 or not GetTradeSkillItemLink then return nil end
-  return itemIdFromLink(GetTradeSkillItemLink(i))
-end
-
-function Missing.OfferProduct(isCraft)
-  if not ns.G() then
-    ns.Print("no estás en ninguna hermandad.")
-    return
-  end
-  local id = productOf(isCraft)
-  if not id then
-    ns.Print("esta receta no fabrica un objeto: no se puede ofrecer.")
-    return
-  end
-  -- Desde la profesión se ofrece la receta (por encargo); lo de las bolsas, desde «Ofrecer de tus bolsas».
-  ns.UI.OpenOfferDialog(id, nil, nil, { craft = true })
-end
-
-local function offerButton()
-  if offer.button then return offer.button end
-  local b = CreateFrame("Button", "HDFProfOfferButton", UIParent, "UIPanelButtonTemplate")
-  b:SetSize(64, 18)
-  b:SetText("Ofrecer")
-  b:Hide()
-  b:SetScript("OnClick", function(self)
-    self:Hide()
-    ns.SafeCall(Missing.OfferProduct, offer.isCraft)
-  end)
-  b:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Ofrecer a la hermandad")
-    GameTooltip:AddLine("Sale en el Mercado, en «Se ofrece»; quien lo quiera te lo pide.", 1, 1, 1, true)
-    GameTooltip:Show()
-  end)
-  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-  b:SetScript("OnUpdate", function(self, elapsed)
-    local over = self:IsMouseOver() or (offer.icon and offer.icon:IsVisible() and offer.icon:IsMouseOver())
-    if over == true then
-      self.away = 0
-    else
-      self.away = (self.away or 0) + (elapsed or 0)
-      if self.away > 0.6 then self:Hide() end
-    end
-  end)
-  offer.button = b
-  return b
-end
-
-local function showOffer(icon, isCraft)
-  if not productOf(isCraft) then return end
-  local b = offerButton()
-  offer.icon, offer.isCraft = icon, isCraft
-  b:SetParent(icon)
-  b:ClearAllPoints()
-  b:SetPoint("TOPLEFT", icon, "BOTTOMLEFT", -2, -2)
-  b:SetFrameStrata(icon:GetFrameStrata() or "HIGH")
-  b:SetFrameLevel(icon:GetFrameLevel() + 10)
-  b.away = 0
-  b:Show()
-end
-
-local function hookProduct(icon, isCraft)
-  if not icon or icon.hdfOffer then return end
-  icon.hdfOffer = true
-  icon:HookScript("OnEnter", function(self) ns.SafeCall(showOffer, self, isCraft) end)
-  icon:HookScript("OnClick", function(self) ns.SafeCall(showOffer, self, isCraft) end)
-end
-
----------------------------------------------------------------------------
 -- Ventana de profesiones moderna (WoW Forever)
 -- Las casillas de materiales se crean y reciclan sobre la marcha y Blizzard les cambia
 -- OnEnter/OnLeave al elegir otra receta, así que no nos enganchamos a ellas: ponemos
@@ -523,27 +442,6 @@ function Missing.LayoutModern(form)
     slot.hdfAsk:SetShown(id ~= nil)
     slot.hdfAsk:SetScript("OnClick", function() ns.SafeCall(Missing.AskModernReagent, id, need) end)
   end
-  -- "Ofrecer" sobre la parte de abajo del objeto que fabrica la receta. Debajo del icono
-  -- tapaba la descripción de la receta.
-  if form.OutputIcon then
-    if not form.hdfOffer then
-      local w = form.OutputIcon.GetWidth and tonumber(form.OutputIcon:GetWidth()) or 0
-      form.hdfOffer = smallButton(form, "Ofrecer", math.max(44, w))
-      form.hdfOffer:SetHeight(14)
-      form.hdfOffer:SetPoint("BOTTOM", form.OutputIcon, "BOTTOM", 0, 1)
-      form.hdfOffer:SetFrameLevel(form.OutputIcon:GetFrameLevel() + 10)
-    end
-    local info = form.GetRecipeInfo and form:GetRecipeInfo()
-    local itemID
-    if type(info) == "table" and info.recipeID and C_TradeSkillUI then
-      itemID = ns.Scan.ModernOutput(info.recipeID, C_TradeSkillUI.GetRecipeSchematic(info.recipeID, false))
-    end
-    form.hdfOffer:SetShown(itemID ~= nil and form.OutputIcon:IsShown())
-    form.hdfOffer:SetScript("OnClick", function()
-      if not ns.G() then return ns.Print("no estás en ninguna hermandad.") end
-      ns.UI.OpenOfferDialog(itemID, nil, nil, { craft = true })
-    end)
-  end
 end
 
 local function attachModern()
@@ -581,13 +479,11 @@ local function attachTrade()
   if not TradeSkillFrame then return end
   addButton(TradeSkillFrame, TradeSkillCreateButton)
   hookReagents("TradeSkillReagent", false)
-  hookProduct(TradeSkillSkillIcon, false)
 end
 local function attachCraft()
   if not CraftFrame then return end
   addButton(CraftFrame, CraftCreateButton)
   hookReagents("CraftReagent", true)
-  hookProduct(CraftIcon, true)
 end
 Missing.Attach = function()
   attachTrade()

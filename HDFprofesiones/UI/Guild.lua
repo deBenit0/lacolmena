@@ -31,10 +31,12 @@ local function countWith(pk)
   return n
 end
 
-local function peopleWith(pk, byKarma)
+local TOP_CRAFTERS, AWAY = 5, 7 * 86400
+local function peopleWith(pk, byKarma, officer)
   local g = ns.G()
   local rows = {}
-  if not g then return rows end
+  if not g then return rows, 0 end
+  local now = ns.Now()
   local karmaOf = {} -- una vez por persona (su principal)
   for name, e in pairs(g.entries) do
     local p = type(e.p) == "table" and e.p[pk]
@@ -44,16 +46,21 @@ local function peopleWith(pk, byKarma)
       local k = karmaOf[main]
       rows[#rows + 1] = { name = name, class = e.c or ns.ClassOf(name), pk = pk, r = p.r, unavailable = e.u,
         online = ns.Guild.IsOnline(name), seen = ns.Guild.LastSeen(name), k = k,
-        karma = ns.Data.KarmaText(main), thanks = ns.Data.ThanksFor(name) }
-      if byKarma then rows[#rows].extra = "|cffbbbbbbkarma " .. rows[#rows].karma .. "|r" end
+        karma = officer and ns.Data.KarmaText(main) or nil, thanks = ns.Data.ThanksFor(name) }
     end
   end
   table.sort(rows, function(a, b)
-    if byKarma and a.k ~= b.k then return a.k > b.k end
     if (a.r or 0) ~= (b.r or 0) then return (a.r or 0) > (b.r or 0) end
     return a.name < b.name
   end)
-  return rows
+  local total = #rows
+  local top = {}
+  for _, row in ipairs(rows) do
+    if #top >= TOP_CRAFTERS then break end
+    local away = not row.online and (not row.seen or now - row.seen > AWAY)
+    if not away then top[#top + 1] = row end
+  end
+  return top, total
 end
 
 -- Cuántos personajes tienen alguna profesión de fabricar y cuántos de recolectar (cada personaje
@@ -210,8 +217,9 @@ ns.UI.RegisterPage("guild", function(page)
   weekBox.sub:SetPoint("RIGHT", -8, 0)
   page.weekBox = weekBox
 
-  title("Karma", COL1 + 4, -118)
+  page.karmaTitle = title("Karma", COL1 + 4, -118)
   local karmaHint = W.Text(page, "GameFontDisableSmall")
+  page.karmaHint = karmaHint
   karmaHint:SetPoint("TOPLEFT", COL1 + 60, -120)
   karmaHint:SetText("+1 por dar, -1 por recibir")
   page.bars = {}
@@ -240,8 +248,9 @@ ns.UI.RegisterPage("guild", function(page)
   page.noKarma:SetText("Aún nadie tiene karma.")
 
   -- Debajo del karma: cuántos tanques, sanadores y DPS hay (cada personaje, desde el nivel 10).
-  title("Roles", COL1 + 4, -322)
+  page.rolesTitle = title("Roles", COL1 + 4, -322)
   local rolesHint = W.Text(page, "GameFontDisableSmall")
+  page.rolesHint = rolesHint
   rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324)
   rolesHint:SetText("desde nivel 10 · pulsa los tuyos")
 
@@ -291,6 +300,17 @@ ns.UI.RegisterPage("guild", function(page)
     b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     b.count = W.Text(b, "GameFontNormalLarge")
     b.count:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+    b.col, b.row2 = col, s.row == 2
+    if s.key == "unknown" then
+      -- en vez de un «?», con letras: «sin rol 51»
+      b.icon:Hide()
+      b:SetWidth(70)
+      b.label = W.Text(b, "GameFontHighlightSmall")
+      b.label:SetPoint("LEFT", 0, 0)
+      b.label:SetText("sin rol")
+      b.count:ClearAllPoints()
+      b.count:SetPoint("LEFT", b.label, "RIGHT", 4, 0)
+    end
     if s.row == 2 then
       b.label = W.Text(b, "GameFontHighlightSmall")
       b.label:SetPoint("LEFT", b.count, "RIGHT", 5, 0)
@@ -370,65 +390,62 @@ ns.UI.RegisterPage("guild", function(page)
   end
   page.profTitle = W.Text(page, "GameFontNormalSmall")
   page.profTitle:SetPoint("TOPLEFT", COL2 + 4, -106)
-  page.who = W.Crafters(page, WHO_W, 13, nil, nil, function(c) ns.UI.ShowHistory(c.name) end)
+  page.who = W.Crafters(page, WHO_W, 5, nil, nil, function(c) ns.UI.ShowHistory(c.name) end)
   page.who:SetPoint("TOPLEFT", COL2, -120)
-  -- Ordenar por nivel (como siempre) o por karma; se recuerda.
-  page.whoSort = W.Button(page, "", 128, 18, function()
-    ns.db.settings.whoSort = (ns.db.settings.whoSort ~= "karma") and "karma" or nil
-    page:Refresh()
-  end)
-  page.whoSort:SetFontSize("small")
-  page.whoSort:SetPoint("BOTTOMRIGHT", page.who, "TOPRIGHT", 0, 1)
-  ns.UI.Tip(page.whoSort, "Ordenar", "Por nivel de la profesión o por el karma de cada persona (el de su "
-    .. "personaje principal).")
   page.noWho = W.Text(page, "GameFontHighlightSmall", "CENTER")
   page.noWho:SetPoint("CENTER", page.who, "CENTER")
   page.noWho:SetWidth(WHO_W - 40)
   page.noWho:SetTextColor(0.6, 0.6, 0.6)
 
   -- Columna 3: oficiales.
-  -- Abajo a la derecha: la ventana de hermandad del juego (la J abre esta página).
-  page.gameGuild = W.Button(page, "Ventana del juego", 146, 22, function() ns.UI.OpenGameGuild() end)
-  page.gameGuild:SetPoint("BOTTOMRIGHT", 0, 2)
-  ns.UI.Tip(page.gameGuild, "Ventana de hermandad del juego", "La de siempre: lista de miembros, rangos, noticias...")
-  page.guildKey = W.Check(page, "La J abre el addon", function(checked) ns.UI.SetGuildKey(checked) end)
-  page.guildKey:SetPoint("RIGHT", page.gameGuild, "LEFT", -150, 0)
-  ns.UI.Tip(page.guildKey, "La J abre el addon", "La J abre esta ventana (en Miembros) en lugar de la de hermandad "
-    .. "del juego. Quítalo para que la J abra la del juego, como siempre.")
 
   page.officerTitle = title("Oficiales", COL3 + 4, -6)
-  page.announce = W.Input(page, OFF_W - 86)
+  page.announce = W.Input(page, OFF_W - 8)
   page.announce:SetPoint("TOPLEFT", COL3 + 8, -28)
   page.announce:SetMaxLetters(S.ANNOUNCE_MAX)
   W.Placeholder(page.announce, "Anuncio para el Inicio…")
-  page.publish = W.Button(page, "Publicar", 80, 20, function()
+  page.publish = W.Button(page, "Publicar anuncio", OFF_W, 22, function()
     local ok, err = S.SetAnnouncement(page.announce:GetText(), ns.Now())
     if not ok then ns.Print(err) else ns.Print("anuncio publicado en el Inicio de todos.") end
   end)
-  page.publish:SetPoint("LEFT", page.announce, "RIGHT", 4, 0)
+  page.publish:SetPoint("TOPLEFT", COL3, -54)
   page.addNeed = W.Button(page, "+ Pedido de la hermandad", OFF_W, 22, function()
-    ns.UI.OpenOfferDialog(nil, nil, "need")
+    ns.UI.OpenNeedDialog()
   end)
-  page.addNeed:SetPoint("TOPLEFT", COL3, -54)
+  page.addNeed:SetPoint("TOPLEFT", COL3, -82)
   ns.UI.Tip(page.addNeed, "Pedido de la hermandad", "Frascos para la banda, materiales… Todos lo verán arriba del "
     .. "Mercado y podrán aportar por correo.")
   page.needs = W.Button(page, "", OFF_W, 22, function() ns.UI.OpenMarket(nil, "want") end)
-  page.needs:SetPoint("TOPLEFT", COL3, -80)
+  page.needs:SetPoint("TOPLEFT", COL3, -108)
   page.missing = W.Button(page, "", OFF_W, 22, function() ns.UI.ShowMissingRecipes() end)
-  page.missing:SetPoint("TOPLEFT", COL3, -106)
+  page.missing:SetPoint("TOPLEFT", COL3, -134)
   page.welcome = W.Check(page, "Bienvenida a los nuevos", function(checked)
     ns.QoL.WelcomeSettings().on = checked
   end)
-  page.welcome:SetPoint("TOPLEFT", COL3, -134)
+  page.welcome:SetPoint("TOPLEFT", COL3, -162)
   ns.UI.Tip(page.welcome, "Bienvenida automática", "Saluda en el chat de hermandad a quien entra nuevo.")
   page.inactive = W.Text(page, "GameFontHighlightSmall")
-  page.inactive:SetPoint("TOPLEFT", COL3 + 4, -164)
+  page.inactive:SetPoint("TOPLEFT", COL3 + 4, -192)
   page.inactive:SetWidth(OFF_W)
   page.inactive:SetJustifyV("TOP")
   page.inactive:SetSpacing(2)
+  -- Al pasar el ratón por la lista: quién no tiene el addon.
+  page.inactiveHover = CreateFrame("Frame", nil, page)
+  page.inactiveHover:SetPoint("TOPLEFT", page.inactive, "TOPLEFT", 0, 0)
+  page.inactiveHover:SetPoint("BOTTOMRIGHT", page.inactive, "BOTTOMRIGHT", 0, 0)
+  page.inactiveHover:EnableMouse(true)
+  page.inactiveHover:SetScript("OnEnter", function(self)
+    local list = page.noAddonList or {}
+    if #list == 0 then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetText("Sin el addon (" .. #list .. ")")
+    for i = 1, math.min(30, #list) do GameTooltip:AddLine(ns.DisplayName(list[i]), 1, 1, 1) end
+    if #list > 30 then GameTooltip:AddLine(string.format("y %d más", #list - 30), 0.7, 0.7, 0.7) end
+    GameTooltip:Show()
+  end)
+  page.inactiveHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   function page:Refresh()
-    page.guildKey:SetChecked(ns.UI.GuildKeyOn())
     local now = ns.Now()
     local officer = S.AmOfficer()
 
@@ -442,8 +459,10 @@ ns.UI.RegisterPage("guild", function(page)
       weekBox.sub:SetText("La semana pasada nadie ayudó (o aún no hay datos).")
     end
 
-    -- Karma con barras.
-    local ranking = karmaRanking()
+    -- Karma con barras: solo oficiales. Sin karma, los roles suben debajo del miembro de la semana.
+    page.karmaTitle:SetShown(officer)
+    page.karmaHint:SetShown(officer)
+    local ranking = officer and karmaRanking() or {}
     local top = ranking[1] and math.max(1, math.abs(ranking[1].k)) or 1
     for i, bar in ipairs(page.bars) do
       local e = ranking[i]
@@ -455,7 +474,13 @@ ns.UI.RegisterPage("guild", function(page)
         bar.fill:SetWidth(math.max(2, 250 * math.max(0, e.k) / top))
       end
     end
-    page.noKarma:SetShown(#ranking == 0)
+    page.noKarma:SetShown(officer and #ranking == 0)
+    local dy = officer and 0 or 204 -- lo que sube todo si no se ve el karma
+    page.rolesTitle:SetPoint("TOPLEFT", COL1 + 4, -322 + dy)
+    page.rolesHint:SetPoint("TOPLEFT", COL1 + 60, -324 + dy)
+    for _, b in ipairs(page.roleSlots) do
+      b:SetPoint("TOPLEFT", COL1 + 4 + b.col * 62, (b.row2 and -374 or -342) + dy)
+    end
 
     -- Roles.
     local g = ns.G()
@@ -485,17 +510,18 @@ ns.UI.RegisterPage("guild", function(page)
       b.count:SetText(counts[b.pk] > 0 and tostring(counts[b.pk]) or "")
       b.tex:SetDesaturated(b.pk ~= state.pk)
     end
-    local byKarma = ns.db.settings.whoSort == "karma"
-    page.whoSort:SetText(byKarma and "Ordenar: karma" or "Ordenar: nivel")
-    local rows = peopleWith(state.pk, byKarma)
-    page.profTitle:SetText(ns.ProfessionName(state.pk) .. " |cffbbbbbb(" .. #rows .. ")|r")
+    local rows, total = peopleWith(state.pk, false, officer)
+    page.profTitle:SetText(ns.ProfessionName(state.pk) .. string.format(
+      " |cffbbbbbb· los %d de más nivel (de %d)|r", #rows, total))
     page.who:SetItems(rows)
     page.noWho:SetShown(#rows == 0)
-    page.noWho:SetText("Nadie ha publicado " .. ns.ProfessionName(state.pk) .. ".\nCada uno debe abrir la ventana de su profesión una vez.")
+    page.noWho:SetText(total > 0
+      and ("Nadie de " .. ns.ProfessionName(state.pk) .. " se ha conectado esta semana.")
+      or ("Nadie ha publicado " .. ns.ProfessionName(state.pk) .. ".\nCada uno debe abrir la ventana de su profesión una vez."))
 
     -- Oficiales.
     for _, f in ipairs({ page.officerTitle, page.announce, page.publish, page.addNeed, page.needs, page.missing,
-      page.welcome, page.inactive }) do
+      page.welcome, page.inactive, page.inactiveHover }) do
       f:SetShown(officer)
     end
     page.who:SetWidth(officer and WHO_W or WHO_W_WIDE)
@@ -513,10 +539,8 @@ ns.UI.RegisterPage("guild", function(page)
       for i = 1, math.min(6, #inactive) do
         out[#out + 1] = string.format("  %s  |cff999999%d días|r", ns.DisplayName(inactive[i].name), inactive[i].days)
       end
-      out[#out + 1] = string.format("|cffffd100Sin el addon: %d|r", #noAddon)
-      local names = {}
-      for i = 1, math.min(8, #noAddon) do names[#names + 1] = ns.DisplayName(noAddon[i]) end
-      if #names > 0 then out[#out + 1] = "  " .. table.concat(names, ", ") .. (#noAddon > 8 and "…" or "") end
+      out[#out + 1] = string.format("|cffffd100Sin el addon: %d|r |cff999999(pasa el ratón)|r", #noAddon)
+      page.noAddonList = noAddon
       page.inactive:SetText(table.concat(out, "\n"))
     end
   end

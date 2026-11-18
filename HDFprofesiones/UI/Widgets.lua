@@ -270,6 +270,17 @@ local function applyTint(b)
     end
   end
   for _, key in ipairs({ "Left", "Middle", "Right" }) do paint(b[key]) end
+  -- Encima, una capa del mismo color que suma luz: así el verde y el azul se ven vivos.
+  if c and not b.tintGlow and b.CreateTexture then
+    b.tintGlow = b:CreateTexture(nil, "ARTWORK")
+    b.tintGlow:SetPoint("TOPLEFT", 3, -3)
+    b.tintGlow:SetPoint("BOTTOMRIGHT", -3, 3)
+    if b.tintGlow.SetBlendMode then b.tintGlow:SetBlendMode("ADD") end
+  end
+  if b.tintGlow then
+    if c then b.tintGlow:SetColorTexture(c[1] * 0.3, c[2] * 0.3, c[3] * 0.3, 1) end
+    b.tintGlow:SetShown(c and true or false)
+  end
   for _, get in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetDisabledTexture" }) do
     if b[get] then paint(b[get](b)) end
   end
@@ -1076,9 +1087,33 @@ function ns.AuthorText(name)
 end
 
 -- Botón pequeño de texto (filtros rápidos, interruptores). SetOn lo deja encendido.
+-- Encendido: además del brillo, un marco dorado para que se vea a simple vista.
+local function chipOn(self, on)
+  setOn(self, on)
+  if on and not self.goldEdge then
+    local e = {}
+    for i, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+      local t = self:CreateTexture(nil, "OVERLAY")
+      t:SetColorTexture(C.GOLD[1], C.GOLD[2], C.GOLD[3], 1)
+      if i <= 2 then
+        t:SetHeight(2)
+        t:SetPoint(side .. "LEFT", 1, 0)
+        t:SetPoint(side .. "RIGHT", -1, 0)
+      else
+        t:SetWidth(2)
+        t:SetPoint("TOP" .. side, 0, -1)
+        t:SetPoint("BOTTOM" .. side, 0, 1)
+      end
+      e[i] = t
+    end
+    self.goldEdge = e
+  end
+  for _, t in ipairs(self.goldEdge or {}) do t:SetShown(on and true or false) end
+end
+
 function W.Chip(parent, text, width, onClick)
   local b = W.Button(parent, text, width, 22, onClick)
-  b.SetOn = setOn
+  b.SetOn = chipOn
   return b
 end
 
@@ -1146,7 +1181,7 @@ function W.Crafters(parent, width, nrows, rowHeight, bare, onSelect)
       elseif c.online then
         state = "|cff40ff40en línea|r"
       elseif c.seen then
-        state = "|cff999999visto hace " .. ns.FormatDuration(ns.Now() - c.seen) .. "|r"
+        state = "|cff999999hace " .. ns.FormatDuration(ns.Now() - c.seen) .. "|r"
       end
       if c.extra then state = (state and (state .. "  ") or "") .. c.extra end
       if me then state = nil end

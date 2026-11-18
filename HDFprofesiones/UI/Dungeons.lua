@@ -554,7 +554,7 @@ local function weekdayOffset(now)
   if not ok or type(t) ~= "table" then return 0 end
   return (t.wday + 5) % 7
 end
-local MAX_WEEK = 2 -- esta semana y las dos siguientes (para llegar a 2 semanas desde hoy)
+local MAX_WEEK = 1 -- dos tiras de 7 días desde hoy (hasta 2 semanas)
 
 ns.UI.RegisterPage("dungeons", function(page)
   local state = { id = nil, kind = "all", day = nil, week = 0 }
@@ -587,14 +587,14 @@ ns.UI.RegisterPage("dungeons", function(page)
     page:Refresh()
   end)
   page.prevWeek:SetPoint("TOPLEFT", 0, -30)
-  ns.UI.Tip(page.prevWeek, "Semana anterior")
+  ns.UI.Tip(page.prevWeek, "Días anteriores")
   page.nextWeek = W.Button(page, ">", ARROW_W, 40, function()
     state.week = math.min(MAX_WEEK, state.week + 1)
     state.day, state.id = nil, nil
     page:Refresh()
   end)
   page.nextWeek:SetPoint("TOPLEFT", ARROW_W + 4 + 7 * DAY_W + 6 * 4 + 4, -30)
-  ns.UI.Tip(page.nextWeek, "Semana siguiente", "Se pueden proponer quedadas hasta 2 semanas antes.")
+  ns.UI.Tip(page.nextWeek, "7 días más", "Se pueden proponer quedadas hasta 2 semanas antes.")
   for i = 1, 7 do
     local b = CreateFrame("Button", nil, page, BackdropTemplateMixin and "BackdropTemplate" or nil)
     b:SetSize(DAY_W, 40)
@@ -665,10 +665,9 @@ ns.UI.RegisterPage("dungeons", function(page)
       row.title:SetText(dg.name .. " |cff999999(" .. dg.min .. "-" .. dg.max .. ")|r")
       local when = r.at <= now + 120 and (now > r.at + 120 and ("desde las " .. D.Clock(r.at)) or "ahora")
         or (D.DayText(r.at, now) .. " · " .. D.Clock(r.at))
-      row.when:SetText(when)
+      row.when:SetText(when .. " |cff666666·|r |cffbbbbbbpropone|r " .. ns.WhoColored(r.a))
       local mine = r.s and r.s[item.me] and not r.s[item.me].o
-      row.sub:SetText("propone " .. ns.WhoColored(r.a) .. " · " .. missingText(r)
-        .. (mine and "  |cff66ccff(vas)|r" or ""))
+      row.sub:SetText(missingText(r) .. (mine and "  |cff66ccff(vas)|r" or ""))
       fillSlots(row.slots, r)
     end,
     onSelect = function(item)
@@ -826,9 +825,24 @@ ns.UI.RegisterPage("dungeons", function(page)
       if place then g[#g + 1] = "|cff66ccffTú vas " .. (place == "en el grupo" and "" or "de ") .. place .. ".|r" end
       detail.group:SetText(table.concat(g, "\n"))
     else
-      detail.group:SetPoint("TOPLEFT", 12, -170)
+      detail.group:SetPoint("TOPLEFT", detail.people, "BOTTOMLEFT", 0, -8)
       detail.group:SetText(open and "|cffbbbbbbAún no se ha hecho el grupo.|r" or "")
     end
+    -- «Me apunto de»: con el grupo hecho, debajo de su tarjeta; si no, justo debajo de quién va.
+    local rolesY = -262
+    if not r.gp then
+      local h = (detail.people.GetStringHeight and detail.people:GetStringHeight()) or 60
+      rolesY = -56 - math.floor(tonumber(h) or 60) - 44 -- 44: la línea «Aún no se ha hecho»
+      if rolesY < -262 then rolesY = -262 end -- nunca más abajo que antes
+    end
+    detail.rolesLabel:ClearAllPoints()
+    detail.rolesLabel:SetPoint("TOPLEFT", 12, rolesY)
+    for i, c in ipairs(detail.checks) do
+      c:ClearAllPoints()
+      c:SetPoint("TOPLEFT", 10 + (i - 1) * 96, rolesY - 14)
+    end
+    detail.join:ClearAllPoints()
+    detail.join:SetPoint("TOPLEFT", 12, rolesY - 42)
 
     -- Apuntarme.
     local su = r.s and r.s[me]
@@ -840,21 +854,29 @@ ns.UI.RegisterPage("dungeons", function(page)
     for _, c in ipairs(detail.checks) do
       if not open then c:SetEnabled(false) end
     end
-    detail.join:SetText(joined and "Cambiar roles" or "Apuntarme")
+    -- Un solo botón: Apuntarme; ya apuntado, Desapuntarme (o Cambiar roles si marcas otros).
+    detail.leave:Hide()
     detail.updateJoin = function()
-      local none = checkedMask(detail.checks) == 0
-      detail.join:SetEnabled(open and not none)
-      detail.rolesLabel:SetText((open and none) and "Me apunto de: |cffff8040(elige tu rol)|r" or "Me apunto de:")
+      local mask = checkedMask(detail.checks)
+      local none = mask == 0
+      local same = joined and mask == su.r
+      local leaving = joined and (same or none)
+      detail.join:SetText(leaving and "Desapuntarme" or (joined and "Cambiar roles" or "Apuntarme"))
+      detail.join:SetWidth(leaving and 130 or 110)
+      detail.join:SetEnabled(open and (leaving or not none) or false)
+      detail.rolesLabel:SetText((open and none and not joined) and "Me apunto de: |cffff8040(elige tu rol)|r" or "Me apunto de:")
     end
     detail.updateJoin()
     detail.join:SetScript("OnClick", function()
       local mask = checkedMask(detail.checks)
+      if joined and (mask == 0 or mask == su.r) then
+        ns.Sync.LeaveRun(r.id)
+        return
+      end
       if mask == 0 then return end
       rememberRoles(mask)
       ns.Sync.SignUpRun(r.id, mask)
     end)
-    detail.leave:SetEnabled(open and joined or false)
-    detail.leave:SetScript("OnClick", function() ns.Sync.LeaveRun(r.id) end)
 
     -- Solo quien la propuso.
     local author = r.a == me
@@ -890,9 +912,8 @@ ns.UI.RegisterPage("dungeons", function(page)
     for i, k in ipairs(KINDS) do
       if not k.soon then page.kinds[i]:SetOn(state.kind == k.id) end
     end
-    -- La semana: de lunes a domingo (0 = esta, 1 = la siguiente...), con un punto por quedada.
+    -- Los días, empezando por hoy (0 = los 7 primeros, 1 = los 7 siguientes), con un punto por quedada.
     local today = D.DayNumber(now)
-    local offset = weekdayOffset(now)
     local perDay = {}
     local items = {}
     for _, r in pairs(D.Runs() or {}) do
@@ -906,7 +927,7 @@ ns.UI.RegisterPage("dungeons", function(page)
       end
     end
     for i, b in ipairs(page.days) do
-      local delta = (i - 1) - offset + 7 * state.week -- días desde hoy
+      local delta = (i - 1) + 7 * state.week -- días desde hoy
       local at = now + delta * 86400
       local day = D.DayNumber(at)
       b.dayNumber = day
@@ -947,8 +968,7 @@ ns.UI.RegisterPage("dungeons", function(page)
   function page:SelectDay(at)
     local now = ns.Now()
     state.day = D.DayNumber(math.max(at, now))
-    state.week = math.max(0, math.min(MAX_WEEK,
-      math.floor((state.day - D.DayNumber(now) + weekdayOffset(now)) / 7)))
+    state.week = math.max(0, math.min(MAX_WEEK, math.floor((state.day - D.DayNumber(now)) / 7)))
     state.id = nil
     state.kind = "all" -- con otro tipo elegido, la quedada podía no salir en la lista
     page:Refresh()

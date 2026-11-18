@@ -112,11 +112,6 @@ function Extras.AnnounceText(kind, obj)
     if obj.g then text = text .. " (propina " .. ns.MoneyWords(obj.g) .. ")" end
     if obj.nt then text = text .. " - " .. obj.nt end
     return text .. ". ¿Quién puede hacerlo? Susurradme."
-  elseif kind == "offer" then
-    local text = tag .. "Ofrezco " .. itemText("i" .. obj.id, obj.free or obj.q)
-    text = text .. ((obj.g and obj.g > 0) and (" a " .. ns.MoneyWords(obj.g) .. " c/u") or " gratis")
-    if obj.nt then text = text .. " - " .. obj.nt end
-    return text .. ". Susurradme si lo queréis."
   elseif kind == "need" then
     return tag .. "La hermandad necesita " .. itemText("i" .. obj.id, obj.left or obj.q)
       .. ". Si podéis aportar, mandádselo a " .. ns.DisplayName(obj.owner) .. "."
@@ -160,7 +155,6 @@ end
 ---------------------------------------------------------------------------
 Extras.STAT_NAMES = {
   { id = "delivered", label = "Pedidos entregados" },
-  { id = "offers", label = "Ofertas entregadas" },
   { id = "donated", label = "Aportaciones a la hermandad" },
   { id = "received", label = "Cosas recibidas" },
   { id = "tips", label = "Propinas ganadas", money = true },

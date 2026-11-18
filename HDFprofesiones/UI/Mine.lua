@@ -1,8 +1,7 @@
--- Página "Opciones" (rueda dentada): tres grupos con icono.
---   Yo: personaje, profesiones leídas, principal, no disponible y no molestar.
---   Avisos: cada tipo de aviso, si se escribe en el chat (ya no hay ventanas de aviso).
---   Otros: mis pedidos en el chat, minimapa, demostración, comprobar el addon, letra de las listas
---   y el estado.
+-- Página "Opciones" (18/11, rehecha):
+--   Tu personaje (lo principal): nombre, profesiones, principal, rol, no disponible y no molestar.
+--   Avisos en tu chat: 4 casillas. Otros: mis pedidos en el chat y el minimapa.
+--   Para arreglar fallos (abajo, en gris): comprobar el addon, copiar informe y estado y números.
 local _, ns = ...
 local W, Data, Guild = ns.W, ns.Data, ns.Guild
 
@@ -81,24 +80,84 @@ local function statusText()
   return table.concat(stats, "\n")
 end
 
+-- Quitados de Opciones (18/11): letra de las listas, demostración y ayuda con el correo. Quien los
+-- tuviera cambiados vuelve a lo normal.
+ns.Listen("DB_READY", function()
+  local s = ns.db.settings
+  s.listFont, s.demo, s.mailOff = nil, nil, nil
+  s.guildKey = nil -- «La J abre el addon» también se quitó (Hermandad): la J siempre abre el addon
+end)
+
+-- Avisos en el chat: 4 casillas, cada una enciende varios tipos de aviso.
+local ALERT_GROUPS = {
+  { id = "craft", label = "Pedidos que puedo hacer", types = { "craft" } },
+  { id = "mine", label = "Novedades de mis pedidos", types = { "accepted", "expire" } },
+  { id = "runs", label = "Quedadas y grupos", types = { "run", "signup", "group", "remind" } },
+  { id = "other", label = "Lo demás", types = { "other" } },
+}
+local GROUP_OF = {}
+for _, g in ipairs(ALERT_GROUPS) do
+  for _, t in ipairs(g.types) do GROUP_OF[t] = g.id end
+end
+ns.UI.ALERT_GROUPS = ALERT_GROUPS
+
+local function groupOn(g)
+  for _, t in ipairs(g.types) do
+    local ts = ns.Alerts.TypeSettings(t)
+    if ts.on and ts.chat then return true end
+  end
+  return false
+end
+
+local function box(page, x, y, w, h, title)
+  local b = W.Box(page, w, h)
+  b:SetPoint("TOPLEFT", x, y)
+  if title then
+    b.title = W.Text(b, "GameFontNormalLarge")
+    b.title:SetPoint("TOPLEFT", 12, -10)
+    b.title:SetText(title)
+  end
+  return b
+end
+
+local function grey(parent, x, y, width)
+  local t = W.Text(parent, "GameFontHighlightSmall")
+  t:SetPoint("TOPLEFT", x, y)
+  t:SetWidth(width)
+  t:SetTextColor(0.6, 0.6, 0.6)
+  return t
+end
+
+local function label(parent, x, y, text)
+  local t = W.Text(parent, "GameFontNormalSmall")
+  t:SetPoint("TOPLEFT", x, y)
+  t:SetText(text)
+  return t
+end
+
 ns.UI.RegisterPage("mine", function(page)
   -------------------------------------------------------------------------
-  -- Yo
+  -- Tu personaje (lo principal)
   -------------------------------------------------------------------------
-  local me = group(page, 0, 250, "Interface\\Icons\\INV_Misc_Head_Human_01", "Yo")
-  page.charText = W.Text(me, "GameFontHighlight")
-  page.charText:SetPoint("TOPLEFT", 12, -44)
+  local me = box(page, 0, -2, 440, 300)
+  page.meBox = me
+  page.charText = W.Text(me, "GameFontNormalLarge")
+  page.charText:SetPoint("TOPLEFT", 14, -14)
+  label(me, 14, -44, "Profesiones")
   page.profText = W.Text(me, "GameFontHighlightSmall")
-  page.profText:SetPoint("TOPLEFT", 12, -66)
-  page.profText:SetSize(226, 120)
+  page.profText:SetPoint("TOPLEFT", 22, -60)
+  page.profText:SetSize(406, 50)
   page.profText:SetJustifyV("TOP")
-  page.profText:SetSpacing(2)
+  page.profText:SetSpacing(3)
+  local sep = me:CreateTexture(nil, "ARTWORK")
+  sep:SetPoint("TOPLEFT", 12, -118)
+  sep:SetSize(416, 1)
+  sep:SetColorTexture(0.6, 0.45, 0.15, 0.5)
 
+  local C1, C2, CW = 14, 228, 198
   -- Personaje principal: los alts suman karma y ayudas con él. Por defecto, el de más nivel.
-  local mainLabel = W.Text(me, "GameFontNormalSmall")
-  mainLabel:SetPoint("TOPLEFT", 12, -196)
-  mainLabel:SetText("Personaje principal:")
-  page.mainButton = W.Button(me, "", 110, 22, function()
+  label(me, C1, -132, "Personaje principal")
+  page.mainButton = W.Button(me, "", CW, 22, function()
     local chars = ns.Social.MyChars()
     if #chars < 2 then
       ns.Print("solo conozco este personaje tuyo. Entra con tus alts (con el addon) y podrás elegir.")
@@ -112,138 +171,105 @@ ns.UI.RegisterPage("mine", function(page)
     ns.Social.SetMyMain(chars[nextIdx].name)
     page:Refresh()
   end)
-  page.mainButton:SetPoint("LEFT", mainLabel, "RIGHT", 6, 0)
-  page.hint = W.Text(me, "GameFontHighlightSmall")
-  page.hint:SetPoint("TOPLEFT", 12, -222)
-  page.hint:SetWidth(226)
-  page.hint:SetTextColor(0.7, 0.7, 0.7)
+  page.mainButton:SetPoint("TOPLEFT", C1 - 2, -148)
+  page.hint = grey(me, C1, -176, CW)
 
+  -- Rol de este personaje (para el recuento de la Hermandad): sale de los talentos o se elige.
+  label(me, C2, -132, "Rol de este personaje")
+  page.roleButton = W.Button(me, "", CW, 22, function() ns.UI.ChooseRoles() end)
+  page.roleButton:SetPoint("TOPLEFT", C2 - 2, -148)
+  ns.UI.Tip(page.roleButton, "Rol de este personaje", "Para contar en la Hermandad cuántos tanques, sanadores y DPS "
+    .. "hay. «Auto» lo saca de tus talentos.")
+  page.roleHint = grey(me, C2, -176, CW)
+
+  label(me, C1, -214, "Estado")
   page.unavailable = W.Check(me, "No disponible", function(checked) ns.Sync.SetUnavailable(checked) end)
-  page.unavailable:SetPoint("TOPLEFT", 8, -256)
+  page.unavailable:SetPoint("TOPLEFT", C1 - 4, -230)
   ns.UI.Tip(page.unavailable, "No disponible", "Sin avisos, y sales el último en «Quién lo fabrica».")
+  grey(me, C1, -260, CW):SetText("Sin avisos y sales el último en los artesanos.")
   -- No molestar (1 h, 3 h, hasta mañana): los avisos se guardan y salen después juntos.
-  page.quiet = W.Button(me, "", 200, 22, function()
+  page.quiet = W.Button(me, "", CW, 22, function()
     local opts = ns.Alerts.QUIET_OPTIONS
     local current = ns.Alerts.IsQuiet() and (ns.db.settings.dndOption or 1) or 1
     ns.Alerts.SetQuiet(current % #opts + 1, ns.Now())
     page:Refresh()
   end)
-  page.quiet:SetPoint("TOPLEFT", 12, -288)
+  page.quiet:SetPoint("TOPLEFT", C2 - 2, -232)
   ns.UI.Tip(page.quiet, "No molestar", "Los avisos se guardan y salen después, juntos.")
-
-  -- Rol de este personaje (para el recuento de la Hermandad): sale de los talentos y se puede
-  -- elegir a mano. Cada pulsación pasa al siguiente rol que pueda hacer la clase, y vuelve a «Auto».
-  local roleLabel = W.Text(me, "GameFontNormalSmall")
-  roleLabel:SetPoint("TOPLEFT", 12, -334)
-  roleLabel:SetText("Rol de este personaje:")
-  page.roleButton = W.Button(me, "", 100, 22, function() ns.UI.ChooseRoles() end)
-  page.roleButton:SetPoint("LEFT", roleLabel, "RIGHT", 6, 0)
-  ns.UI.Tip(page.roleButton, "Rol de este personaje", "Para contar en la Hermandad cuántos tanques, sanadores y DPS "
-    .. "hay. «Auto» lo saca de tus talentos.")
-  page.roleHint = W.Text(me, "GameFontHighlightSmall")
-  page.roleHint:SetPoint("TOPLEFT", 12, -358)
-  page.roleHint:SetWidth(226)
-  page.roleHint:SetTextColor(0.7, 0.7, 0.7)
+  grey(me, C2, -260, CW):SetText("1 h, 3 h o hasta mañana.")
 
   -------------------------------------------------------------------------
-  -- Avisos
+  -- Avisos en tu chat: 4 casillas
   -------------------------------------------------------------------------
-  local al = group(page, 260, 330, "Interface\\Icons\\INV_Misc_Bell_01", "Avisos")
+  local al = box(page, 450, -2, 338, 172, "Avisos en tu chat")
   page.alertsBox = al
-  -- Sin ventanas de aviso (18/11): solo «en el chat», por tipo.
-  local COLS = { { key = "chat", label = "En el chat" } }
-  local X0 = 250
-  for i, c in ipairs(COLS) do
-    local h = W.Text(al, "GameFontNormalSmall", "CENTER")
-    h:SetPoint("TOP", al, "TOPLEFT", X0 + (i - 1) * 40 + 12, -46)
-    h:SetText(c.label)
-  end
+  grey(al, 12, -34, 314):SetText("Escríbeme en el chat cuando haya:")
   page.alertRows = {}
-  for i, t in ipairs(ns.Alerts.TYPES) do
-    local y = -64 - (i - 1) * 30
-    local row = { id = t.id }
-    row.label = W.Text(al, "GameFontHighlightSmall")
-    row.label:SetPoint("TOPLEFT", 12, y - 6)
-    row.label:SetWidth(X0 - 16)
-    row.label:SetText(t.label)
+  for i, g in ipairs(ALERT_GROUPS) do
+    local y = -50 - (i - 1) * 28
+    local row = { id = g.id }
     row.mark = al:CreateTexture(nil, "BACKGROUND")
     row.mark:SetPoint("TOPLEFT", 6, y + 2)
-    row.mark:SetSize(318, 28)
+    row.mark:SetSize(326, 28)
     row.mark:SetColorTexture(1, 0.82, 0, 0.2)
     row.mark:Hide()
-    row.checks = {}
-    for k, c in ipairs(COLS) do
-      local cb = W.Check(al, "", function(checked)
-        local ts = ns.Alerts.TypeSettings(t.id)
-        ts[c.key] = checked
+    row.check = W.Check(al, g.label, function(checked)
+      for _, t in ipairs(g.types) do
+        local ts = ns.Alerts.TypeSettings(t)
+        ts.chat = checked and true or false
         if checked then ts.on = true end
-        page:Refresh()
-      end)
-      cb:SetPoint("TOPLEFT", X0 + (k - 1) * 40, y)
-      cb.key = c.key
-      row.checks[k] = cb
-    end
-    page.alertRows[t.id] = row
+      end
+      page:Refresh()
+    end)
+    row.check:SetPoint("TOPLEFT", 8, y)
+    page.alertRows[g.id] = row
   end
-  local legend = W.Text(al, "GameFontDisableSmall")
-  legend:SetPoint("BOTTOMLEFT", 12, 44)
-  legend:SetWidth(306)
-  legend:SetJustifyV("BOTTOM")
-  legend:SetText("Ya no salen ventanas de aviso. Marca los que quieras ver escritos en tu chat.")
-  page.test = W.Button(al, "Probar en el chat", 130, 22, function()
-    ns.Print("así se ve un aviso en el chat (" .. date("%H:%M:%S") .. ")")
-  end)
-  page.test:SetPoint("BOTTOMLEFT", 10, 12)
 
   -------------------------------------------------------------------------
-  -- Otros
+  -- Otros: dos casillas
   -------------------------------------------------------------------------
-  local ot = group(page, 600, 188, "Interface\\Icons\\INV_Misc_Gear_01", "Otros")
+  local ot = box(page, 450, -182, 338, 120, "Otros")
   page.chatPost = W.Check(ot, "Escribir mis pedidos en el chat", function(checked) ns.db.settings.chatPost = checked end)
-  page.chatPost:SetPoint("TOPLEFT", 8, -44)
-  page.chatPost.label:SetWidth(150)
-  page.mailHelp = W.Check(ot, "Ayuda con el correo", function(checked) ns.db.settings.mailOff = not checked or nil end)
-  page.mailHelp:SetPoint("TOPLEFT", 8, -132)
-  ns.UI.Tip(page.mailHelp, "Ayuda con el correo", "Pone el reembolso de los pedidos y apunta solo las entregas al "
-    .. "enviar. Apágala si un envío falla, para ver si es cosa del addon (vuelve a abrir el buzón).")
+  page.chatPost:SetPoint("TOPLEFT", 8, -40)
   page.minimap = W.Check(ot, "Icono en el minimapa", function(checked) ns.MinimapButton.SetShown(checked) end)
-  page.minimap:SetPoint("TOPLEFT", 8, -80)
-  page.demo = W.Check(ot, "Demostración", function(checked) ns.Demo.Set(checked) end)
-  page.demo:SetPoint("TOPLEFT", 8, -106)
-  ns.UI.Tip(page.demo, "Modo demostración", "Jugadores y pedidos de ejemplo. Solo los ves tú.")
-  page.check = W.Button(ot, "Comprobar el addon", 166, 22, function() ns.Diag.Show() end)
-  page.check:SetPoint("TOPLEFT", 10, -164)
-  page.report = W.Button(ot, "Copiar informe", 166, 22, function() ns.Diag.Show() end)
-  page.report:SetPoint("TOPLEFT", 10, -190)
-  page.errors = W.Text(ot, "GameFontHighlightSmall")
-  page.errors:SetPoint("TOPLEFT", 12, -218)
-  page.errors:SetWidth(166)
-  -- Letra de las listas: pequeña → normal → grande.
-  local fontLabel = W.Text(ot, "GameFontNormalSmall")
-  fontLabel:SetPoint("TOPLEFT", 12, -254)
-  fontLabel:SetText("Letra de las listas:")
-  page.fontButton = W.Button(ot, "", 166, 22, function()
-    local sizes, current = W.FONT_SIZES, W.ListFontSize()
-    for i, s in ipairs(sizes) do
-      if s == current then W.SetListFont(sizes[i % #sizes + 1].id) break end
-    end
-    page:Refresh()
-  end)
-  page.fontButton:SetPoint("TOPLEFT", 10, -270)
-  ns.UI.Tip(page.fontButton, "Letra de las listas", "Pequeña, normal o grande: Mercado, Grupos, Hermandad e Inicio.")
-  page.statusButton = W.Button(ot, "Estado y números", 166, 22, function()
+  page.minimap:SetPoint("TOPLEFT", 8, -70)
+
+  -------------------------------------------------------------------------
+  -- Para arreglar fallos: aparte, abajo, en gris
+  -------------------------------------------------------------------------
+  local fx = box(page, 0, -312, 788, 108)
+  page.fixBox = fx
+  local fxTitle = W.Text(fx, "GameFontDisableSmall")
+  fxTitle:SetPoint("TOPLEFT", 12, -10)
+  fxTitle:SetText("Para arreglar fallos")
+  local BW, X = 200, { 12, 294, 576 }
+  page.check = W.Button(fx, "Comprobar el addon", BW, 22, function() ns.Diag.Show() end)
+  page.check:SetPoint("TOPLEFT", X[1], -28)
+  grey(fx, X[1] + 2, -56, 240):SetText("Mira si todo va bien.")
+  page.report = W.Button(fx, "Copiar informe", BW, 22, function() ns.Diag.Show() end)
+  page.report:SetPoint("TOPLEFT", X[2], -28)
+  page.reportHint = grey(fx, X[2] + 2, -56, 270)
+  page.reportHint:SetText("Sirve para compartir tu opinión o un fallo del addon: cópialo y pégalo donde nos lo mandes.")
+  page.errors = W.Text(fx, "GameFontHighlightSmall")
+  page.errors:SetPoint("TOPLEFT", X[2] + 2, -86)
+  page.errors:SetWidth(270)
+  page.statusButton = W.Button(fx, "Estado y números", BW, 22, function()
     page.statusBox:SetShown(not page.statusBox:IsShown())
     page:Refresh()
   end)
-  page.statusButton:SetPoint("BOTTOMLEFT", 10, 12)
+  page.statusButton:SetPoint("TOPLEFT", X[3], -28)
+  grey(fx, X[3] + 2, -56, 200):SetText("Números del addon y de la hermandad.")
+  for _, b in ipairs({ page.check, page.report, page.statusButton }) do
+    if b.GetFontString and b:GetFontString() then b:GetFontString():SetTextColor(0.85, 0.75, 0.5) end
+  end
 
-  -- Estado y números (encima de Avisos, hasta que se vuelve a pulsar).
-  local sb = W.Box(page, 590, 418)
+  -- Estado y números (encima de todo menos la franja de abajo, hasta que se vuelve a pulsar).
+  local sb = W.Box(page, 788, 300)
   sb:SetPoint("TOPLEFT", 0, -2)
-  sb:SetFrameLevel(al:GetFrameLevel() + 10)
+  sb:SetFrameLevel(math.max(me:GetFrameLevel(), al:GetFrameLevel(), ot:GetFrameLevel()) + 10)
   sb.text = W.Text(sb, "GameFontHighlightSmall")
   sb.text:SetPoint("TOPLEFT", 14, -14)
-  sb.text:SetSize(560, 360)
+  sb.text:SetSize(560, 276)
   sb.text:SetJustifyV("TOP")
   sb.close = W.Button(sb, "Cerrar", 90, 22, function()
     sb:Hide()
@@ -253,10 +279,10 @@ ns.UI.RegisterPage("mine", function(page)
   sb:Hide()
   page.statusBox = sb
 
-  -- Desde la rueda de un aviso: marca su fila.
+  -- Desde la rueda de un aviso: marca su casilla.
   function page:FocusAlert(id)
     page.statusBox:Hide()
-    page.focus = id
+    page.focus = GROUP_OF[id] or id
     page:Refresh()
   end
 
@@ -264,7 +290,7 @@ ns.UI.RegisterPage("mine", function(page)
     local c, myName = ns.MyChar(), ns.Me()
     if not c then return end
     local now = ns.Now()
-    page.charText:SetText(ns.ColoredName(myName, c.class) .. (c.level and (" |cffbbbbbbnivel " .. c.level .. "|r") or ""))
+    page.charText:SetText(ns.ColoredName(myName, c.class) .. (c.level and ("  |cff999999nivel " .. c.level .. "|r") or ""))
     local profs = {}
     for pk, prof in pairs(c.profs) do profs[#profs + 1] = { pk = pk, prof = prof } end
     table.sort(profs, function(a, b) return ns.ProfessionName(a.pk) < ns.ProfessionName(b.pk) end)
@@ -272,8 +298,9 @@ ns.UI.RegisterPage("mine", function(page)
     for _, p in ipairs(profs) do
       local count = 0
       for _ in pairs(p.prof.recipes or {}) do count = count + 1 end
-      local line = string.format("|T%s:14|t |cffffd100%s|r %s · %d recetas", ns.ProfessionIcon(p.pk), ns.ProfessionName(p.pk),
-        p.prof.r and string.format("%d/%d", p.prof.r, p.prof.m or 0) or "", count)
+      local line = string.format("|T%s:14|t |cffffd100%s|r  %s · %d receta%s", ns.ProfessionIcon(p.pk),
+        ns.ProfessionName(p.pk), p.prof.r and string.format("%d/%d", p.prof.r, p.prof.m or 0) or "", count,
+        count == 1 and "" or "s")
       if count == 0 and not p.prof.t then line = line .. " |cffff8040(ábrela)|r" end
       lines[#lines + 1] = line
     end
@@ -291,35 +318,27 @@ ns.UI.RegisterPage("mine", function(page)
     local D = ns.Dungeons
     if c.roleSet then
       page.roleButton:SetText(D.RoleLabel(c.roleSet))
-      page.roleHint:SetText("Elegido por ti (puedes tener varios). Pulsa para cambiarlo.")
+      page.roleHint:SetText("Elegido por ti. Pulsa para cambiarlo.")
     else
       page.roleButton:SetText("Auto: " .. (D.RoleLabel(c.roleAuto) or "?"))
       page.roleHint:SetText(c.roleAuto and "Sale de tus talentos. Pulsa para elegirlo tú."
         or "Sin talentos todavía: pulsa para elegirlo.")
     end
-    page.hint:SetText(main == myName and (nChars > 1 and "Tus alts suman karma y ayudas contigo (pulsa para cambiar)."
+    page.hint:SetText(main == myName and (nChars > 1 and "Tus alts suman karma y ayudas contigo. Pulsa para cambiar."
       or "Tus alts suman karma y ayudas con tu principal.")
       or ("Este es un alt de " .. ns.DisplayName(main) .. "."))
 
-    -- Avisos: un tipo apagado deja sus otras casillas en gris.
-    for id, row in pairs(page.alertRows) do
-      local ts = ns.Alerts.TypeSettings(id)
-      for _, cb in ipairs(row.checks) do
-        cb:SetChecked((ts.on and ts[cb.key]) and true or false)
-      end
-      local lit = ts.on and ts.chat
-      row.label:SetTextColor(lit and 1 or 0.6, lit and 1 or 0.6, lit and 1 or 0.6)
-      row.mark:SetShown(page.focus == id)
+    for _, g in ipairs(ALERT_GROUPS) do
+      local row = page.alertRows[g.id]
+      row.check:SetChecked(groupOn(g))
+      row.mark:SetShown(page.focus == g.id)
     end
 
     page.chatPost:SetChecked(ns.db.settings.chatPost ~= false)
-    page.mailHelp:SetChecked(not ns.db.settings.mailOff)
-    page.demo:SetChecked(ns.db.settings.demo and true or false)
     page.minimap:SetChecked(ns.MinimapButton.IsShown())
-    page.fontButton:SetText(W.ListFontSize().label)
     local nErrors = #(ns.db.errors or {})
-    page.errors:SetText(nErrors > 0 and string.format("|cffff8040Hay %d error%s guardado%s: pulsa Copiar informe.|r",
-      nErrors, nErrors > 1 and "es" or "", nErrors > 1 and "s" or "") or "|cff999999Sin errores guardados.|r")
+    page.errors:SetText(nErrors > 0 and string.format("|cffff8040Hay %d error%s guardado%s.|r",
+      nErrors, nErrors > 1 and "es" or "", nErrors > 1 and "s" or "") or "")
     if page.statusBox:IsShown() then page.statusBox.text:SetText(statusText()) end
     page.statusButton:SetText(page.statusBox:IsShown() and "Ocultar estado" or "Estado y números")
   end

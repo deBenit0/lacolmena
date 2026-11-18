@@ -1,10 +1,10 @@
--- Mercado › TABLÓN: lo que pide y ofrece la hermandad (lo tuyo va en Mis pedidos, Mis encargos y
--- Mis ofertas).
+-- Mercado › TABLÓN: lo que pide la hermandad (lo tuyo va en Mis pedidos y Mis encargos). Aquí no
+-- se ofrece nada: la gente pide y quien puede hacerlo acepta el encargo.
 --   Arriba: iconos de profesión que se encienden y apagan (al entrar, las tuyas; sin profesiones,
---   todas), «Todas», buscador, «Conectados», «Con prisa» y «SOLO MATERIALES». Debajo, «Ver: Todo /
---   Lo que piden / Lo que ofrecen».
---   Cada fila: una etiqueta de color (PIDE, OFRECE, FABRICA, HERMANDAD o BLIZZARD) y UN botón. Lo
---   que puedes hacer o dar sale primero y con borde dorado. Pulsar la fila abre el detalle.
+--   todas), «Todas», buscador y la casilla «Ver solo lo que puedo hacer». Debajo, el tipo de
+--   cosa: Todo · Equipo · Materiales · Consumibles · Recetas · Encantamientos · Otros.
+--   Cada fila con UN botón («ME ENCARGO»; «APORTAR» en lo de la hermandad). Lo que puedes hacer
+--   o dar sale primero y con borde dorado. Pulsar la fila abre el detalle.
 local _, ns = ...
 local W, Data = ns.W, ns.Data
 
@@ -12,17 +12,45 @@ local W, Data = ns.W, ns.Data
 local PROFS = { 164, 165, 197, 171, 202, 333, 185, 186, 182, 393 }
 local ROWS, ROW_H = 7, 48
 
+-- Solo se marca lo que no es un pedido normal.
 local TAG = {
-  req = { "PIDE", 0.85, 0.5, 0.2 },
-  offer = { "OFRECE", 0.35, 0.6, 0.9 },
-  craft = { "FABRICA", 0.35, 0.6, 0.9 },
   need = { "HERMANDAD", 0.9, 0.7, 0.2 },
   co = { "BLIZZARD", 0.25, 0.75, 0.9 },
 }
-local VIEW_SIDE = { { id = nil, label = "Todo" }, { id = "want", label = "Lo que piden" },
-  { id = "offer", label = "Lo que ofrecen" } }
 
-local function sideOf(it) return (it.kind == "offer" or it.kind == "craft") and "offer" or "want" end
+-- Tipos de cosa (la fila de debajo de las profesiones).
+local CATS = {
+  { id = nil, label = "Todo", width = 54 },
+  { id = "gear", label = "Equipo", width = 70 },
+  { id = "mats", label = "Materiales", width = 92 },
+  { id = "cons", label = "Consumibles", width = 100 },
+  { id = "recipe", label = "Recetas", width = 76 },
+  { id = "ench", label = "Encantamientos", width = 124 },
+  { id = "other", label = "Otros", width = 60 },
+}
+local CAT_TIPS = {
+  gear = "Armas, armaduras, bolsas y abalorios.",
+  mats = "Minerales, hierbas, telas, cueros, gemas... lo que se usa para fabricar.",
+  cons = "Pociones, elixires, frascos, comida y vendas.",
+  recipe = "Recetas, patrones, planos y fórmulas.",
+  ench = "Encantamientos (se hacen en el comercio, no por correo).",
+  other = "Todo lo que no entra en los demás.",
+}
+
+-- Tipo de cosa de una clave ("i123" objeto, "e456" encantamiento).
+local function catOf(key)
+  local kind, id = ns.ParseKey(key)
+  if kind == "e" then return "ench" end
+  if kind ~= "i" then return "other" end
+  local _, class = ns.ItemInstant(id)
+  if class == 2 or class == 4 or class == 1 or class == 11 then return "gear" end
+  if class == 7 or class == 5 or class == 3 then return "mats" end
+  if class == 0 then return "cons" end
+  if class == 9 then return "recipe" end
+  return "other"
+end
+
+local function noBrackets(s) return (tostring(s or ""):gsub("%[", ""):gsub("%]", "")) end
 
 local function payText(r)
   local parts = {}
@@ -31,7 +59,7 @@ local function payText(r)
     local ids = {}
     for id in pairs(r.pi) do ids[#ids + 1] = id end
     table.sort(ids)
-    for _, id in ipairs(ids) do parts[#parts + 1] = r.pi[id] .. "x " .. ns.KeyLabel("i" .. id) end
+    for _, id in ipairs(ids) do parts[#parts + 1] = r.pi[id] .. "x " .. noBrackets(ns.KeyLabel("i" .. id)) end
   end
   return #parts > 0 and table.concat(parts, " + ") or nil
 end
@@ -75,36 +103,15 @@ local function action(it)
     if info.state ~= "open" or info.remaining <= 0 then return nil end
     local have = haveInBags(r.k)
     local craft = Data.ICanCraft(r.k) or Data.ICanGather(r.k)
-    local hint = craft and "|cffffd100Sabes hacerlo|r"
-      or have > 0 and string.format("|cff40ff40Tienes %d en tus bolsas|r", have) or nil
-    local label = (not craft and have > 0) and "LO DOY" or "ME ENCARGO"
-    return label, W.GREEN, true, function() W.AcceptRequest(r) end, hint, (craft or have > 0) and true or false
+    local hint = have > 0 and string.format("|cff40ff40Tienes %d en tus bolsas|r", have)
+      or craft and "|cff40ff40Sabes hacerlo|r" or nil
+    return "ME ENCARGO", W.GREEN, true, function() W.AcceptRequest(r) end, hint, (craft or have > 0) and true or false
   elseif it.kind == "need" then
     local have = haveInBags(it.k)
     return "APORTAR", W.GREEN, true, function() ns.UI.ContributeNeed(it.need) end,
       have > 0 and string.format("|cff40ff40Tienes %d en tus bolsas|r", have) or nil, have > 0
-  elseif it.kind == "offer" then
-    local o = it.o
-    if o.myClaim and o.myClaim > 0 then
-      return "PEDIDO", W.BLUE, false, nil, string.format("|cff66ccffHas pedido %d|r", o.myClaim), false
-    end
-    return "LO QUIERO", W.BLUE, o.free > 0, function()
-      if o.free <= 1 then
-        local ok, err = ns.Offers.Claim(o.key, 1, ns.Now())
-        if not ok and err then ns.Print(err) end
-      else
-        W.AskAmount(string.format("¿Cuántos quieres? (quedan %d)", o.free), 1, function(n)
-          local ok, err = ns.Offers.Claim(o.key, n, ns.Now())
-          if not ok and err then ns.Print(err) end
-        end)
-      end
-    end, nil, false
-  elseif it.kind == "craft" then
-    return "PEDÍRSELO", W.BLUE, true, function()
-      ns.UI.OpenRequestDialog({ k = it.k, pk = Data.SingleProfession(it.k), q = 1 })
-    end, nil, false
   elseif it.kind == "co" then
-    return nil, nil, nil, nil, it.canServe and "|cffffd100Sabes hacerlo: cógelo en tu profesión|r" or nil,
+    return nil, nil, nil, nil, it.canServe and "|cff40ff40Sabes hacerlo: cógelo en tu profesión|r" or nil,
       it.canServe and true or false
   end
 end
@@ -121,29 +128,17 @@ local function subText(it, now)
       parts[#parts + 1] = "|cff66ccfflo hace " .. table.concat(names, ", ") .. (#info.owners > 2 and "…" or "") .. "|r"
     end
     if it.r.pr then parts[#parts + 1] = "|cffff9933" .. Data.WHEN[it.r.pr].need:lower() .. "|r" end
-  elseif it.kind == "craft" then
-    local cr = it.craft.crafters
-    parts = { "lo fabrica" .. (#cr > 1 and "n " or " ") .. ns.WhoColored(cr[1].name)
-      .. (#cr > 1 and string.format(" y %d más", #cr - 1) or "") }
   elseif it.kind == "co" then
     parts[#parts + 1] = "se coge en tu profesión"
   end
   return table.concat(parts, " |cff666666·|r ")
 end
 
--- Lo de la derecha: propina, precio o lo aportado.
+-- Lo de la derecha: la propina (solo si hay) o lo aportado.
 local function moneyText(it)
   if it.kind == "req" then
     local p = payText(it.r)
-    return p and ("Propina: " .. p) or "|cff999999Sin propina|r"
-  elseif it.kind == "offer" then
-    return "Precio: " .. ns.UI.PriceText(it.o.g)
-  elseif it.kind == "craft" then
-    local cheapest
-    for _, c in ipairs(it.craft.crafters) do
-      if not cheapest or (c.g or 0) < cheapest then cheapest = c.g or 0 end
-    end
-    return "Precio: " .. ns.UI.PriceText(cheapest)
+    return p and ("Propina: " .. p) or ""
   elseif it.kind == "need" then
     return string.format("Aportado %d de %d", it.need.given, it.need.q)
   end
@@ -152,12 +147,11 @@ end
 
 local function qtyOf(it)
   if it.kind == "req" then return it.info.remaining > 0 and it.info.remaining or it.r.q end
-  if it.kind == "offer" then return it.o.free > 0 and it.o.free or it.o.q end
   if it.kind == "need" then return it.need.left end
 end
 
 ns.UI.MarketView("board", function(view, M)
-  local state = { search = "", side = nil }
+  local state = { search = "" }
   local function settings() return M.Settings() end
   -- Profesiones encendidas: las guardadas o, la primera vez, las mías (sin ninguna, todas).
   local function enabled()
@@ -181,7 +175,7 @@ ns.UI.MarketView("board", function(view, M)
     return true
   end
 
-  -- Fila de filtros
+  -- Fila 1: profesiones, «Todas», buscador y «Ver solo lo que puedo hacer».
   view.profs = {}
   for i, pk in ipairs(PROFS) do
     local b = CreateFrame("Button", nil, view)
@@ -197,7 +191,7 @@ ns.UI.MarketView("board", function(view, M)
       on[pk] = (not on[pk]) or nil
       view:Refresh(view.data)
     end)
-    ns.UI.Tip(b, ns.ProfessionName(pk), "Pulsa para encender o apagar sus pedidos y ofertas.")
+    ns.UI.Tip(b, ns.ProfessionName(pk), "Pulsa para encender o apagar sus pedidos.")
     b.pk = pk
     view.profs[i] = b
   end
@@ -216,7 +210,7 @@ ns.UI.MarketView("board", function(view, M)
   view.all:SetPoint("TOPLEFT", x, -3)
   ns.UI.Tip(view.all, "Todas", "Enciende todas las profesiones. Otra vez: solo las tuyas.")
   x = x + 58
-  view.search = W.Input(view, 128)
+  view.search = W.Input(view, 150)
   view.search:SetPoint("TOPLEFT", x + 6, -4)
   view.search.hdfLink = true
   W.Placeholder(view.search, "Buscar…")
@@ -230,38 +224,27 @@ ns.UI.MarketView("board", function(view, M)
     state.search = text:lower()
     view:Refresh(view.data)
   end)
-  x = x + 140
-  local function toggle(key, label, width, tipText)
-    local b = W.Chip(view, label, width, function()
-      local m = settings()
-      m[key] = (not m[key]) or nil
-      view:Refresh(view.data)
-    end)
-    b:SetPoint("TOPLEFT", x, -3)
-    ns.UI.Tip(b, label, tipText)
-    x = x + width + 2
-    return b
-  end
-  view.online = toggle("online", "Conectados", 86, "Solo lo de quien está conectado ahora.")
-  view.rush = toggle("rush", "Con prisa", 74, "Solo los pedidos que corren prisa.")
-  view.mats = toggle("onlyMats", "SOLO MATERIALES", M.BODY_W - x,
-    "Solo materiales (minerales, hierbas, cueros, telas...).")
+  x = x + 170
+  view.onlyMine = W.Check(view, "Ver solo lo que puedo hacer", function(on)
+    settings().onlyMine = on or nil
+    view:Refresh(view.data)
+  end)
+  view.onlyMine:SetPoint("TOPLEFT", x, -2)
+  view.onlyMine.label:SetFontObject("GameFontHighlight")
+  ns.UI.Tip(view.onlyMine, "Ver solo lo que puedo hacer", "Lo que sabes fabricar o recolectar y lo que ya tienes en tus bolsas.")
 
-  -- Ver: Todo / Lo que piden / Lo que ofrecen
-  local label = W.Text(view, "GameFontNormalSmall")
-  label:SetPoint("TOPLEFT", 2, -36)
-  label:SetText("Ver:")
-  view.sides = {}
-  local sx = 30
-  for i, s in ipairs(VIEW_SIDE) do
-    local w = i == 1 and 70 or 116
-    local b = W.Chip(view, s.label, w, function()
-      state.side = s.id
+  -- Fila 2: el tipo de cosa.
+  view.cats = {}
+  local cx = 0
+  for i, c in ipairs(CATS) do
+    local b = W.Chip(view, c.label, c.width, function()
+      settings().cat = c.id
       view:Refresh(view.data)
     end)
-    b:SetPoint("TOPLEFT", sx, -31)
-    sx = sx + w + 2
-    view.sides[i] = b
+    b:SetPoint("TOPLEFT", cx, -31)
+    if c.id then ns.UI.Tip(b, c.label, CAT_TIPS[c.id]) end
+    cx = cx + c.width + 4
+    view.cats[i] = b
   end
   view.count = W.Text(view, "GameFontHighlightSmall", "RIGHT")
   view.count:SetPoint("TOPRIGHT", -4, -36)
@@ -279,6 +262,7 @@ ns.UI.MarketView("board", function(view, M)
       row.icon:SetPoint("LEFT", 8, 0)
       row.qty = row:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
       row.qty:SetPoint("BOTTOMRIGHT", row.icon, "BOTTOMRIGHT", -1, 1)
+      -- Etiqueta (solo HERMANDAD o BLIZZARD), delante del nombre.
       row.tag = CreateFrame("Frame", nil, row)
       row.tag:SetSize(70, 15)
       row.tag:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 0)
@@ -288,20 +272,19 @@ ns.UI.MarketView("board", function(view, M)
       row.tag.text:SetPoint("CENTER", 0, 0)
       row.tag.text:SetTextColor(0.08, 0.06, 0.04)
       row.title = W.ListText(row, "GameFontHighlight")
-      row.title:SetPoint("LEFT", row.tag, "RIGHT", 6, 0)
-      row.title:SetWidth(270)
+      row.title:SetWidth(330)
       row.title:SetWordWrap(false)
       row.sub = W.ListText(row, "GameFontHighlightSmall")
-      row.sub:SetPoint("TOPLEFT", row.tag, "BOTTOMLEFT", 0, -6)
-      row.sub:SetWidth(330)
+      row.sub:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, -21)
+      row.sub:SetWidth(360)
       row.sub:SetWordWrap(false)
       row.hint = W.ListText(row, "GameFontHighlightSmall")
       row.hint:SetPoint("TOPLEFT", row, "TOPLEFT", 440, -9)
-      row.hint:SetWidth(180)
+      row.hint:SetWidth(190)
       row.hint:SetWordWrap(false)
       row.money = W.ListText(row, "GameFontNormalSmall")
       row.money:SetPoint("TOPLEFT", row.hint, "BOTTOMLEFT", 0, -5)
-      row.money:SetWidth(180)
+      row.money:SetWidth(190)
       row.money:SetWordWrap(false)
       row.button = W.Button(row, "", 122, 28)
       row.button:SetPoint("RIGHT", -8, 0)
@@ -314,11 +297,19 @@ ns.UI.MarketView("board", function(view, M)
       row.icon:SetTexture(icon)
       local q = qtyOf(it)
       row.qty:SetText(q and q > 1 and tostring(q) or "")
-      local tag = TAG[it.kind] or TAG.req
-      row.tag.bg:SetColorTexture(tag[2], tag[3], tag[4], 0.95)
-      row.tag.text:SetText(tag[1])
-      row.tag:SetWidth((row.tag.text:GetStringWidth() or 40) + 10)
-      row.title:SetText(ns.KeyLabel(it.k))
+      local tag = TAG[it.kind]
+      row.title:ClearAllPoints()
+      if tag then
+        row.tag.bg:SetColorTexture(tag[2], tag[3], tag[4], 0.95)
+        row.tag.text:SetText(tag[1])
+        row.tag:SetWidth((row.tag.text:GetStringWidth() or 40) + 10)
+        row.tag:Show()
+        row.title:SetPoint("LEFT", row.tag, "RIGHT", 6, 0)
+      else
+        row.tag:Hide()
+        row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 0)
+      end
+      row.title:SetText(noBrackets(ns.KeyLabel(it.k)))
       row.sub:SetText(subText(it, now))
       local label, color, can, fn, hint, gold = action(it)
       row.hint:SetText(hint or "")
@@ -357,10 +348,9 @@ ns.UI.MarketView("board", function(view, M)
   local function passes(it, m, on, everything)
     if it.mine then return false end
     if it.kind == "req" and it.pending > 0 then return false end -- lo hago yo: Mis encargos
-    if state.side and sideOf(it) ~= state.side then return false end
-    if m.rush and not (it.r and it.r.pr) then return false end
-    if m.onlyMats and ns.UI.ItemCategory(it.k) ~= "mats" then return false end
-    if m.online and not ns.Guild.IsOnline(it.author) then return false end
+    if it.kind ~= "req" and it.kind ~= "need" and it.kind ~= "co" then return false end
+    if m.onlyMine and not it.gold then return false end
+    if m.cat and catOf(it.k) ~= m.cat then return false end
     if state.search ~= "" then
       local text = (ns.KeyName(it.k) .. " " .. ns.DisplayName(it.author)):lower()
       if not text:find(state.search, 1, true) then return false end
@@ -389,10 +379,8 @@ ns.UI.MarketView("board", function(view, M)
       b.ring:SetShown(on[b.pk] == true)
     end
     view.all:SetOn(everything)
-    view.online:SetOn(m.online == true)
-    view.rush:SetOn(m.rush == true)
-    view.mats:SetOn(m.onlyMats == true)
-    for i, s in ipairs(VIEW_SIDE) do view.sides[i]:SetOn(state.side == s.id) end
+    view.onlyMine:SetChecked(m.onlyMine == true)
+    for i, c in ipairs(CATS) do view.cats[i]:SetOn(m.cat == c.id) end
 
     local items, hidden = {}, 0
     for _, it in ipairs(data.items) do
@@ -440,9 +428,9 @@ ns.UI.MarketView("board", function(view, M)
     end
   end
 
-  -- Desde Inicio y los avisos (nombres de la 0.34).
-  function view:SetQuick(chip, side)
-    state.side = (side == "offer" or side == "want") and side or nil
+  -- Desde Inicio: «craft» = ver solo lo que puedo hacer.
+  function view:SetQuick(chip)
+    if chip == "craft" then settings().onlyMine = true end
   end
 
   function view:Select(id)

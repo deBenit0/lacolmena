@@ -46,25 +46,17 @@ function Mail.RegisterDelivery(to, items, how)
       ns.DisplayName(r.a), Data.DeliveredOf(cm), cm.n, ns.KeyLabel(r.k), how)
     ns.Sync.PushRequest(r.id, "high")
   end
-  local offered = 0
-  local offeredList = ns.Offers.RegisterMail(to, items, now)
-  for _, d in ipairs(offeredList) do
-    offered = offered + 1
-    ns.Print("apuntado en tu oferta: %dx %s entregadas a %s %s.", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.who), how)
-  end
   local donated = ns.Social.RegisterMail(to, items, now)
   for _, d in ipairs(donated) do
     ns.Print("aportación apuntada: %dx %s para la hermandad (a %s). ¡Gracias!", d.n, ns.KeyLabel("i" .. d.id), ns.DisplayName(d.owner))
   end
   -- Mis estadísticas.
   ns.Extras.AddStat("delivered", #changed)
-  ns.Extras.AddStat("offers", offered)
   ns.Extras.AddStat("donated", #donated)
   for _, r in ipairs(changed) do ns.Extras.CountTip(r) end
-  local total = #changed + offered + #donated
+  local total = #changed + #donated
   local helpIds = {}
   for _, r in ipairs(changed) do helpIds[#helpIds + 1] = "r:" .. r.id end
-  for _, d in ipairs(offeredList) do helpIds[#helpIds + 1] = "o:" .. d.id .. ":" .. d.who end
   for _, d in ipairs(donated) do helpIds[#helpIds + 1] = "n:" .. d.owner .. ":" .. d.id end
   ns.Social.AddHelps(helpIds)
   if #changed > 0 then ns.Fire("DATA_CHANGED", "mail") end
@@ -237,19 +229,6 @@ end)
 ns.On("MAIL_SEND_SUCCESS", Mail.OnSent)
 ns.On("MAIL_FAILED", function() pending = nil end)
 ns.On("MAIL_CLOSED", function() pending = nil end)
-
--- Lo mismo para una oferta mía: destinatario, asunto y, si tiene precio, contra reembolso.
-function Mail.PrepareOffer(who, id, amount, price)
-  if not Mail.CanPrepare() then return false end
-  if MailFrameTab_OnClick then pcall(MailFrameTab_OnClick, nil, 2) end
-  SendMailNameEditBox:SetText(ns.TellName(who) or ns.ShortName(who))
-  if SendMailSubjectEditBox then
-    SendMailSubjectEditBox:SetText(string.format("%dx %s", amount, ns.KeyName("i" .. id)))
-  end
-  Mail.SetPendingCOD(who, (price or 0) * amount)
-  ns.Print("pon %dx %s en el correo y envíalo: se apuntará solo.", amount, ns.KeyLabel("i" .. id))
-  return true
-end
 
 -- Donar a una necesidad de la hermandad: destinatario (el oficial) y asunto.
 function Mail.PrepareNeed(owner, id, amount)

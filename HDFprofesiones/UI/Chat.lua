@@ -76,10 +76,20 @@ ns.UI.RegisterPage("chat", function(f)
 
   local box = W.Box(f, 788, 382)
   box:SetPoint("TOPLEFT", 0, 0)
+  -- Arriba a la derecha, en gris: que se puede subir con la rueda.
+  local wheel = W.Text(box, "GameFontDisableSmall")
+  wheel:SetPoint("TOPRIGHT", -10, -6)
+  wheel:SetText("rueda del ratón para ver más")
   local messages = CreateFrame("ScrollingMessageFrame", nil, box)
-  messages:SetPoint("TOPLEFT", 10, -8)
-  messages:SetPoint("BOTTOMRIGHT", -10, 8)
   messages:SetFontObject(ChatFontNormal or GameFontHighlight)
+  -- Alto justo para líneas enteras: si no, la de arriba sale cortada por la mitad.
+  local _, fontH = messages:GetFont()
+  local lineH = (tonumber(fontH) or 14) + ((messages.GetSpacing and messages:GetSpacing()) or 0)
+  if lineH < 8 then lineH = 14 end
+  local lines = math.floor((382 - 22 - 8) / lineH)
+  messages:SetPoint("BOTTOMLEFT", 10, 8)
+  messages:SetPoint("BOTTOMRIGHT", -10, 8)
+  messages:SetHeight(lines * lineH)
   messages:SetJustifyH("LEFT")
   messages:SetFading(false)
   messages:SetMaxLines(KEEP + 20)

@@ -1,7 +1,8 @@
--- Página "Mercado" (0.35): cuatro pestañas y dos botones para crear.
---   TABLÓN (lo de todos) · MIS PEDIDOS (lo que pides) · MIS ENCARGOS (lo que haces para otros)
---   · MIS OFERTAS (lo que ofreces), y a la derecha «+ PEDIR» (verde) y «+ OFRECER» (azul).
--- Cada pestaña está en su archivo (MarketBoard, MarketMine, MarketJobs, MarketOffers) y se
+-- Página "Mercado": tres pestañas y un botón para pedir. Aquí no se ofrece nada: la gente
+-- pide y quien puede hacerlo acepta el encargo.
+--   TABLÓN (lo de todos) · MIS PEDIDOS (lo que pides) · MIS ENCARGOS (lo que haces para otros),
+--   y a la derecha «+ PEDIR» (verde).
+-- Cada pestaña está en su archivo (MarketBoard, MarketMine, MarketJobs) y se
 -- registra con ns.UI.MarketView(id, build): build(view, M) monta su contenido en "view" y
 -- define view:Refresh(data) y, si quiere, view:Select(id).
 local _, ns = ...
@@ -14,13 +15,11 @@ M.BODY_W, M.BODY_H = ns.UI.CONTENT_W, ns.UI.CONTENT_H - M.HEADER_H
 
 M.VIEWS = {
   { id = "board", label = "TABLÓN", width = 116,
-    tip = "Lo que pide y ofrece la hermandad. El número: lo que tú puedes hacer o dar." },
+    tip = "Lo que pide la hermandad. El número: lo que tú puedes hacer o dar." },
   { id = "mine", label = "MIS PEDIDOS", width = 132,
     tip = "Lo que has pedido tú. El número: lo que espera algo de ti (te lo han enviado o caduca)." },
   { id = "jobs", label = "MIS ENCARGOS", width = 140,
     tip = "Lo que te has encargado de hacer para otros. El número: lo que te queda por enviar." },
-  { id = "offers", label = "MIS OFERTAS", width = 132,
-    tip = "Lo que ofreces tú. El número: lo que alguien quiere y tienes que mandarle." },
 }
 
 local builders = {}
@@ -69,7 +68,7 @@ end
 -- Lo que espera algo de mí en cada pestaña. En Mis pedidos cuentan también los ya completos
 -- por correo que aún no he dado por recibidos.
 function M.Counts(items, stats, now)
-  local c = { board = stats and stats.servable or 0, mine = 0, jobs = 0, offers = 0 }
+  local c = { board = stats and stats.servable or 0, mine = 0, jobs = 0 }
   local g, me = ns.G(), ns.Me()
   for _, r in pairs(g and g.requests or {}) do
     if r.a == me and not r.x then
@@ -82,8 +81,6 @@ function M.Counts(items, stats, now)
       -- (contados arriba)
     elseif it.kind == "req" and it.pending > 0 then
       c.jobs = c.jobs + 1
-    elseif it.kind == "offer" and it.mine and it.pending > 0 then
-      c.offers = c.offers + 1
     end
   end
   return c
@@ -220,7 +217,7 @@ function M.CardList(view, top, fill, emptyText, emptyButton)
 end
 
 -- «Anunciar» en el chat de hermandad: queda escrito y lo envía el jugador con Intro (el juego
--- bloquea a veces lo que manda el addon). kind: "request", "offer" o "need".
+-- bloquea a veces lo que manda el addon). kind: "request" o "need".
 function M.Announce(kind, obj)
   local m = ns.Extras.AnnounceMacro(kind, obj)
   if m then W.ChatCommand(m, "anunciarlo en el chat de hermandad") else ns.Print("no estás en ninguna hermandad.") end
@@ -236,7 +233,7 @@ end
 
 -- Para las pestañas de la ventana y la tira pequeña.
 function ns.UI.MarketCounts()
-  if not ns.G() or not ns.UI.MarketCollect then return { board = 0, mine = 0, jobs = 0, offers = 0 } end
+  if not ns.G() or not ns.UI.MarketCollect then return { board = 0, mine = 0, jobs = 0 } end
   local g = ns.G()
   local items, stats = ns.UI.MarketCollect(g.boardSeen)
   return M.Counts(items, stats, ns.Now())
@@ -257,7 +254,7 @@ ns.UI.RegisterPage("market", function(page)
     x = x + v.width + 6
   end
 
-  -- Arrastrar un objeto a «+ PEDIR» o «+ OFRECER» lo deja ya elegido.
+  -- Arrastrar un objeto a «+ PEDIR» lo deja ya elegido.
   local function cursorItem()
     if not GetCursorInfo then return nil end
     local kind, id = GetCursorInfo()
@@ -266,26 +263,16 @@ ns.UI.RegisterPage("market", function(page)
       return tonumber(id)
     end
   end
-  page.addOffer = W.Tint(W.Button(page, "+ OFRECER", 124, 28, function()
-    local id = cursorItem()
-    if id then ns.UI.OpenOfferDialog(id) else ns.UI.OpenOffer() end
-  end), W.BLUE)
-  page.addOffer:SetPoint("TOPRIGHT", 0, -2)
-  page.addOffer:SetScript("OnReceiveDrag", function()
-    local id = cursorItem()
-    if id then ns.UI.OpenOfferDialog(id) end
-  end)
-  page.addAsk = W.Tint(W.Button(page, "+ PEDIR", 124, 28, function()
+  page.addAsk = W.Tint(W.Button(page, "+ PEDIR", 150, 28, function()
     local id = cursorItem()
     if id then ns.UI.AskFor("i" .. id) else ns.UI.OpenAsk("ask") end
   end), W.GREEN)
-  page.addAsk:SetPoint("RIGHT", page.addOffer, "LEFT", -6, 0)
+  page.addAsk:SetPoint("TOPRIGHT", 0, -2)
   page.addAsk:SetScript("OnReceiveDrag", function()
     local id = cursorItem()
     if id then ns.UI.AskFor("i" .. id) end
   end)
   ns.UI.Tip(page.addAsk, "+ PEDIR", "Pide algo a la hermandad: búscalo, o arrastra aquí un objeto.")
-  ns.UI.Tip(page.addOffer, "+ OFRECER", "Ofrece algo de tus bolsas, o fabricar algo de tus recetas.")
 
   -- Cuerpo: una vista por pestaña.
   for _, v in ipairs(M.VIEWS) do
@@ -332,13 +319,13 @@ ns.UI.RegisterPage("market", function(page)
 
   -- Desde Inicio, los avisos y otras páginas (nombres de la 0.34).
   --   chip: "craft" (lo que puedes hacer) · "mine" (lo tuyo) · "involved" (lo que haces)
-  --   side: "offer" (ofertas) o "want"
+  --   side: ya no se usa (era para las ofertas)
   function page:SetChip(chip, side)
     local id = "board"
     if chip == "involved" then
       id = "jobs"
     elseif chip == "mine" then
-      id = side == "offer" and "offers" or "mine"
+      id = "mine"
     end
     local view = page.views[id]
     if id == "board" and view and view.SetQuick then view:SetQuick(chip, side) end
@@ -354,9 +341,6 @@ ns.UI.RegisterPage("market", function(page)
       view = "mine"
     elseif r and r.c and r.c[me] then
       view = "jobs"
-    elseif type(id) == "string" and id:sub(1, 2) == "o:" then
-      local owner = ns.Offers and ns.Offers.ParseKey(id:sub(3))
-      if owner == me then view = "offers" end
     end
     page:SetView(view)
     local f = page.views[view]

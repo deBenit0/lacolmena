@@ -1,4 +1,4 @@
--- Modo demostración: jugadores de mentira (3 o 4 por profesión) que ofrecen recetas y hacen
+-- Modo demostración: jugadores de mentira (3 o 4 por profesión) que saben recetas y hacen
 -- peticiones, para ver cómo queda el addon. Solo se ven en tu ordenador: nunca se envían.
 local _, ns = ...
 local Codec, Data = ns.Codec, ns.Data
@@ -122,26 +122,6 @@ local function addMyRequests(g, now)
   return made
 end
 
--- Ofertas de ejemplo: { quien, objeto, cuántos, precio por unidad }.
-local OFFERS = {
-  { "Tula", 4240, 4, 0 },        -- Bolsa de lana, gratis
-  { "Lys", 14046, 2, 50000 },    -- Bolsa de paño rúnico, 5 oro
-  { "Ivette", 929, 10, 0 },      -- Poción de sanación
-  { "Mortis", 13446, 5, 10000 }, -- Poción de sanación sublime, 1 oro
-  { "Pepa", 13931, 20, 0 },      -- Comida
-  { "Gerda", 12404, 10, 5000 },  -- Piedra de afilar densa
-}
-
-function Demo.AddOffers(g, now)
-  for i, o in ipairs(OFFERS) do
-    local e = g.entries[full(o[1])]
-    if e then
-      e.of = e.of or {}
-      e.of[o[2]] = { q = o[3], g = o[4] > 0 and o[4] or nil, t = now - i * 1500 }
-    end
-  end
-end
-
 -- Quedadas de mazmorra de ejemplo: una tuya (para probar "Hacer grupo") y otra de Bruno.
 function Demo.AddRuns(g, now)
   local D = ns.Dungeons
@@ -201,27 +181,6 @@ function Demo.AddGuild(g, now)
     if e then e.wk = { w = week, n = h[1], pn = h[2] } end
   end
   S.Invalidate()
-end
-
--- Has pedido algo de una oferta de ejemplo: te lo "manda" a los pocos segundos.
-function Demo.OnClaim(owner, id, q)
-  local me = ns.Me()
-  ns.After(2, function() say(owner, "¡Es tuyo! Te lo mando ahora por correo.") end)
-  ns.After(4, function()
-    local g = ns.G()
-    local e = g and g.entries[owner]
-    if not ns.db.settings.demo or not e then return end
-    e.od = e.od or {}
-    e.od[me] = e.od[me] or {}
-    local d = e.od[me][id] or { n = 0 }
-    d.n, d.t = d.n + q, ns.Now()
-    e.od[me][id] = d
-    if e.of and e.of[id] then
-      e.of[id].q = e.of[id].q - q
-      if e.of[id].q <= 0 then e.of[id] = nil end
-    end
-    ns.Fire("DATA_CHANGED", "entry", owner)
-  end)
 end
 
 -- Has aceptado una petición de ejemplo.
@@ -298,11 +257,6 @@ local function buildEntry(name, pk, recipes, now, index)
     tree == 2 and 31 or 0, tree == 3 and 31 or 0 }) or nil
   return {
     n = full(name), v = now, c = class, l = 60, demo = true, ro = role,
-    -- Algunos ofrecen fabricar sus primeras recetas (varios la misma: salen juntos).
-    fb = (index % 2 == 0 and items[1]) and {
-      ["i" .. items[1]] = { g = (index % 4 == 0) and 10000 or nil, m = (index % 3 == 0) and 1 or nil, t = now - index * 3600 },
-      [items[2] and ("i" .. items[2]) or ("i" .. items[1])] = { t = now - index * 7200 },
-    } or nil,
     u = (index % 7 == 3) or nil,
     p = { [pk] = {
       r = 300 - (index % 3) * 15, m = 300,
@@ -359,7 +313,6 @@ function Demo.Enable()
   end
   Demo.mine = addMyRequests(g, now)
   Demo.AddRuns(g, now)
-  Demo.AddOffers(g, now)
   Demo.AddGuild(g, now)
   Data.indexDirty = true
   ns.Fire("DATA_CHANGED", "demo")

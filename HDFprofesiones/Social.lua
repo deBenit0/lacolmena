@@ -66,7 +66,7 @@ function Social.SanitizeInto(out, e)
     local dn, any = {}, false
     for k, d in pairs(e.dn) do
       local n = type(d) == "table" and tonumber(d.n)
-      if type(k) == "string" and ns.Offers.ParseKey(k) and n and n >= 1 then
+      if type(k) == "string" and k:match("^.+:%d+$") and n and n >= 1 then
         dn[k] = { n = floor(n), t = tonumber(d.t) or 0, nt = tonumber(d.nt) }
         any = true
       end
@@ -153,7 +153,6 @@ function Social.BuildInto(e, now)
   end
   e.mc = times(c.mc, ns.Data.REQUEST_TTL * 2)
   e.mp = times(c.mp, ns.Data.REQUEST_TTL * 2)
-  e.mo = times(c.mo, ns.Offers.CRAFT_TTL * 2)
   local nd
   for id, need in pairs(c.needs) do
     if now - need.t <= Social.NEED_TTL then
@@ -259,12 +258,6 @@ ns.Listen("ROSTER_UPDATED", Social.Invalidate)
 
 function Social.IsModClosed(id) return officerData().mc[id] end
 function Social.IsPriority(id) return officerData().mp[id] ~= nil end
--- ¿Un oficial ha quitado esta oferta? Solo si la quitó después de ponerla: si el dueño la vuelve
--- a poner, sale otra vez.
-function Social.IsOfferRemoved(k, t)
-  local at = officerData().mo[k]
-  return at ~= nil and at >= (t or 0)
-end
 function Social.Announcement() return officerData().announcements[1] end
 
 -- Acciones de oficial.
@@ -286,15 +279,6 @@ end
 function Social.ModClose(id, now)
   if not Social.AmOfficer() then return nil, "Solo los oficiales pueden cerrar pedidos de otros." end
   mine().mc[id] = now
-  publish()
-  return true
-end
-
--- Quitar una oferta de otro: k = Offers.Key(dueño, objeto) para «de sus bolsas» o
--- "Dueño-Reino:i123" para «ofrece fabricarlo».
-function Social.ModRemoveOffer(k, now)
-  if not Social.AmOfficer() then return nil, "Solo los oficiales pueden quitar ofertas de otros." end
-  mine().mo[k] = now
   publish()
   return true
 end
