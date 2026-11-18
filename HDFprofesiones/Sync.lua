@@ -564,8 +564,8 @@ function Sync.CreateRequest(opts)
   return r, err
 end
 
-function Sync.Commit(id, when)
-  local r, err = afterRequestAction(Data.Commit(id, when, ns.Now()))
+function Sync.Commit(id, when, n)
+  local r, err = afterRequestAction(Data.Commit(id, when, ns.Now(), n))
   if r and r.demo and ns.Demo then ns.Demo.OnCommit(r) end
   return r, err
 end

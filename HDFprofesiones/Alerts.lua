@@ -272,27 +272,31 @@ function Alerts.OnRequestUpdated(old, new, retry)
 
   -- Alguien acepta una de mis peticiones.
   if new.a == me and old then
-    local owner, cm = Data.OwnerOf(new, now)
-    local before = Data.OwnerOf(old, now)
-    if owner and owner ~= before then
-      local w = cm.w and Data.WHEN[cm.w]
-      Alerts.Push({
-        id = new.id, icon = icon, type = "accepted",
-        text = string.format("%s te hace %dx %s%s", ns.DisplayName(owner), new.q, ns.KeyLabel(new.k),
-          w and (" (" .. w.label:gsub("^Lo hago ", ""):lower() .. ")") or ""),
-      })
+    local was = {}
+    for _, o in ipairs(Data.OwnersOf(old, now)) do was[o.name] = true end
+    for _, o in ipairs(Data.OwnersOf(new, now)) do
+      if not was[o.name] then
+        local cm = o.cm
+        local w = cm.w and Data.WHEN[cm.w]
+        Alerts.Push({
+          id = new.id, icon = icon, type = "accepted",
+          text = string.format("%s te hace %dx %s%s", ns.DisplayName(o.name), cm.n - Data.DeliveredOf(cm),
+            ns.KeyLabel(new.k), w and (" (" .. w.label:gsub("^Lo hago ", ""):lower() .. ")") or ""),
+        })
+      end
     end
   end
 
-  -- Mi encargado pide más tiempo.
+  -- Uno de mis encargados pide más tiempo.
   if new.a == me and old then
-    local owner, cm = Data.OwnerOf(new, now)
-    local before = owner and old.c and old.c[owner]
-    if owner and cm.ex and before and not before.ex and before.n then
-      local w = cm.w and Data.WHEN[cm.w]
-      Alerts.Push({ id = new.id, icon = icon, type = "accepted",
-        text = string.format("%s necesita más tiempo para %s%s", ns.DisplayName(owner), ns.KeyLabel(new.k),
-          w and (": " .. w.label:gsub("^Lo hago ", ""):lower()) or "") })
+    for _, o in ipairs(Data.OwnersOf(new, now)) do
+      local cm, before = o.cm, old.c and old.c[o.name]
+      if cm.ex and before and not before.ex and before.n then
+        local w = cm.w and Data.WHEN[cm.w]
+        Alerts.Push({ id = new.id, icon = icon, type = "accepted",
+          text = string.format("%s necesita más tiempo para %s%s", ns.DisplayName(o.name), ns.KeyLabel(new.k),
+            w and (": " .. w.label:gsub("^Lo hago ", ""):lower()) or "") })
+      end
     end
   end
 
@@ -306,8 +310,10 @@ function Alerts.OnRequestUpdated(old, new, retry)
   -- Lo acepté a la vez que otro y él lo hizo antes: me quedo sin él.
   if new.a ~= me and old and new.c and new.c[me] then
     local mineBefore = old.c and old.c[me] and Data.CommitActive(old.c[me], now, old)
+    local cm = new.c[me]
+    local stillOpen = not cm.rl and cm.n and Data.DeliveredOf(cm) < cm.n -- ni lo solté ni lo entregué
     local owner = Data.OwnerOf(new, now)
-    if mineBefore and owner and owner ~= me then
+    if mineBefore and stillOpen and not Data.CommitActive(cm, now, new) and owner and owner ~= me then
       Alerts.Push({ id = new.id, icon = icon,
         text = string.format("%s aceptó antes que tú: %s", ns.DisplayName(owner), ns.KeyLabel(new.k)) })
     end
