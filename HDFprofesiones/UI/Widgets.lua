@@ -1007,7 +1007,7 @@ end
 -- Clase de un jugador de la hermandad (de su ficha o de la lista de la hermandad).
 function ns.ClassOf(name)
   local g = ns.G()
-  local e = g and g.entries[name]
+  local e = g and ns.Data.EntryFor(name)
   if e and e.c then return e.c end
   local info = ns.Guild and ns.Guild.Info(name)
   return info and info.class

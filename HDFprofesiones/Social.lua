@@ -467,7 +467,7 @@ function Social.Inactive(now)
     if not info.online and seen and now - seen > Social.INACTIVE_DAYS * 86400 then
       list[#list + 1] = { name = name, days = floor((now - seen) / 86400) }
     end
-    if g and not g.entries[name] then noAddon[#noAddon + 1] = name end
+    if g and not ns.Data.EntryFor(name) then noAddon[#noAddon + 1] = name end
   end
   table.sort(list, function(a, b) return a.days > b.days end)
   table.sort(noAddon)

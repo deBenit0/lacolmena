@@ -282,7 +282,7 @@ ns.UI.RegisterPage("members", function(page)
       -- Dos con el mismo nombre de pila: el addon aún guarda sus datos juntos, así que no se
       -- enseñan (serían de uno de los dos, sin saber de cuál).
       local twin = ns.Guild.dupes and ns.Guild.dupes[name]
-      local e = not twin and g and g.entries[name] or nil
+      local e = not twin and g and ns.Data.EntryFor(name) or nil
       local addon, addonState = addonText(e)
       if twin then addon, addonState = "|cffff9933\194\183 Nombre repetido|r", 0 end
       local display = displayName(name, info)
